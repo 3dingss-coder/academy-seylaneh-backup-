@@ -277,7 +277,7 @@ export function CompletionReport({
       </Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-text-secondary">
-          {toPersianDigits(people.length)} نفر · {toPersianDigits(filtered.length)} آموزش
+          {toPersianDigits(people.length)} نفر · {toPersianDigits(filtered.length)} ردیف آموزش
         </p>
         <div className="flex gap-2">
           {any && (

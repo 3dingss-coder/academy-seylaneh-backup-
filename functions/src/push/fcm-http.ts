@@ -142,6 +142,9 @@ export class FcmHttpPushSender implements PushSender {
         data: msg.data ?? {},
         android: { priority: 'HIGH' },
         webpush: {
+          // Without Urgency the push service treats it as "normal" and a sleeping Android phone
+          // (Doze / battery saver) can hold it back; TTL keeps it deliverable for a day.
+          headers: { Urgency: 'high', TTL: '86400' },
           notification: {
             icon: '/push-icons/push-icon-192.png',
             dir: 'rtl',

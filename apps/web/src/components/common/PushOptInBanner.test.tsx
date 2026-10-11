@@ -49,22 +49,15 @@ describe('PushOptInBanner', () => {
     }
   });
 
-  it('snoozes for one day when dismissed, then asks again every day until allowed', () => {
-    vi.useFakeTimers();
-    try {
-      const r = renderBanner();
-      fireEvent.click(screen.getByRole('button', { name: 'بعداً' }));
-      expect(screen.queryByRole('region')).toBeNull();
-      r.unmount();
+  it('hides on ✕ only for this visit and asks again on the next entry', () => {
+    const r = renderBanner();
+    fireEvent.click(screen.getByRole('button', { name: 'بعداً' }));
+    expect(screen.queryByRole('region')).toBeNull();
+    r.unmount();
 
-      renderBanner();
-      expect(screen.queryByRole('region')).toBeNull(); // still the same day
-
-      vi.setSystemTime(Date.now() + 25 * 3600_000); // next day, app resumed
-      fireEvent(document, new Event('visibilitychange'));
-      expect(screen.queryByRole('region')).not.toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
+    // Next entry / reload: no remembered dismissal.
+    renderBanner();
+    expect(screen.queryByRole('region')).not.toBeNull();
+    expect(localStorage.getItem('push-optin-snoozed-until')).toBeNull();
   });
 });

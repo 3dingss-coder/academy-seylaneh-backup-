@@ -53,6 +53,7 @@ describe('FcmHttpPushSender', () => {
     if (!sendCall) throw new Error('no FCM send call');
     const first = JSON.parse(sendCall.body);
     expect(first.message.webpush.fcm_options.link).toBe('https://academy-seylaneh.site/messages');
+    expect(first.message.webpush.headers).toEqual({ Urgency: 'high', TTL: '86400' });
     expect(sendCall.auth).toBe('Bearer ya29.test');
     expect(calls.some((c) => c.url.includes('/v1/projects/proj-1/messages:send'))).toBe(true);
   });

@@ -41,3 +41,30 @@ self.addEventListener('notificationclick', (event) => {
     }),
   );
 });
+
+/* Update delivery. Pages opened from an OLD cached build have no code to reload themselves, so the
+ * new worker does it: it takes over (skipWaiting + clientsClaim in the Workbox config) and then
+ * navigates every open window to its own URL, which loads the fresh build. `registration.active`
+ * is only set while installing when a previous worker exists, i.e. this is an update — the very
+ * first install never reloads the page. */
+let isUpdate = false;
+self.addEventListener('install', () => {
+  isUpdate = !!self.registration.active;
+});
+self.addEventListener('activate', (event) => {
+  if (!isUpdate) return;
+  event.waitUntil(
+    self.clients
+      .claim()
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then((wins) =>
+        Promise.all(
+          wins.map((w) =>
+            'navigate' in w && new URL(w.url).origin === self.location.origin
+              ? w.navigate(w.url).catch(() => undefined)
+              : undefined,
+          ),
+        ),
+      ),
+  );
+});

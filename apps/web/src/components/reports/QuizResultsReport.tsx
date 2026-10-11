@@ -20,7 +20,7 @@ import { fromZonedInput } from '@/lib/dates';
 import { toPersianDigits } from '@/lib/digits';
 import { faDate, faDateTime, faNumber, faPercent } from '@/lib/format';
 import { track } from '@/lib/telemetry';
-import { groupByPerson, personKey, type PersonGroup } from '@/lib/people';
+import { personKey } from '@/lib/people';
 import type { QuizAttemptRow, QuizReport, QuizSummaryRow } from '@/lib/types';
 
 type Filter =
@@ -39,9 +39,6 @@ const durationFa = (sec: number | null) => {
     ? `${toPersianDigits(m)} دقیقه و ${toPersianDigits(s)} ثانیه`
     : `${toPersianDigits(s)} ثانیه`;
 };
-const resultLabel = (r: Pick<QuizSummaryRow, 'passed' | 'attempts' | 'passedAtAttempt'>) =>
-  r.passed ? `قبول (تلاش ${toPersianDigits(r.passedAtAttempt ?? r.attempts)})` : 'مردود';
-
 /**
  * گزارش نتایج آزمون — برای هر کاربر: تعداد دفعات آزمون، پاسخ درست و غلط، نمره و قبولی.
  * دو نما: «خلاصه هر کاربر» (یک ردیف برای هر کاربر و آزمون) و «همه تلاش‌ها» (یک ردیف برای هر تلاش).
@@ -142,7 +139,7 @@ export function QuizResultsReport({
   }, [data, sp]);
 
   const kpis = useMemo(() => {
-    const learners = new Set(summary.map((r) => personKey(r.userName) || r.userName)).size;
+    const learners = new Set(summary.map((r) => r.userId)).size;
     const passedQuizzes = summary.filter((r) => r.passed).length;
     const scores = attempts.map((a) => a.score).filter((x): x is number => x !== null);
     const first = attempts.filter((a) => a.attemptNumber === 1);
@@ -158,11 +155,19 @@ export function QuizResultsReport({
     };
   }, [summary, attempts]);
 
-  // One row per person: learners that share a name (different numbers) are merged.
-  const people: Array<PersonGroup<QuizSummaryRow>> = useMemo(
-    () => groupByPerson(summary, (r) => ({ name: r.userName, phone: r.phone })),
-    [summary],
-  );
+  // One row per account (name + phone): a name repeats only when the number differs.
+  const accounts = useMemo(() => {
+    const m = new Map<string, QuizSummaryRow[]>();
+    for (const r of summary) {
+      const l = m.get(r.userId);
+      if (l) l.push(r);
+      else m.set(r.userId, [r]);
+    }
+    return [...m.values()].flatMap((rows) => {
+      const first = rows[0];
+      return first ? [{ id: first.userId, first, rows }] : [];
+    });
+  }, [summary]);
 
   const summaryColumns: ExcelColumn[] = [
     { header: 'نام بازاریاب', key: 'userName', width: 22 },
@@ -426,29 +431,23 @@ export function QuizResultsReport({
         ) : (
           <DataTable
             caption="خلاصه نتایج آزمون هر کاربر"
-            rows={people}
-            rowKey={(g) => g.key}
-            onRowClick={(g) => nav(memberLink(g.first.userId))}
+            rows={accounts}
+            rowKey={(a) => a.id}
+            onRowClick={(a) => nav(memberLink(a.id))}
             columns={[
               {
                 key: 'u',
                 header: 'نام',
-                sortValue: (g) => g.name,
-                cell: (g) => (
+                sortValue: (a) => a.first.userName,
+                cell: (a) => (
                   <div>
-                    <span className="font-bold">{g.name}</span>
-                    {g.phones.map((p) => (
+                    <span className="font-bold">{a.first.userName}</span>
+                    {a.first.phone && (
                       <span
-                        key={p}
                         dir="ltr"
                         className="block text-start text-[11px] leading-5 text-text-secondary"
                       >
-                        {toPersianDigits(p)}
-                      </span>
-                    ))}
-                    {g.rows[0]?.city && (
-                      <span className="block text-xs text-text-secondary">
-                        {g.rows[0].province} • {g.rows[0].city}
+                        {toPersianDigits(a.first.phone)}
                       </span>
                     )}
                   </div>
@@ -456,54 +455,59 @@ export function QuizResultsReport({
               },
               {
                 key: 'q',
-                header: 'آزمون‌ها و نتیجه',
-                sortValue: (g) => g.rows.length,
-                cell: (g) => (
-                  <ul className="flex min-w-72 flex-col gap-3">
-                    {g.rows.map((r) => (
-                      <li key={`${r.userId}-${r.quizId}`} className="flex flex-col gap-0.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <span>
-                            {r.packageTitle}
-                            <span className="block text-xs text-text-secondary">
-                              {r.sectionTitle}
-                            </span>
-                          </span>
-                          {r.passed ? (
-                            <span className="inline-flex shrink-0 items-center gap-1 font-bold text-success-fg">
-                              <CheckCircle2 className="size-4" aria-hidden /> {resultLabel(r)}
-                            </span>
-                          ) : (
-                            <span className="inline-flex shrink-0 items-center gap-1 font-bold text-danger">
-                              <XCircle className="size-4" aria-hidden /> {resultLabel(r)}
-                              {r.inProgress && (
-                                <span className="text-xs font-normal text-text-secondary">
-                                  {' '}
-                                  (در حال آزمون)
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-text-secondary">
-                          {fa(r.attempts)} دفعه · آخرین: {fa(r.lastCorrect)} درست از{' '}
-                          {fa(r.lastTotal)} ({fa(r.lastWrong)} غلط) · نمره آخر {score(r.lastScore)}{' '}
-                          · بهترین {score(r.bestScore)}
-                          {r.lastSubmittedAt ? ` · ${faDate(r.lastSubmittedAt)}` : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                header: 'آزمون‌ها',
+                sortValue: (a) => a.rows.length,
+                cell: (a) => fa(a.rows.length),
+              },
+              {
+                key: 'ok',
+                header: 'قبول',
+                sortValue: (a) => a.rows.filter((r) => r.passed).length,
+                cell: (a) => (
+                  <span className="inline-flex items-center gap-1 font-bold text-success-fg">
+                    <CheckCircle2 className="size-4" aria-hidden />
+                    {fa(a.rows.filter((r) => r.passed).length)}
+                  </span>
                 ),
               },
               {
+                key: 'no',
+                header: 'مردود / در حال آزمون',
+                sortValue: (a) => a.rows.filter((r) => !r.passed).length,
+                cell: (a) => {
+                  const n = a.rows.filter((r) => !r.passed).length;
+                  return n ? (
+                    <span className="inline-flex items-center gap-1 font-bold text-danger">
+                      <XCircle className="size-4" aria-hidden />
+                      {fa(n)}
+                    </span>
+                  ) : (
+                    '—'
+                  );
+                },
+              },
+              {
                 key: 'at',
+                header: 'تلاش‌ها',
+                hideOnMobile: true,
+                sortValue: (a) => a.rows.reduce((n, r) => n + r.attempts, 0),
+                cell: (a) => fa(a.rows.reduce((n, r) => n + r.attempts, 0)),
+              },
+              {
+                key: 'best',
+                header: 'بهترین نمره',
+                hideOnMobile: true,
+                sortValue: (a) => Math.max(...a.rows.map((r) => r.bestScore ?? 0)),
+                cell: (a) => score(Math.max(...a.rows.map((r) => r.bestScore ?? 0))),
+              },
+              {
+                key: 'last',
                 header: 'آخرین آزمون',
                 hideOnMobile: true,
-                sortValue: (g) =>
-                  Math.max(0, ...g.rows.map((r) => Date.parse(r.lastSubmittedAt ?? ''))) || null,
-                cell: (g) => {
-                  const last = g.rows
+                sortValue: (a) =>
+                  Math.max(0, ...a.rows.map((r) => Date.parse(r.lastSubmittedAt ?? ''))) || null,
+                cell: (a) => {
+                  const last = a.rows
                     .map((r) => r.lastSubmittedAt)
                     .filter((x): x is string => !!x)
                     .sort()

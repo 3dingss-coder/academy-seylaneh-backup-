@@ -14,7 +14,16 @@ export function FullPageSpinner() {
       role="status"
       aria-label="در حال بارگذاری"
     >
-      <Spinner className="size-8 text-primary" />
+      <div className="flex flex-col items-center gap-3">
+        <img
+          src="/brand/mascot.webp"
+          alt=""
+          width={96}
+          height={124}
+          className="h-auto w-24 motion-safe:animate-bounce"
+        />
+        <Spinner className="size-5 text-primary" />
+      </div>
     </div>
   );
 }

@@ -766,6 +766,20 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
       201,
     ),
   );
+  // «اعتبارسنجی قبل از ذخیره»: the create form's payload, run through the very validators a save uses and
+  // answered with a verdict instead of a 400. Nothing is written — no document, no audit row, no counter.
+  r.post(
+    '/admin/push-automations/validate',
+    rateLimit(
+      limiter,
+      'push-automation-validate',
+      60,
+      5 * 60_000,
+      (req) => me(req).id,
+      'اعتبارسنجی حداکثر ۶۰ بار در پنج دقیقه ممکن است.',
+    ),
+    h(async (req) => automations.validateDraft(d, actorOf(req), null, req.body ?? {})),
+  );
   r.get(
     '/admin/push-automations/:key',
     h(async (req) => automations.automationDetail(d, id(req, 'key'))),
@@ -806,6 +820,45 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
   r.post(
     '/admin/push-automations/:key/dry-run',
     h(async (req) => automations.dryRun(d, id(req, 'key'))),
+  );
+  // Same verdict for an edit: the patch is merged over the stored rule first, so what you are told about
+  // is exactly what the PATCH would store — including whether the save would cancel parked steps.
+  r.post(
+    '/admin/push-automations/:key/validate',
+    rateLimit(
+      limiter,
+      'push-automation-validate',
+      60,
+      5 * 60_000,
+      (req) => me(req).id,
+      'اعتبارسنجی حداکثر ۶۰ بار در پنج دقیقه ممکن است.',
+    ),
+    h(async (req) => automations.validateDraft(d, actorOf(req), id(req, 'key'), req.body ?? {})),
+  );
+  r.post(
+    '/admin/push-automations/:key/duplicate',
+    h(
+      async (req) =>
+        automations.duplicateAutomation(
+          d,
+          actorOf(req),
+          id(req, 'key'),
+          parse(automations.duplicateSchema, req.body),
+        ),
+      201,
+    ),
+  );
+  // A read-only per-user answer to «why nothing for this user?». Deliberately un-prefixed by any write:
+  // no notification row, no claim, no counter — see `previewForUsers`.
+  r.get(
+    '/admin/push-automations/:key/preview',
+    h(async (req) =>
+      automations.previewForUsers(
+        d,
+        id(req, 'key'),
+        parse(automations.previewQuerySchema, req.query).userIds,
+      ),
+    ),
   );
   r.post(
     '/admin/push-automations/:key/test-send',

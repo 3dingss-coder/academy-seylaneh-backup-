@@ -9,9 +9,22 @@ import type {
   RuleNode,
   User,
 } from '../domain/types';
-import { allFields } from './automation/fields';
-import { describeExpr, RULE_LIMITS, validateRuleExpr } from './automation/expr';
-import { deadConditions, usesInheritedPolicy, withDefaults } from './automation/migrate';
+import { allFields, fieldById } from './automation/fields';
+import {
+  countLeaves,
+  countNodes,
+  describeExpr,
+  leavesOf,
+  maxDepth,
+  RULE_LIMITS,
+  validateRuleExpr,
+} from './automation/expr';
+import {
+  conditionsToExpr,
+  deadConditions,
+  usesInheritedPolicy,
+  withDefaults,
+} from './automation/migrate';
 import { allOperators } from './automation/operators';
 import { POLICY_LIMITS, validateRepeatPolicy } from './automation/repeat';
 import {
@@ -19,9 +32,12 @@ import {
   describeSteps,
   stepDefs,
   needsFlowEngine,
+  stepIds,
+  stepLabel,
   unknownStepPolicyKeys,
   validateSteps,
 } from './automation/steps';
+import { audienceAllows, evaluateFor, explainFor, firstFailure } from './automation/rule';
 import {
   CATEGORY_HINTS,
   CATEGORY_LABELS,
@@ -71,6 +87,7 @@ import {
   evaluateSweep,
   eventVars,
   factsForRule,
+  isAudienceCandidate,
   sendAutomation,
   resolveVars,
   listPendingSteps,
@@ -286,7 +303,68 @@ export const automationPatchSchema = automationSchema
     expectedVersion: z.number().int().min(1).optional(),
   });
 
-/** The store keeps `null`, not `undefined`, so optional inputs are normalised once here. */
+/**
+ * The two fields that steer the *write* rather than the *rule*. `validate` has to merge a patch the same
+ * way `update` does — a validation the save does not respect is not a validation — so the split lives here
+ * instead of inside one caller.
+ */
+function splitPatch(patch: z.infer<typeof automationPatchSchema>): {
+  body: Partial<PushAutomation>;
+  audienceIn?: z.infer<typeof audienceSchema>;
+} {
+  const body = { ...patch } as Record<string, unknown> & Partial<PushAutomation>;
+  delete body.confirmCritical;
+  delete body.expectedVersion;
+  const audienceIn = body.audience;
+  delete body.audience;
+  return { body, audienceIn };
+}
+
+/** The document a create would write. Reads nothing, writes nothing. */
+function createdDoc(
+  input: z.infer<typeof automationSchema>,
+  at: string,
+  actor: Actor,
+): PushAutomation {
+  return {
+    ...input,
+    audience: normAudience(input.audience),
+    isSystem: false,
+    templateKey: null,
+    requiresFeature: null,
+    category: input.category,
+    version: 1,
+    createdAt: at,
+    updatedAt: at,
+    createdBy: actor.id,
+    updatedBy: actor.id,
+    stats: null,
+  };
+}
+
+/** The document a patch would write, before the enable/confirm checks are allowed to object. */
+function patchedDoc(
+  cur: Doc<PushAutomation>,
+  body: Partial<PushAutomation>,
+  audienceIn: z.infer<typeof audienceSchema> | undefined,
+  actor: Actor,
+  at: string,
+): PushAutomation {
+  return {
+    ...cur,
+    ...body,
+    ...(audienceIn ? { audience: normAudience(audienceIn) } : {}),
+    // Fields a custom automation may never gain, and gates keep their identity.
+    key: cur.key,
+    isSystem: cur.isSystem,
+    templateKey: cur.templateKey ?? null,
+    requiresFeature: cur.requiresFeature ?? null,
+    version: cur.version + 1,
+    updatedAt: at,
+    updatedBy: actor.id,
+  };
+}
+
 /** The store keeps `null`, not `undefined`, so optional inputs are normalised once here. */
 function normAudience(aud: z.infer<typeof audienceSchema>): PushAutomation['audience'] {
   return {
@@ -314,7 +392,7 @@ export function validateSemantics(input: {
     throw new ApiError('VALIDATION', msg);
   };
   if ((t.kind === 'event' || t.kind === 'event_delay') && !t.event)
-    bad('برای.trigger از نوع اتفاق، نام اتفاق لازم است.');
+    bad('برای trigger از نوع اتفاق، نام اتفاق لازم است.');
   if (t.kind === 'event_delay' && !t.delayMinutes)
     bad('برای اتفاق با تأخیر، تعداد دقیقه لازم است.');
   if (t.kind === 'inactivity' && !t.inactivityDays) bad('برای بی‌فعالیتی، تعداد روز لازم است.');
@@ -879,21 +957,7 @@ export async function createAutomation(
     throw new ApiError('CONFLICT', 'این کلید در کاتالوگ سیستمی وجود دارد؛ آن را ویرایش کنید.');
   const existing = await d.store.get(`${AUTOMATIONS}/${input.key}`);
   if (existing) throw new ApiError('CONFLICT', 'اتوماسیونی با همین کلید وجود دارد.');
-  const now = d.clock().toISOString();
-  const doc: PushAutomation = {
-    ...input,
-    audience: normAudience(input.audience),
-    isSystem: false,
-    templateKey: null,
-    requiresFeature: null,
-    category: input.category,
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-    createdBy: actor.id,
-    updatedBy: actor.id,
-    stats: null,
-  };
+  const doc = createdDoc(input, d.clock().toISOString(), actor);
   await d.store.set(`${AUTOMATIONS}/${input.key}`, doc as unknown as Record<string, unknown>);
   await audit(d, actor, 'push_automation.created', AUTOMATIONS, input.key, null, input);
   return { ...doc, id: input.key } as Doc<PushAutomation>;
@@ -911,22 +975,11 @@ export async function updateAutomation(
   patch: z.infer<typeof automationPatchSchema>,
 ): Promise<Doc<PushAutomation>> {
   const cur = await mustGet(d, key);
-  const { confirmCritical, expectedVersion, audience: audienceIn, ...body } = patch;
+  const { confirmCritical, expectedVersion } = patch;
+  const { body, audienceIn } = splitPatch(patch);
   if (expectedVersion !== undefined && expectedVersion !== cur.version)
     throw new ApiError('CONFLICT', 'این اتوماسیون هم‌زمان ویرایش شده است؛ صفحه را بازخوانی کنید.');
-  const next: PushAutomation = {
-    ...cur,
-    ...body,
-    ...(audienceIn ? { audience: normAudience(audienceIn) } : {}),
-    // Fields a custom automation may never gain, and gates keep their identity.
-    key: cur.key,
-    isSystem: cur.isSystem,
-    templateKey: cur.templateKey ?? null,
-    requiresFeature: cur.requiresFeature ?? null,
-    version: cur.version + 1,
-    updatedAt: d.clock().toISOString(),
-    updatedBy: actor.id,
-  };
+  const next = patchedDoc(cur, body, audienceIn, actor, d.clock().toISOString());
   validateSemantics(next);
   if (next.enabled !== cur.enabled && CRITICAL_AUTOMATION_KEYS.includes(key) && !confirmCritical)
     throw new ApiError(
@@ -940,7 +993,7 @@ export async function updateAutomation(
   // A pending step is a promise about the future that an older definition made. When the part of the rule
   // that promise rested on moves, the promise is cancelled rather than re-interpreted; a wording-only fix
   // does not void it, so correcting a typo does not silently eat three days of follow-ups.
-  const structural = ['steps', 'when', 'trigger', 'delivery', 'repeatPolicy'] as const;
+  const structural = STRUCTURAL_FIELDS;
   const touched =
     audienceIn !== undefined ||
     structural.some((f) => (body as Record<string, unknown>)[f] !== undefined) ||
@@ -1013,6 +1066,448 @@ export async function deleteAutomation(
   await d.store.delete(`${AUTOMATIONS}/${key}`);
   await audit(d, actor, 'push_automation.deleted', AUTOMATIONS, key, cur, null);
   return { deleted: true };
+}
+
+const STRUCTURAL_FIELDS = ['steps', 'when', 'trigger', 'delivery', 'repeatPolicy'] as const;
+
+// ─── Lifecycle: validate without saving, duplicate, per-user preview ───────
+//
+// The three operations an operator needs around a rule that is not yet trusted: ask the server whether the
+// draft is *saveable* (with the same validator a save runs, so the answer cannot drift), copy a working rule
+// to start from, and read one rule against named users without sending anything. None of them touches a
+// counter, a claim, a queue row or a notification.
+
+export interface VerdictIssue {
+  /** Where the panel can hang the message; `''` when the check is about the rule as a whole. */
+  path: string;
+  message: string;
+}
+
+export interface AutomationVerdict {
+  /** `true` only when every check a save would run has passed. Not a promise that the rule will send. */
+  ok: boolean;
+  errors: VerdictIssue[];
+  warnings: VerdictIssue[];
+  /** The canonical shape the save would store, for the parts the logic card owns. `null` if unreadable. */
+  normalized: {
+    schemaVersion: 1 | 2 | null;
+    when: PushAutomation['when'];
+    audience: PushAutomation['audience'];
+    repeatPolicy: PushAutomation['repeatPolicy'];
+    steps: PushAutomation['steps'];
+  } | null;
+  review: {
+    key: string;
+    isGate: boolean;
+    enabled: boolean;
+    triggerKind: PushAutomation['trigger']['kind'];
+    event: string | null;
+    /** `when` for a v2 rule; `trigger.conditions` re-expressed for a v1 one; `null` when there is neither. */
+    treeSource: 'when' | 'legacy_conditions' | null;
+    treeSummary: string | null;
+    /** What the tree costs the engine, measured by the same walkers the engine enforces with. */
+    budget: { nodes: number; leaves: number; depth: number } | null;
+    limits: typeof RULE_LIMITS;
+    usesFlow: boolean;
+    stepIds: string[];
+    /** Flat conditions the trigger kind of this rule never evaluates. */
+    deadConditions: string[];
+    /** `false` = the event this rule waits for is registered but no code emits it. `null` = no event. */
+    eventProduced: boolean | null;
+    /** Flow steps already parked for this rule, which a structural change would cancel. */
+    pendingSteps: number;
+    runNote: string | null;
+  } | null;
+}
+
+/**
+ * Turns a thrown validation error into per-field rows. The zod path comes through `details`; the
+ * cross-field messages come from `validateSemantics`, which prefixes them with `path: ` and joins several
+ * with ` | ` because the import report has one string per row — so the same split recovers the path here
+ * instead of a second validator that could drift away from the first.
+ */
+function issuesFrom(e: unknown): VerdictIssue[] {
+  const details = (e as { details?: unknown }).details;
+  if (Array.isArray(details) && details.length > 0)
+    return (details as Array<{ field?: unknown; message?: unknown }>).map((x) => ({
+      path: typeof x.field === 'string' ? x.field : '',
+      message: String(x.message ?? ''),
+    }));
+  const message = (e as { message?: string }).message ?? 'ساختار قاعده نامعتبر است.';
+  return message.split(' | ').map((part) => {
+    const m = /^([a-zA-Z][\w.[\]-]*): ([\s\S]*)$/.exec(part.trim());
+    return m ? { path: m[1] ?? '', message: m[2] ?? '' } : { path: '', message: part };
+  });
+}
+
+export const validateDraftSchema = z.object({
+  /** Present = validate this patch *on top of* the stored rule; absent = a rule that does not exist yet. */
+  patch: z.record(z.unknown()).optional(),
+});
+
+/**
+ * The check a save would run, without saving. One path builds the candidate document for both cases —
+ * create (`key` absent from the store) and edit (a patch merged over the stored row) — and runs it through
+ * `parse` + `validateSemantics`, the very functions the writers call. So «valid» here means exactly
+ * «acceptable to the save endpoint», nothing more and nothing less.
+ */
+export async function validateDraft(
+  d: Deps,
+  actor: Actor,
+  key: string | null,
+  raw: unknown,
+): Promise<AutomationVerdict> {
+  const at = d.clock().toISOString();
+  const errors: VerdictIssue[] = [];
+  const warnings: VerdictIssue[] = [];
+  let doc: PushAutomation | null = null;
+  let parked = 0;
+
+  if (key === null) {
+    try {
+      const input = parse(automationSchema, raw);
+      if (CATALOG_KEYS.includes(input.key))
+        errors.push({
+          path: 'key',
+          message: 'این کلید در کاتالوگ سیستمی وجود دارد؛ همان را ویرایش کنید.',
+        });
+      else if (await d.store.get(`${AUTOMATIONS}/${input.key}`))
+        errors.push({
+          path: 'key',
+          message: 'اتوماسیونی با همین کلید وجود دارد؛ برای ویرایش به همان بروید.',
+        });
+      doc = createdDoc(input, at, actor);
+    } catch (e) {
+      return { ok: false, errors: issuesFrom(e), warnings, normalized: null, review: null };
+    }
+  } else {
+    let patch: z.infer<typeof automationPatchSchema>;
+    try {
+      patch = parse(automationPatchSchema, raw);
+    } catch (e) {
+      return { ok: false, errors: issuesFrom(e), warnings, normalized: null, review: null };
+    }
+    const cur = await mustGet(d, key);
+    const { body, audienceIn } = splitPatch(patch);
+    doc = patchedDoc(cur, body, audienceIn, actor, at);
+    if (
+      audienceIn !== undefined ||
+      STRUCTURAL_FIELDS.some((f) => (body as Record<string, unknown>)[f] !== undefined)
+    ) {
+      parked = (await listPendingSteps(d, key, { limit: 50 })).items.length;
+      if (parked)
+        warnings.push({
+          path: 'steps',
+          message: `ذخیرهٔ این تغییر ${parked} گام در انتظارِ این قاعده را لغو می‌کند.`,
+        });
+    }
+  }
+  const built = doc;
+
+  try {
+    validateSemantics(built);
+  } catch (e) {
+    errors.push(...issuesFrom(e));
+  }
+  if (built.enabled && built.requiresFeature)
+    errors.push({
+      path: 'enabled',
+      message: 'این سناریو نیازمند داده‌ای است که هنوز محاسبه نمی‌شود؛ روشن شدنی نیست.',
+    });
+  if (built.enabled && isSystemGate(built))
+    errors.push({
+      path: 'enabled',
+      message: 'ردیف قالب به‌تنهایی ارسال نمی‌کند؛ روشن‌کردنش معنی ندارد.',
+    });
+  if (CRITICAL_AUTOMATION_KEYS.includes(built.key) && built.enabled)
+    warnings.push({
+      path: 'enabled',
+      message: 'این قاعده در فهرست حساس است؛ روشن/خاموش‌کردنش در ذخیره تأیید جدا می‌خواهد.',
+    });
+
+  const tree = built.when ?? conditionsToExpr(built.trigger.conditions ?? []);
+  const seen = new Set<string>();
+  const warn = (path: string, message: string): void => {
+    if (seen.has(message)) return;
+    seen.add(message);
+    warnings.push({ path, message });
+  };
+  if (tree) {
+    for (const leaf of leavesOf(tree)) {
+      const field = fieldById(leaf.field);
+      // An unknown field, an ill-typed operator or an over-budget tree is already an *error* the
+      // validator raises, so it never reaches here. What that check cannot know is the trigger kind: a
+      // field no scheduled sweep computes resolves to «no data», which every operator answers by rejecting.
+      if (field && !field.sweep && !built.trigger.kind.startsWith('event'))
+        warn(
+          'when',
+          `«${field.label}» در بررسی زمان‌بندی‌شده محاسبه نمی‌شود؛ این شرط همیشه رد می‌شود.`,
+        );
+    }
+  } else if (built.trigger.kind === 'event' || built.trigger.kind === 'event_delay') {
+    warn(
+      'when',
+      'هیچ شرطی نگذاشته‌اید؛ هر رویدادِ این نوع، قاعده را فعال می‌کند و سقف‌ها/ترجیحات تنها بازدارنده‌اند.',
+    );
+  }
+  const event0 = built.trigger.event ?? null;
+  if (built.trigger.kind.startsWith('event') && event0 && !PRODUCED_EVENTS.includes(event0))
+    warn(
+      'trigger.event',
+      `اتفاق «${event0}» را هنوز هیچ کدی نمی‌فرستد؛ این قاعده حتی اگر روشن باشد اجرا نمی‌شود.`,
+    );
+  const dead = deadConditions(built);
+  if (dead.length)
+    warn(
+      'trigger.conditions',
+      `${dead.length} شرط قدیمی است که این نوع فعال‌سازی آن‌ها را نمی‌خواند؛ در «منطق قاعده» بازنویسی‌شان کنید.`,
+    );
+  if (needsFlowEngine(built))
+    warn(
+      'steps',
+      'این قاعده با موتور گردش‌کار اجرا می‌شود: گام‌های «صبر» در صف می‌نشینند و در صفحهٔ گام‌ها دیده می‌شوند.',
+    );
+  const ghost = unknownStepPolicyKeys(built);
+  for (const g of ghost)
+    warn('repeatPolicy.perStep', `سیاست گام «${g}» گامی با این شناسه ندارد؛ نادیده گرفته می‌شود.`);
+
+  const event = built.trigger.kind.startsWith('event') ? (built.trigger.event ?? null) : null;
+  const settings = await readSettings(d);
+  const runNote = built.requiresFeature
+    ? 'این سناریو داده‌ای می‌خواهد که هنوز محاسبه نمی‌شود؛ حتی اگر روشن شود اجرا نمی‌شود.'
+    : !built.enabled
+      ? 'قاعده خاموش است؛ «معتبر است» یعنی «ذخیره شدنی است»، نه «ارسال می‌شود».'
+      : settings.paused
+        ? 'کلید توقف کلی فعال است؛ هیچ قاعده‌ای ارسال نمی‌کند.'
+        : null;
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    normalized: {
+      schemaVersion: built.schemaVersion ?? null,
+      when: built.when ?? null,
+      audience: built.audience,
+      repeatPolicy: built.repeatPolicy ?? null,
+      steps: built.steps ?? null,
+    },
+    review: {
+      key: built.key,
+      isGate: isSystemGate(built),
+      enabled: !!built.enabled,
+      triggerKind: built.trigger.kind,
+      event,
+      treeSource: built.when ? 'when' : tree ? 'legacy_conditions' : null,
+      treeSummary: tree ? describeExpr(tree) : null,
+      budget: tree
+        ? { nodes: countNodes(tree), leaves: countLeaves(tree), depth: maxDepth(tree) }
+        : null,
+      limits: RULE_LIMITS,
+      usesFlow: needsFlowEngine(built),
+      stepIds: stepIds(built.steps),
+      deadConditions: dead.map((c) => c.field),
+      eventProduced: event === null ? null : PRODUCED_EVENTS.includes(event),
+      pendingSteps: parked,
+      runNote,
+    },
+  };
+}
+
+export const duplicateSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .regex(AUTOMATION_KEY, 'کلید باید کوچک، لاتین و یکتا باشد؛ مثل welcome_followup_copy.'),
+  name: z.string().trim().min(2).max(60).optional(),
+});
+
+/**
+ * A copy is a *new, switched-off* rule. Everything the operator wrote comes along — text, delivery,
+ * trigger, audience, tree, steps, cadence; everything that is history or a promise about the future does
+ * not: `enabled`, `stats`, `version`, `createdAt`, and above all the pending steps parked under the source
+ * key, which keep belonging to the source.
+ */
+export async function duplicateAutomation(
+  d: Deps,
+  actor: Actor,
+  fromKey: string,
+  input: z.infer<typeof duplicateSchema>,
+): Promise<Doc<PushAutomation>> {
+  const src = await mustGet(d, fromKey);
+  if (isSystemGate(src))
+    throw new ApiError(
+      'CONFLICT',
+      'ردیف قالب پیام خودش را ندارد؛ تکثیرش معنی ندارد. یک اتوماسیون تازه بسازید و متن را در آن بنویسید.',
+    );
+  const shaped = parse(automationSchema, {
+    key: input.key,
+    name: input.name?.trim() || `${src.name} (کپی)`,
+    description: src.description,
+    category: src.category,
+    audienceRole: src.audienceRole,
+    enabled: false,
+    trigger: src.trigger,
+    audience: src.audience,
+    message: src.message,
+    delivery: src.delivery,
+    supersedes: src.supersedes ?? null,
+    optInOnly: src.optInOnly ?? null,
+    schemaVersion: src.schemaVersion ?? null,
+    when: src.when ?? null,
+    repeatPolicy: src.repeatPolicy ?? null,
+    steps: src.steps ?? null,
+  });
+  if (CATALOG_KEYS.includes(shaped.key))
+    throw new ApiError('CONFLICT', 'این کلید در کاتالوگ سیستمی وجود دارد؛ کلید تازه‌ای بگذارید.');
+  if (await d.store.get(`${AUTOMATIONS}/${shaped.key}`))
+    throw new ApiError('CONFLICT', 'اتوماسیونی با همین کلید وجود دارد.');
+  validateSemantics(shaped);
+  const doc = createdDoc(shaped, d.clock().toISOString(), actor);
+  await d.store.set(`${AUTOMATIONS}/${shaped.key}`, doc as unknown as Record<string, unknown>);
+  await audit(d, actor, 'push_automation.duplicated', AUTOMATIONS, shaped.key, null, {
+    from: fromKey,
+    key: shaped.key,
+    name: doc.name,
+    enabled: false,
+    copied: ['message', 'delivery', 'trigger', 'audience', 'when', 'steps', 'repeatPolicy'].filter(
+      (f) => (shaped as unknown as Record<string, unknown>)[f] !== undefined,
+    ),
+  });
+  return { ...doc, id: shaped.key } as Doc<PushAutomation>;
+}
+
+export const previewQuerySchema = z.object({
+  /** Comma-separated (Persian comma accepted too), one to ten users — a test group, not an audience. */
+  userIds: z.string().min(1).max(400),
+});
+
+export interface AutomationPreviewRow {
+  userId: string;
+  name: string | null;
+  /** False when the id matches no user row. */
+  exists: boolean;
+  /** The population half (`audience.type`) and the filter half, reported apart because they fail apart. */
+  inPopulation: boolean;
+  inFilter: boolean;
+  /** Which of the two said no, in Persian — `null` when the audience accepts this user. */
+  audienceWhy: string | null;
+  /** The rule's own condition tree — the part an operator usually means by «does it match». */
+  matched: boolean;
+  whyNot: string | null;
+  truncated: boolean;
+  explain: string[];
+  /** The text as it would go out, variables filled from this user. */
+  title: string | null;
+  body: string | null;
+  steps: Array<{ id: string; type: string; label: string }>;
+}
+
+export interface AutomationPreviewResult {
+  key: string;
+  evaluatedAt: string;
+  paused: boolean;
+  enabled: boolean;
+  rows: AutomationPreviewRow[];
+  note: string;
+}
+
+/**
+ * One rule read against named users. This is the answer to «چرا برای این کاربر چیزی نگفت؟» and to testing a
+ * rule on a small group before trusting it: the audience, the trigger's own tree and the rendered text, per
+ * user. It reads only — no send, no counter, no claim, no queue row — and it deliberately does not consult
+ * caps, the gate or the user's devices: those are the sweep's business and `/dry-run` reports them for the
+ * whole audience in one pass.
+ */
+export async function previewForUsers(
+  d: Deps,
+  key: string,
+  userIds: string,
+): Promise<AutomationPreviewResult> {
+  const a = withDefaults(await mustGet(d, key));
+  const ids = Array.from(
+    new Set(
+      userIds
+        .split(/[\s,،]+/)
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 10);
+  if (!ids.length) throw new ApiError('VALIDATION', 'حداقل یک شناسهٔ کاربر لازم است.');
+  const settings = await readSettings(d);
+  const now = d.clock();
+  const found = await Promise.all(
+    ids.map(async (id) => ({ id, user: await d.store.get<User>(`users/${id}`) })),
+  );
+  const users = found.map((f) => f.user).filter((u): u is Doc<User> => !!u);
+  const ctx = users.length
+    ? await buildSweepContext(d, users, { health: a.category === 'health' })
+    : null;
+  const tree = a.when ?? conditionsToExpr(a.trigger.conditions ?? []);
+  const rows: AutomationPreviewRow[] = [];
+  for (const { id, user } of found) {
+    if (!user) {
+      rows.push({
+        userId: id,
+        name: null,
+        exists: false,
+        inPopulation: false,
+        inFilter: false,
+        audienceWhy: 'کاربری با این شناسه وجود ندارد.',
+        matched: false,
+        whyNot: null,
+        truncated: false,
+        explain: [],
+        title: null,
+        body: null,
+        steps: [],
+      });
+      continue;
+    }
+    const inPopulation = isAudienceCandidate(a, user);
+    const aud = audienceAllows(a, user, now);
+    const facts = ctx ? factsForRule(a, ctx, user) : {};
+    const res = evaluateFor(tree, { facts, user, now });
+    const vars = ctx
+      ? resolveVars(
+          user,
+          ctx.packagesByUser.get(user.id) ?? [],
+          ctx.nextByUser.get(user.id) ?? null,
+          facts,
+        )
+      : {};
+    rows.push({
+      userId: user.id,
+      name: user.name ?? null,
+      exists: true,
+      inPopulation,
+      inFilter: aud.ok,
+      audienceWhy: !inPopulation
+        ? 'خارج از مخاطب انتخابی این قاعده است؛ پیش‌نمایش شرط را هم برای او خوانده است.'
+        : aud.ok
+          ? null
+          : (firstFailure(aud) ?? 'فیلتر مخاطب این کاربر را رد کرد.'),
+      matched: res.ok && !res.truncated,
+      whyNot: res.ok ? null : (firstFailure(res) ?? 'شرط قاعده رد شد.'),
+      truncated: res.truncated,
+      explain: explainFor(res),
+      title: render(a.message.title, vars),
+      body: render(a.message.body, vars),
+      steps: (a.steps ?? []).map((step) => ({
+        id: step.id,
+        type: step.type,
+        label: stepLabel(step),
+      })),
+    });
+  }
+  return {
+    key: a.key,
+    evaluatedAt: now.toISOString(),
+    paused: !!settings.paused,
+    enabled: !!a.enabled,
+    rows,
+    note: 'این پیش‌نمایش مخاطب، شرط و متن را می‌گوید؛ سقف‌ها، دروازه و دستگاه‌های کاربر را نه — برای آن‌ها «برآورد مشمولان» را ببینید. هیچ اعلانی ساخته نمی‌شود.',
+  };
 }
 
 export async function setPaused(

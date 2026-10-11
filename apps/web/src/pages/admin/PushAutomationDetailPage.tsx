@@ -1,7 +1,17 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, FlaskConical, History, Pencil, Save, Trash2, Wand2 } from 'lucide-react';
+import {
+  Activity,
+  Copy,
+  Eye,
+  FlaskConical,
+  History,
+  Pencil,
+  Save,
+  Trash2,
+  Wand2,
+} from 'lucide-react';
 import { Button, Card, Input, Skeleton, useToast } from '@/components/ui';
 import { Select, Tabs, Textarea } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -28,6 +38,7 @@ import {
   triggerSentence,
   validateStep,
   varLabel,
+  type AutomationPreview,
   type CatalogMeta,
   type DetailMeta,
   type RunRow,
@@ -346,6 +357,10 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
             onSend={() => testSend.mutate(testUserId)}
             result={testSend.data}
           />
+
+          <PreviewCard det={det} users={users.data ?? []} />
+
+          {!det.isGate && <DuplicateCard det={det} />}
 
           {det.canDelete && (
             <Card className="border-danger/30">
@@ -1257,6 +1272,212 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
         نمی‌شود و تا وقتی سوییچ را روشن نکنید، هیچ کاربری پیامی نمی‌گیرد.
       </p>
     </div>
+  );
+}
+
+/**
+ * «گروه آزمایشی»: the rule read against named users, without sending anything. This is the panel's answer
+ * to «why nothing for this person?» — it separates the two halves of the audience (population, filter),
+ * shows which condition said no, and renders the text with that user's own variables. Caps, the gate and
+ * the user's devices are deliberately not judged here: `/dry-run` reports those for the whole audience.
+ */
+function PreviewCard({
+  det,
+  users,
+}: {
+  det: DetailMeta;
+  users: Array<{ id: string; name: string; role: string }>;
+}) {
+  const toast = useToast();
+  const [ids, setIds] = useState('');
+  const [res, setRes] = useState<AutomationPreview | null>(null);
+  const picked = ids
+    .split(/[\s,،]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const run = useMutation({
+    mutationFn: () =>
+      api.get<AutomationPreview>(
+        `/admin/push-automations/${det.key}/preview?userIds=${encodeURIComponent(picked.join(','))}`,
+      ),
+    onSuccess: setRes,
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'پیش‌نمایش گرفته نشد.') }),
+  });
+  return (
+    <Card className="flex flex-col gap-3">
+      <h2 className="flex items-center gap-2 text-sm font-extrabold text-text">
+        <Eye className="size-4" aria-hidden />
+        پیش‌نمایش برای گروه آزمایشی
+      </h2>
+      <p className="text-xs leading-6 text-text-secondary">
+        برای هر کاربر می‌گوید مخاطب این قاعده هست یا نه، کدام شرط رد شد و متن با دادهٔ همان کاربر چه
+        می‌شود. چیزی ارسال نمی‌کند و هیچ ثبتی پشت خود نمی‌گذارد.
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {users.map((u) => {
+          const on = picked.includes(u.id);
+          return (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() =>
+                setIds((on ? picked.filter((x) => x !== u.id) : [...picked, u.id]).join('،'))
+              }
+              className={cn(
+                'rounded-card border px-2 py-1 text-[11px] font-bold',
+                on
+                  ? 'border-primary/40 bg-primary-light text-primary-fg'
+                  : 'border-border bg-surface text-muted-fg',
+              )}
+            >
+              {u.name} · {u.role}
+            </button>
+          );
+        })}
+      </div>
+      <Input
+        label="شناسهٔ کاربران (با ویرگول جدا کنید)"
+        value={ids}
+        onChange={(e) => setIds(e.target.value)}
+        hint={`${toFa(picked.length)} از ۱۰ — می‌توانید شناسه‌ای را که در فهرست بالا نیست هم بنویسید`}
+      />
+      <Button
+        variant="secondary"
+        loading={run.isPending}
+        disabled={!picked.length}
+        onClick={() => run.mutate()}
+      >
+        پیش‌نمایش (بدون ارسال)
+      </Button>
+      {run.isError && (
+        <p className="text-xs font-bold text-danger-fg">
+          {errMsg(run.error, 'پیش‌نمایش گرفته نشد.')}
+        </p>
+      )}
+      {res && (
+        <div className="flex flex-col gap-2">
+          {res.paused && (
+            <p className="rounded-card border border-warning/30 bg-warning-light px-2 py-1 text-[11px] leading-5 text-warning-fg">
+              کلید توقف کلی فعال است؛ حتی اگر همهٔ شرط‌ها برقرار باشند، ارسال نمی‌شود.
+            </p>
+          )}
+          <p className="text-[11px] leading-5 text-muted-fg">{res.note}</p>
+          {res.rows.map((row) => (
+            <div
+              key={row.userId}
+              className="flex flex-col gap-1 rounded-card border border-border p-2"
+            >
+              <p className="text-xs font-extrabold text-text">
+                {row.name ?? row.userId}
+                {row.name ? (
+                  <span className="ms-1 font-mono text-[10px] font-normal text-muted-fg">
+                    {row.userId}
+                  </span>
+                ) : null}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                <Chip tone={row.inPopulation ? 'success' : 'neutral'}>
+                  {row.inPopulation ? 'در مخاطب' : 'خارج از مخاطب'}
+                </Chip>
+                {row.inPopulation && (
+                  <Chip tone={row.inFilter ? 'success' : 'danger'}>
+                    {row.inFilter ? 'فیلتر مخاطب قبول کرد' : 'فیلتر مخاطب رد کرد'}
+                  </Chip>
+                )}
+                <Chip tone={row.matched ? 'success' : 'danger'}>
+                  {row.matched ? 'شرط قاعده برقرار است' : 'شرط قاعده رد شد'}
+                </Chip>
+                {row.truncated && <Chip tone="warning">بودجهٔ ارزیابی پر شد</Chip>}
+              </div>
+              {row.audienceWhy && (
+                <p className="text-[11px] leading-5 text-muted-fg">{row.audienceWhy}</p>
+              )}
+              {row.whyNot && (
+                <p className="text-[11px] leading-5 text-muted-fg">
+                  اولین شرطِ ردشده: {row.whyNot}
+                </p>
+              )}
+              {row.exists && (
+                <>
+                  <PushNotificationPreview
+                    title={row.title ?? ''}
+                    body={row.body ?? ''}
+                    imageUrl={det.message.imageUrl ?? ''}
+                    actionRef={det.message.actionRef}
+                  />
+                  {row.explain.length > 0 && (
+                    <ul className="flex flex-col gap-0.5 font-mono text-[10px] leading-5 text-muted-fg">
+                      {row.explain.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {row.steps.length > 0 && (
+                    <p className="text-[11px] leading-5 text-muted-fg">
+                      گام‌های این قاعده: {row.steps.map((st) => st.label).join(' ← ')}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * A copy is how an operator starts from a rule that already works. The server guarantees the part the UI
+ * cannot: the copy is created switched off, and the source's pending steps, stats and history stay behind.
+ */
+function DuplicateCard({ det }: { det: DetailMeta }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [key, setKey] = useState(`${det.key}_copy`);
+  const clean = key.trim();
+  const ok = /^[a-z0-9][a-z0-9_]{2,39}$/.test(clean) && clean !== det.key;
+  const dup = useMutation({
+    mutationFn: () =>
+      api.post<{ key: string; name: string }>(`/admin/push-automations/${det.key}/duplicate`, {
+        key: clean,
+      }),
+    onSuccess: (r) => {
+      toast.show({ type: 'success', message: `کپی ساخته شد: ${r.name}` });
+      navigate(`/admin/push-campaigns/automations/${r.key}`);
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'تکثیر نشد.') }),
+  });
+  return (
+    <Card className="flex flex-col gap-2">
+      <h2 className="flex items-center gap-2 text-sm font-extrabold text-text">
+        <Copy className="size-4" aria-hidden />
+        تکثیر این قاعده
+      </h2>
+      <p className="text-xs leading-6 text-text-secondary">
+        متن، نحوهٔ ارسال، مخاطب، شرط‌ها، گام‌ها و سیاست تکرار کپی می‌شوند. وضعیت «روشن»، آمار،
+        تاریخچه و گام‌های در انتظار کپی نمی‌شوند — قاعدهٔ تازه خاموش ساخته می‌شود تا خودتان روشنش
+        کنید.
+      </p>
+      <Input
+        label="کلید قاعدهٔ تازه"
+        value={key}
+        onChange={(e) => setKey(e.target.value)}
+        error={
+          clean && !ok
+            ? 'کلید باید کوچک و لاتین باشد (۳ تا ۴۰ نویسه) و با کلید فعلی فرق کند.'
+            : undefined
+        }
+      />
+      <Button
+        variant="secondary"
+        loading={dup.isPending}
+        disabled={!ok}
+        onClick={() => dup.mutate()}
+      >
+        ساخت کپی (خاموش)
+      </Button>
+    </Card>
   );
 }
 

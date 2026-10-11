@@ -571,7 +571,11 @@ export async function sweepUsers(d: Deps): Promise<Array<Doc<User>>> {
   return rows.filter((u) => u.role === 'marketer' || u.role === 'manager' || u.role === 'admin');
 }
 
-function isCandidate(a: PushAutomation, u: Doc<User>): boolean {
+/**
+ * Whether the sweep would walk to this user at all — the *population* half of the audience. The filter half
+ * is `audienceAllows`. Exported for the per-user preview, which has to say which of the two said no.
+ */
+export function isAudienceCandidate(a: PushAutomation, u: Doc<User>): boolean {
   const aud = a.audience;
   switch (aud.type) {
     case 'team':
@@ -647,7 +651,7 @@ export async function evaluateSweep(
   const settings = opts.settings ?? (await readSettings(d));
   // A manager summary is not «does this manager match the rule» but «how many of their team do».
   const aggregate = !!a.delivery.aggregateForManager && a.trigger.kind === 'inactivity';
-  const inAudience = ctx.users.filter((u) => isCandidate(a, u));
+  const inAudience = ctx.users.filter((u) => isAudienceCandidate(a, u));
   out.reviewed = inAudience.length;
   if (opts.explain) {
     for (const u of inAudience.slice(0, EXPLAIN_USERS_PER_RUN)) {

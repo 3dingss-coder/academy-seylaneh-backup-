@@ -37,7 +37,13 @@ export interface AutomationConditionValue {
 
 export interface DetailMeta extends AutomationRow {
   trigger: TriggerValue;
-  audience: { type: AudienceType; targetId: string | null; channel: 'any' | 'web' | 'android' };
+  audience: {
+    type: AudienceType;
+    targetId: string | null;
+    channel: 'any' | 'web' | 'android';
+    /** The v2 audience tree; `unknown` on purpose — the logic card converts it, the wizard ignores it. */
+    filter?: unknown;
+  };
   message: { title: string; body: string; actionRef: string; imageUrl: string | null };
   delivery: {
     priority: AutomationPriority;
@@ -171,6 +177,77 @@ export interface TestSendResult {
   reason?: string;
   label?: string;
   preview: { title: string; body: string };
+}
+
+// ─── Lifecycle: validate without saving, duplicate, per-user preview ───────
+
+/** One line of the server's answer. `path` is where the panel can hang it; `''` = about the rule as a whole. */
+export interface VerdictIssue {
+  path: string;
+  message: string;
+}
+
+/** `POST /admin/push-automations[/:key]/validate`. «ok» means «a save would accept this», nothing more. */
+export interface RuleVerdict {
+  ok: boolean;
+  errors: VerdictIssue[];
+  warnings: VerdictIssue[];
+  normalized: {
+    schemaVersion: 1 | 2 | null;
+    when: unknown;
+    audience: { type: string; targetId: string | null; channel: string; filter: unknown };
+    repeatPolicy: unknown;
+    steps: unknown;
+  } | null;
+  review: {
+    key: string;
+    isGate: boolean;
+    enabled: boolean;
+    triggerKind: string;
+    event: string | null;
+    treeSource: 'when' | 'legacy_conditions' | null;
+    treeSummary: string | null;
+    budget: { nodes: number; leaves: number; depth: number } | null;
+    limits: {
+      maxNodes: number;
+      maxDepth: number;
+      maxLeaves: number;
+      maxChildren: number;
+      maxSteps: number;
+    };
+    usesFlow: boolean;
+    stepIds: string[];
+    deadConditions: string[];
+    eventProduced: boolean | null;
+    pendingSteps: number;
+    runNote: string | null;
+  } | null;
+}
+
+/** `GET /admin/push-automations/:key/preview?userIds=…` — one rule read against named users. */
+export interface AutomationPreviewRow {
+  userId: string;
+  name: string | null;
+  exists: boolean;
+  inPopulation: boolean;
+  inFilter: boolean;
+  audienceWhy: string | null;
+  matched: boolean;
+  whyNot: string | null;
+  truncated: boolean;
+  explain: string[];
+  title: string | null;
+  body: string | null;
+  steps: Array<{ id: string; type: string; label: string }>;
+}
+
+export interface AutomationPreview {
+  key: string;
+  evaluatedAt: string;
+  paused: boolean;
+  enabled: boolean;
+  rows: AutomationPreviewRow[];
+  note: string;
 }
 
 // ─── Draft ───────────────────────────────────────────────────────────────────

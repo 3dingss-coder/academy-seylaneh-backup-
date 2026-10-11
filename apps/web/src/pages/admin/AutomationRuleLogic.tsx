@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Braces, Plus, Save, Trash2 } from 'lucide-react';
+import { Braces, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { ApiError, api } from '@/lib/api';
 import { errMsg } from '@/lib/errors';
 import { Button, Card, Input, useToast } from '@/components/ui';
 import { Select, Textarea } from '@/components/common/Field';
+import { cn } from '@/lib/cn';
 import { Chip } from './PushAutomationsPanel';
-import type { CatalogMeta, DetailMeta } from './automationWizardModel';
+import { toFa, type CatalogMeta, type DetailMeta, type RuleVerdict } from './automationWizardModel';
 import {
   addChild,
   countLeaves,
@@ -58,24 +59,33 @@ export function LogicCard({
   const toast = useToast();
   const [draft, setDraft] = useState<LogicDraft>(() => emptyLogic(det));
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [verdict, setVerdict] = useState<RuleVerdict | null>(null);
   const scheduled = det.triggerKind === 'schedule_daily' || det.triggerKind === 'schedule_weekly';
 
+  // One builder for two calls: what `اعتبارسنجی` asks about is byte-for-byte what `ذخیره` would send, so a
+  // green verdict and a red save cannot disagree.
+  const patchBody = (): Record<string, unknown> => {
+    const patch = logicToPatch(draft, meta);
+    return {
+      // A rule only becomes v2 when it actually carries a tree; an empty card must not flip the shape
+      // and leave a rule whose conditions live nowhere.
+      ...(patch.when || patch.audienceFilter || patch.steps ? { schemaVersion: 2 } : {}),
+      when: patch.when,
+      audience: { ...det.audience, filter: patch.audienceFilter },
+      steps: patch.steps,
+      repeatPolicy: patch.repeatPolicy,
+    };
+  };
+
   const save = useMutation({
-    mutationFn: () => {
-      const patch = logicToPatch(draft, meta);
-      return api.patch(`/admin/push-automations/${det.key}`, {
-        // A rule only becomes v2 when it actually carries a tree; an empty card must not flip the shape
-        // and leave a rule whose conditions live nowhere.
-        ...(patch.when || patch.audienceFilter || patch.steps ? { schemaVersion: 2 } : {}),
-        when: patch.when,
-        audience: { ...det.audience, filter: patch.audienceFilter },
-        steps: patch.steps,
-        repeatPolicy: patch.repeatPolicy,
+    mutationFn: () =>
+      api.patch(`/admin/push-automations/${det.key}`, {
+        ...patchBody(),
         expectedVersion: det.version,
-      });
-    },
+      }),
     onSuccess: () => {
       setIssues([]);
+      setVerdict(null);
       toast.show({ type: 'success', message: 'منطق قاعده ذخیره شد.' });
       onSaved();
     },
@@ -92,6 +102,23 @@ export function LogicCard({
       );
       toast.show({ type: 'error', message: errMsg(e, 'ذخیره نشد.') });
     },
+  });
+
+  const check = useMutation({
+    mutationFn: () =>
+      api.post<RuleVerdict>(`/admin/push-automations/${det.key}/validate`, patchBody()),
+    onSuccess: (v) => {
+      setVerdict(v);
+      // The server names the field, so the same rows that block a save light up here too.
+      setIssues(v.errors.filter((e) => e.path).map((e) => ({ path: e.path, message: e.message })));
+      toast.show({
+        type: v.ok ? 'success' : 'error',
+        message: v.ok
+          ? 'سرور این تعریف را می‌پذیرد؛ ذخیره شدنی است.'
+          : 'این تعریف هنوز ذخیره نمی‌شود؛ پیام‌ها را ببینید.',
+      });
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'اعتبارسنجی انجام نشد.') }),
   });
 
   if (!meta?.ruleFields?.length) {
@@ -205,11 +232,16 @@ export function LogicCard({
           <Save className="size-4" aria-hidden />
           ذخیره منطق
         </Button>
+        <Button variant="secondary" loading={check.isPending} onClick={() => check.mutate()}>
+          <ShieldCheck className="size-4" aria-hidden />
+          اعتبارسنجی با سرور
+        </Button>
         <Button
           variant="ghost"
           onClick={() => {
             setDraft(emptyLogic(det));
             setIssues([]);
+            setVerdict(null);
           }}
         >
           بازگشت به آنچه ذخیره شده
@@ -220,7 +252,107 @@ export function LogicCard({
           </span>
         )}
       </div>
+
+      {verdict && <VerdictBox verdict={verdict} />}
     </Card>
+  );
+}
+
+/**
+ * The server's own answer about the draft: what it refuses, what it would merely warn about, and what the
+ * rule costs the engine. Nothing here is recomputed locally — the tree, its budget and the warnings are the
+ * evaluation-side numbers, from the same walkers the sender uses.
+ */
+function VerdictBox({ verdict }: { verdict: RuleVerdict }) {
+  const r = verdict.review;
+  return (
+    <section
+      className={cn(
+        'flex flex-col gap-2 rounded-card border p-3',
+        verdict.ok
+          ? 'border-success/30 bg-success-light text-success-fg'
+          : 'border-danger/30 bg-danger-light text-danger-fg',
+      )}
+      aria-live="polite"
+    >
+      <p className="text-xs font-extrabold">
+        {verdict.ok
+          ? 'این تعریف ذخیره شدنی است.'
+          : `${toFa(verdict.errors.length)} مورد هست که ذخیره را می‌بندد.`}
+      </p>
+      <p className="text-[11px] leading-6 opacity-80">
+        «ذخیره شدنی» یعنی ساختار و رجیستری قبول شده‌اند؛ قولِ ارسال نیست — سقف‌ها، ترجیحات کاربر و
+        دستگاه‌های او موقع اجرا بررسی می‌شوند.
+      </p>
+      {verdict.errors.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {verdict.errors.map((e, i) => (
+            <li key={`${e.path}-${i}`} className="text-xs leading-6">
+              {e.path && (
+                <code className="ms-1 rounded bg-surface-2 px-1 font-mono text-[10px]">
+                  {e.path}
+                </code>
+              )}{' '}
+              {e.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {verdict.warnings.length > 0 && (
+        <ul className="flex flex-col gap-1 border-t border-warning/30 pt-2">
+          {verdict.warnings.map((w, i) => (
+            <li key={`${w.path}-${i}`} className="text-xs leading-6 text-warning-fg">
+              ⚠ {w.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {r && (
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-current/20 pt-2 text-[11px] sm:grid-cols-3">
+          <div className="col-span-2 sm:col-span-3">
+            {r.treeSummary ? `خلاصهٔ شرط: ${r.treeSummary}` : 'شرطی برای این قاعده نیست.'}
+          </div>
+          {r.budget && (
+            <>
+              <dt>گره‌های درخت</dt>
+              <dd>
+                {fa(r.budget.nodes)} از {fa(r.limits.maxNodes)}
+              </dd>
+              <dt>تعداد شرط</dt>
+              <dd>
+                {fa(r.budget.leaves)} از {fa(r.limits.maxLeaves)}
+              </dd>
+              <dt>عمق تودرتو</dt>
+              <dd>
+                {fa(r.budget.depth)} از {fa(r.limits.maxDepth)}
+              </dd>
+            </>
+          )}
+          <dt>مسیر اجرا</dt>
+          <dd>
+            {r.usesFlow
+              ? `گردش‌کار با ${fa(r.stepIds.length)} گام`
+              : 'یک ارسال، بدون موتور گردش‌کار'}
+          </dd>
+          <dt>گام در انتظار</dt>
+          <dd>{r.pendingSteps ? `${fa(r.pendingSteps)} گام پارک‌شده` : '—'}</dd>
+          {r.treeSource === 'legacy_conditions' && (
+            <>
+              <dt>منبع شرط</dt>
+              <dd>شرط‌های نسخهٔ ۱ (این محرک آن‌ها را نمی‌خواند)</dd>
+            </>
+          )}
+          {r.eventProduced === false && (
+            <div className="col-span-2 sm:col-span-3 font-bold">
+              اتفاق «{r.event}» را هنوز هیچ کدی نمی‌فرستد؛ این قاعده اجرا نمی‌شود.
+            </div>
+          )}
+          {r.runNote && (
+            <div className="col-span-2 sm:col-span-3 opacity-80">وضعیت امروز: {r.runNote}</div>
+          )}
+        </dl>
+      )}
+    </section>
   );
 }
 

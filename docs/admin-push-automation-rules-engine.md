@@ -268,21 +268,23 @@ group/leaf. خروجی `nodes` (سقف ۴۰ سطر) در همان `push_automati
 | D2 | سیم‌کشی در موتور: `when` روی همه‌ی محرک‌ها، `audience.filter`، ردپا در decisions، `withDefaults` (v1→v2 در خواندن)، `/meta` با رجیستری‌ها | تست‌های موتوری + تست سازگاری v1 |
 | D3 | `RepeatPolicy` و برداشتن سقف تحمیلی از `gate` (settings → پیش‌فرض)، ادعای «تکرار مجاز ≠ retry» | تست ۱۵ ارسال/روز + دو تست تکرار |
 | D4 | `steps`: notify/wait/stop، صف گام‌ها، `recheckWhen`، لغو، claim سطح گام، stale-retry | تست چرخه‌ی کامل لغو/ادامه |
-| D5 | پنل: RuleTreeEditor، AudienceFilterEditor، StepsEditor، RepeatPolicyEditor، برچسب ظرفیت، duplicate/archive/rollback، dry-run با ردپا | تست‌های کامپوننت (render + تعامل) |
+| D5 | پنل: RuleTreeEditor، AudienceFilterEditor، StepsEditor، RepeatPolicyEditor، برچسب ظرفیت، dry-run با ردپا (duplicate/archive/rollback به D6 منتقل شدند) | تست‌های کامپوننت (render + تعامل) |
 **وضعیت اجرا (همین PR، به ترتیبِ جدول):** D1 ✓ `c1cbf27` (هسته ارزیابی + رجیستری‌ها + سیاست تکرار،
 ۳۲ تست) · D2 ✓ `b5a1257` (اتصال `when`/فیلتر مخاطب/ردپا به موتور و API، ۲۱ تست روی مسیر واقعی) ·
 D3 ✓ (سیاست تکرار در `gate` + شمارنده سطح قاعده + نوشتن شمارنده sweep) · D4 ✓ (گام‌های `notify`/`wait`/
 `stop`، صفِ گام‌ها، بازرسی دوباره در سررسید، لغو با ویرایشِ ساختاری، claim سطح گام، `pending-steps` +
-cancel) · D5 (ویرایشگرهای پنل) و D6 (`/validate`، `/migrate`، `/duplicate`، `/archive`، rollback) انجام
-**نشده‌اند**. تنها استثنا یک
-تکه‌های D5 که همین حالا در پنل کار می‌کنند: ردپای «چرا» و `reviewed` در دیالوگ «چند نفر مشمول؟»، و
-کارت «منطق قاعده (نسخه ۲)» در صفحهٔ جزئیات (`AutomationRuleLogic.tsx` + `automationRuleModel.ts`) که درخت
-شرط، فیلتر مخاطب، گام‌ها و سیاست تکرار را از رجیستری `/catalog` می‌سازد و با همان `PATCH` ذخیره می‌کند.
-آنچه از D5 نمانده: ویرایشگر در صفحهٔ ساخت قاعدهٔ تازه، جابه‌جایی گره با کشیدن، ذخیرهٔ پیش‌نویس، گروه
-آزمایشی، و دکمه‌های تکثیر/بایگانی/بازگردانی.
+cancel) · D5 **بخش اول** ✓ (کارت «منطق قاعده (نسخه ۲)» در صفحهٔ جزئیات: `AutomationRuleLogic.tsx` +
+`automationRuleModel.ts` — درخت شرط، فیلتر مخاطب، گام‌ها و سیاست تکرار را از رجیستری `/catalog` می‌سازد و
+با همان `PATCH` ذخیره می‌کند؛ ردپای «چرا» و `reviewed` هم در دیالوگ «چند نفر مشمول؟» کار می‌کند) ·
+D6 **بخش اول** ✓ (`POST /validate` و `/:key/validate`، `POST /:key/duplicate`،
+`GET /:key/preview` + دکمه‌هایشان در پنل).
+
+آنچه از D5 نمانده: ویرایشگر در صفحهٔ ساخت قاعدهٔ تازه، جابه‌جایی گره با کشیدن، و «ذخیره پیش‌نویس».
+آنچه از D6 نمانده: `/migrate` (با `dryRun`)، بایگانی پرچم‌دار (`/archive`)، `revisions/:v/rollback`،
+و انتخاب «گروه آزمایشی» در خودِ فرم تست (پیش‌نمایش گروه هست، «ارسال آزمایشی» هنوز تک‌نفره است).
 گزارش پایانی هر کدام را صریح «انجام‌نشده» اعلام می‌کند، نه «در پنل هست ولی اجرا نمی‌شود».
 
-| D6 | API تکمیلی (`validate`, `pending-steps`, cancel, `migrate`), سند API/runbook، migration واقعی با dryRun | به‌روزرسانی §۳/§۱۰ سند API |
+| D6 | API تکمیلی (`validate`, `duplicate`, `preview`, `pending-steps` و cancel — که زودتر در D4 آمد), سند API/runbook، و `migrate`/`archive`/rollback | به‌روزرسانی §۳/§۱۰ سند API |
 
 **خارج از این طرح (عمداً، و در گزارش پایانی هم «انجام‌نشده» اعلام می‌شود):** اقدام‌های غیرازاعلان
 (ساخت تسک، تغییر پکیج، نمره)، تقویم چندتایی، و «هر داده‌ای که فروشگاه ندارد» — رجیستری باز است،

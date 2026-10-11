@@ -14,7 +14,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(n.title || 'آکادمی سیلانه', {
       body: n.body || '',
       ...(n.image || data.imageUrl ? { image: n.image || data.imageUrl } : {}),
-      icon: '/icons/icon-192.png',
+      icon: '/push-icons/push-icon-192.png',
       badge: '/icons/icon-192.png',
       dir: 'rtl',
       lang: 'fa',

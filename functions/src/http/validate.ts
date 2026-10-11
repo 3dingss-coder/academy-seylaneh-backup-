@@ -1,11 +1,15 @@
 import { z, type ZodTypeAny } from 'zod';
 import { ApiError } from './errors';
+import { faIssueDetails } from './faIssues';
 
-/** Parse + whitelist (Zod strips unknown keys → no mass assignment). */
+/**
+ * Parse + whitelist (Zod strips unknown keys → no mass assignment). The per-field messages go through
+ * `faIssueDetails`, so a rejected body never answers in a language the panel does not speak.
+ */
 export function parse<S extends ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
   const r = schema.safeParse(input ?? {});
   if (!r.success) {
-    const details = r.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+    const details = faIssueDetails(r.error.issues);
     const first = details[0];
     throw new ApiError(
       'VALIDATION',

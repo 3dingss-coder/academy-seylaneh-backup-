@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Braces, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronUp, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { ApiError, api } from '@/lib/api';
 import { errMsg } from '@/lib/errors';
 import { Button, Card, Input, useToast } from '@/components/ui';
@@ -19,6 +19,8 @@ import {
   logicToPatch,
   nestGroup,
   newLeaf,
+  moveChild,
+  moveItem,
   removeChild,
   setGroupOp,
   updateTree,
@@ -133,7 +135,6 @@ export function LogicCard({
     );
   }
 
-  const errAt = (path: string) => issues.find((i) => i.path === path)?.message;
   const treeCount = `${fa(countNodes(draft.when))} گره / ${fa(depthOf(draft.when))} سطح`;
   const budget = meta.ruleLimits;
 
@@ -161,59 +162,7 @@ export function LogicCard({
         </p>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h4 className="text-sm font-bold text-text">شرط‌های اجرا (when)</h4>
-        <TreeEditor
-          root={draft.when}
-          meta={meta}
-          scope="trigger"
-          onChange={(next) => setDraft((d) => ({ ...d, when: next }))}
-          error={errAt('when')}
-        />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h4 className="text-sm font-bold text-text">فیلتر مخاطب</h4>
-        <p className="text-xs leading-6 text-muted-fg">
-          فقط فیلدهایی که «برای فیلتر مخاطب» ثبت شده‌اند. این فهرست لحظه‌ی ارسال دوباره سنجیده
-          می‌شود، پس عضوی که بین صف‌شدن و تحویل عوض شده، پوش نمی‌گیرد.
-        </p>
-        <TreeEditor
-          root={draft.audience}
-          meta={meta}
-          scope="audience"
-          onChange={(next) => setDraft((d) => ({ ...d, audience: next }))}
-          error={errAt('audience.filter')}
-        />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h4 className="text-sm font-bold text-text">گام‌های گردش‌کار</h4>
-        <p className="text-xs leading-6 text-muted-fg">
-          سه اثر: ارسال پیام، صبر (یک سطر در صف؛ ادامه در اجرای بعدی با بازرسی دوباره)، توقف با
-          دلیل.
-          {det.usesFlow === false && det.stepsSummary
-            ? ' این قاعده یک گام دارد و روی همان مسیر تک‌پیامی می‌ماند.'
-            : null}
-        </p>
-        <StepsEditor
-          steps={draft.steps}
-          meta={meta}
-          onChange={(next) => setDraft((d) => ({ ...d, steps: next }))}
-          issues={issues.filter((i) => i.path.startsWith('steps'))}
-        />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h4 className="text-sm font-bold text-text">سیاست تکرار</h4>
-        <PolicyEditor
-          draft={draft.policy}
-          meta={meta}
-          onChange={(next) => setDraft((d) => ({ ...d, policy: next }))}
-          inherited={det.policySource === 'inherited'}
-          error={errAt('policy')}
-        />
-      </section>
+      <LogicEditors draft={draft} setDraft={setDraft} meta={meta} ctx={det} issues={issues} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -252,6 +201,215 @@ export function LogicCard({
           </span>
         )}
       </div>
+
+      {verdict && <VerdictBox verdict={verdict} />}
+    </Card>
+  );
+}
+
+/**
+ * The four editors of a v2 rule, as one controlled block: condition tree, audience filter, workflow steps
+ * and repeat policy. `LogicCard` (an existing rule, with saves and server verdicts around it) and
+ * `CreateLogicCard` (a rule that does not exist yet) render the very same block, so nothing about *how a
+ * rule is expressed* differs between creating and editing — only what happens to the payload does.
+ *
+ * `ctx` carries the handful of read-only facts the notes quote; a caller with no saved rule simply leaves
+ * them out.
+ */
+export interface LogicEditorsCtx {
+  /** The shape comes from `DetailMeta`; the editors only count them, so nothing tighter is claimed. */
+  deadConditions?: readonly unknown[];
+  usesFlow?: boolean;
+  stepsSummary?: string | null;
+  policySource?: string;
+}
+
+export function LogicEditors({
+  draft,
+  setDraft,
+  meta,
+  ctx,
+  issues,
+}: {
+  draft: LogicDraft;
+  setDraft: (fn: (d: LogicDraft) => LogicDraft) => void;
+  meta: CatalogMeta;
+  ctx: LogicEditorsCtx;
+  issues: Issue[];
+}) {
+  const errAt = (path: string) => issues.find((i) => i.path === path)?.message;
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <h4 className="text-sm font-bold text-text">شرط‌های اجرا (when)</h4>
+        <TreeEditor
+          root={draft.when}
+          meta={meta}
+          scope="trigger"
+          onChange={(next) => setDraft((d) => ({ ...d, when: next }))}
+          error={errAt('when')}
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h4 className="text-sm font-bold text-text">فیلتر مخاطب</h4>
+        <p className="text-xs leading-6 text-muted-fg">
+          فقط فیلدهایی که «برای فیلتر مخاطب» ثبت شده‌اند. این فهرست لحظه‌ی ارسال دوباره سنجیده
+          می‌شود، پس عضوی که بین صف‌شدن و تحویل عوض شده، پوش نمی‌گیرد.
+        </p>
+        <TreeEditor
+          root={draft.audience}
+          meta={meta}
+          scope="audience"
+          onChange={(next) => setDraft((d) => ({ ...d, audience: next }))}
+          error={errAt('audience.filter')}
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h4 className="text-sm font-bold text-text">گام‌های گردش‌کار</h4>
+        <p className="text-xs leading-6 text-muted-fg">
+          سه اثر: ارسال پیام، صبر (یک سطر در صف؛ ادامه در اجرای بعدی با بازرسی دوباره)، توقف با
+          دلیل. ترتیب گام‌ها همان ترتیب اجراست؛ سیاستِ هر گام با «شناسه»اش گره خورده نه جایگاهش، پس
+          جابه‌جایی، سیاست‌ها را بی‌نام نمی‌کند.
+          {ctx.usesFlow === false && ctx.stepsSummary
+            ? ' این قاعده یک گام دارد و روی همان مسیر تک‌پیامی می‌ماند.'
+            : null}
+        </p>
+        <StepsEditor
+          steps={draft.steps}
+          meta={meta}
+          onChange={(next) => setDraft((d) => ({ ...d, steps: next }))}
+          issues={issues.filter((i) => i.path.startsWith('steps'))}
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h4 className="text-sm font-bold text-text">سیاست تکرار</h4>
+        <PolicyEditor
+          draft={draft.policy}
+          meta={meta}
+          onChange={(next) => setDraft((d) => ({ ...d, policy: next }))}
+          inherited={ctx.policySource === 'inherited'}
+          error={errAt('policy')}
+        />
+      </section>
+    </>
+  );
+}
+
+/**
+ * The same editors, before the rule exists. Two things make this card different from `LogicCard` rather
+ * than a copy of it: nothing here is saved on its own (the wizard's «ساخت اتوماسیون» is the only write),
+ * and «اعتبارسنجی با سرور» validates the *exact* body that button will send — the same builder, so a
+ * green verdict and a rejected create can never disagree.
+ */
+export function CreateLogicCard({
+  meta,
+  draft,
+  setDraft,
+  body,
+}: {
+  meta: CatalogMeta | null;
+  draft: LogicDraft;
+  setDraft: (fn: (d: LogicDraft) => LogicDraft) => void;
+  /** The payload `POST /admin/push-automations` will get, built by the wizard's own `createBody`. */
+  body: () => Record<string, unknown>;
+}) {
+  const toast = useToast();
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [verdict, setVerdict] = useState<RuleVerdict | null>(null);
+  const kind = String((body() as { trigger?: { kind?: string } }).trigger?.kind ?? '');
+  const scheduled = kind === 'schedule_daily' || kind === 'schedule_weekly';
+  const check = useMutation({
+    mutationFn: () => api.post<RuleVerdict>('/admin/push-automations/validate', body()),
+    onSuccess: (v) => {
+      setVerdict(v);
+      setIssues(v.errors);
+      toast.show({
+        type: v.ok ? 'success' : 'error',
+        message: v.ok
+          ? 'سرور این تعریف را می‌پذیرد؛ با «ساخت اتوماسیون» همان چیز ساخته می‌شود.'
+          : 'سرور این تعریف را نمی‌پذیرد؛ پیام‌ها را ببینید.',
+      });
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'اعتبارسنجی انجام نشد.') }),
+  });
+
+  if (!meta?.ruleFields?.length) {
+    return (
+      <Card className="flex flex-col gap-2">
+        <p className="inline-flex items-center gap-1.5 text-sm font-extrabold text-text">
+          <Braces className="size-4" aria-hidden />
+          منطق قاعده (نسخه ۲)
+        </p>
+        <p className="text-xs leading-6 text-muted-fg">
+          رجیستری فیلد و عملگر از سرور نیامد، برای همین ویرایشگر درخت اینجا باز نمی‌شود — ساختن
+          درختی که موتور معنایش را نمی‌داند کار پنل نیست. فرم بالا همان شکل سادهٔ قاعده را می‌سازد.
+        </p>
+      </Card>
+    );
+  }
+
+  const local = validateLogic(draft, meta, { scheduled });
+  const treeCount = `${fa(countNodes(draft.when))} گره / ${fa(depthOf(draft.when))} سطح`;
+  return (
+    <Card className="flex flex-col gap-4" data-testid="create-logic-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="inline-flex items-center gap-1.5 text-sm font-extrabold text-text">
+            <Braces className="size-4" aria-hidden />
+            منطق قاعده (نسخه ۲)
+          </p>
+          <p className="mt-1 text-xs leading-6 text-muted-fg">
+            هرچه اینجا بسازید در همان «ساخت اتوماسیون» ثبت می‌شود؛ این کارت به‌تنهایی چیزی ذخیره
+            نمی‌کند. تا وقتی خالی بماند، قاعده در شکل ساده (نسخه ۱) ساخته می‌شود. برای محرک «شرط
+            وضعیتی»، فهرست تختِ فرم هم اعمال می‌شود — هر دو باید برقرار باشند.
+          </p>
+        </div>
+        <Chip tone="neutral">{treeCount}</Chip>
+      </div>
+
+      <LogicEditors
+        draft={draft}
+        setDraft={setDraft}
+        meta={meta}
+        ctx={{ policySource: 'own' }}
+        issues={issues}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          loading={check.isPending}
+          onClick={() => {
+            if (local.length) {
+              setIssues(local);
+              toast.show({ type: 'error', message: local[0]?.message ?? 'نامعتبر.' });
+              return;
+            }
+            check.mutate();
+          }}
+        >
+          <ShieldCheck className="size-4" aria-hidden />
+          اعتبارسنجی با سرور
+        </Button>
+        {issues.length > 0 && (
+          <span className="text-xs font-bold text-danger-fg">
+            {fa(issues.length)} مورد باید درست شود
+          </span>
+        )}
+      </div>
+
+      {issues.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {issues.map((i) => (
+            <li key={`${i.path}-${i.message}`} className="text-xs leading-6 text-danger-fg">
+              <code className="font-mono text-[11px] text-muted-fg">{i.path}</code> — {i.message}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {verdict && <VerdictBox verdict={verdict} />}
     </Card>
@@ -407,19 +565,31 @@ function TreeEditor({
                     onChange={(next) => onChange(updateTree(root, cp, () => next))}
                     error={error}
                   />
+                  <MoveRow
+                    index={i}
+                    count={root.children.length}
+                    onMove={(d) => onChange(moveChild(root, path, i, d))}
+                  />
                   <RemoveButton
                     label="حذف زیرگروه"
                     onClick={() => onChange(removeChild(root, path, i))}
                   />
                 </div>
               ) : (
-                <LeafRow
-                  leaf={child}
-                  fields={allowed}
-                  operators={meta.ruleOperators ?? []}
-                  onChange={(next) => onChange(updateTree(root, cp, () => next))}
-                  onRemove={() => onChange(removeChild(root, path, i))}
-                />
+                <div className="flex flex-col gap-1">
+                  <LeafRow
+                    leaf={child}
+                    fields={allowed}
+                    operators={meta.ruleOperators ?? []}
+                    onChange={(next) => onChange(updateTree(root, cp, () => next))}
+                    onRemove={() => onChange(removeChild(root, path, i))}
+                  />
+                  <MoveRow
+                    index={i}
+                    count={root.children.length}
+                    onMove={(d) => onChange(moveChild(root, path, i, d))}
+                  />
+                </div>
               )}
             </li>
           );
@@ -450,6 +620,40 @@ function TreeEditor({
           </span>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Order is not decoration here: the engine names the first condition that failed, and a flow runs in the
+ * order of its steps. So every item carries its own move buttons — keyboard and touch first, which is why
+ * there is no drag handle: a tree you can only fix with a mouse is a tree an admin on a laptop trackpad
+ * with the panel in a narrow column cannot fix at all.
+ */
+function MoveRow({
+  index,
+  count,
+  onMove,
+}: {
+  index: number;
+  count: number;
+  onMove: (delta: -1 | 1) => void;
+}) {
+  const cls =
+    'inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline disabled:text-muted-fg/60 disabled:no-underline';
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="text-[11px] text-muted-fg">
+        قلم {fa(index + 1)} از {fa(count)}
+      </span>
+      <button type="button" className={cls} disabled={index === 0} onClick={() => onMove(-1)}>
+        <ChevronUp className="size-3.5" aria-hidden />
+        بالا
+      </button>
+      <button type="button" className={cls} disabled={index >= count - 1} onClick={() => onMove(1)}>
+        <ChevronDown className="size-3.5" aria-hidden />
+        پایین
+      </button>
     </div>
   );
 }
@@ -620,6 +824,11 @@ function StepsEditor({
                 حذف گام
               </button>
             </div>
+            <MoveRow
+              index={i}
+              count={steps.length}
+              onMove={(d) => onChange(moveItem(steps, i, d))}
+            />
             {s.type === 'notify' ? (
               <div className="mt-2 flex flex-col gap-2">
                 <Input

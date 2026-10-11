@@ -18,6 +18,7 @@ import {
   incompleteSteps,
   opLabel,
   patchFromDraft,
+  pendingStepsSentence,
   previewOf,
   toFa,
   triggerSentence,
@@ -27,6 +28,7 @@ import {
   type CatalogMeta,
   type DetailMeta,
 } from './automationWizardModel';
+import { emptyLogic, emptyStep, type LogicDraft } from './automationRuleModel';
 import type { AutomationRow } from './pushAutomationModel';
 
 const META: CatalogMeta = {
@@ -377,11 +379,11 @@ describe('wizard model: sentences and previews', () => {
 
 describe('wizard model: پیش‌نویسِ محلی', () => {
   it('writes what the form holds and reads it back', () => {
-    const written = saveDraft(
-      'who',
-      { ...emptyDraft(null), key: 'x_note' },
-      '2026-10-03T06:30:00.000Z',
-    );
+    const written = saveDraft({
+      step: 'who',
+      draft: { ...emptyDraft(null), key: 'x_note' },
+      at: '2026-10-03T06:30:00.000Z',
+    });
     expect(written).toMatchObject({ at: '2026-10-03T06:30:00.000Z', step: 'who' });
     const back = loadDraft();
     expect(back?.draft.key).toBe('x_note');
@@ -417,5 +419,153 @@ describe('wizard model: پیش‌نویسِ محلی', () => {
       localStorage.setItem(DRAFT_STORAGE_KEY, raw);
       expect(loadDraft()).toBeNull();
     }
+  });
+});
+
+const RULE_META = {
+  destinations: [
+    { value: '/learn', label: 'آموزش‌ها' },
+    { value: '/messages', label: 'پیام‌ها' },
+  ],
+  categories: [{ id: 'deadlines', label: 'مهلت و تکلیف', hint: '', protected: false }],
+  variables: [],
+  ruleFields: [
+    { id: 'user.pointsBalance', label: 'امتیاز', kind: 'number', sweep: true, audience: true },
+    { id: 'user.role', label: 'نقش', kind: 'text', sweep: true, audience: true },
+  ],
+  ruleOperators: [
+    { id: 'gte', label: 'بزرگ‌تر یا برابر', kinds: ['number'], arity: 1 },
+    { id: 'eq', label: 'مساوی', kinds: ['number', 'text', 'boolean', 'enum', 'date'], arity: 1 },
+  ],
+  ruleLimits: { maxNodes: 64, maxDepth: 6, maxLeaves: 48, maxChildren: 48, maxSteps: 8 },
+  repeatLimits: { minIntervalFloorMs: 60_000, maxPerDay: 20, maxPerWeek: 100, maxPerMonth: 400 },
+  stepLimits: { maxSteps: 8, minWaitMinutes: 1, maxWaitMinutes: 43_200, maxPolicyKeys: 8 },
+} as unknown as CatalogMeta;
+
+/** One leaf under the root `and`, in draft form — what the card holds before any conversion. */
+const oneLeafTree = (): LogicDraft => ({
+  ...emptyLogic({}),
+  when: {
+    type: 'group',
+    op: 'and',
+    children: [
+      { type: 'leaf', field: 'user.pointsBalance', operator: 'gte', value: '10', value2: '' },
+    ],
+  },
+});
+
+describe('wizard model: بدنهٔ ساخت با منطق نسخهٔ ۲', () => {
+  const d = {
+    ...emptyDraft(RULE_META),
+    key: 'x_new',
+    name: 'قاعدهٔ دست‌ساز',
+    description: 'توضیح',
+  };
+
+  it('a rule that carries a tree is created as version 2', () => {
+    const body = createBody(d, oneLeafTree(), RULE_META) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      key: 'x_new',
+      enabled: false,
+      schemaVersion: 2,
+      when: {
+        type: 'group',
+        op: 'and',
+        children: [{ type: 'leaf', field: 'user.pointsBalance', operator: 'gte', value: 10 }],
+      },
+    });
+    // Absent parts are sent as null, so the server clears them rather than keeping an old document.
+    expect(body.steps).toBeNull();
+    expect((body.audience as Record<string, unknown>).filter).toBeNull();
+  });
+
+  it('an untouched card leaves the create body exactly as the v1 wizard built it', () => {
+    const plain = createBody(d) as Record<string, unknown>;
+    expect(createBody(d, emptyLogic({}), RULE_META)).toEqual(plain);
+    expect(plain.schemaVersion).toBeUndefined();
+    expect(plain.when).toBeUndefined();
+  });
+
+  it('a step added in the card is created with the rule, not patched in afterwards', () => {
+    const tree: LogicDraft = {
+      ...oneLeafTree(),
+      steps: [{ ...emptyStep('notify', 'n1'), title: 'سلام', body: 'ادامه بده' }],
+    };
+    const body = createBody(d, tree, RULE_META) as { steps?: Array<Record<string, unknown>> };
+    expect(body.steps?.[0]).toMatchObject({ type: 'notify', id: 'n1' });
+    expect((body.steps?.[0]?.message as Record<string, unknown>)?.title).toBe('سلام');
+  });
+});
+
+describe('wizard model: پیش‌نویسِ محلی با درخت', () => {
+  it('keeps the tree with the form it was saved from', () => {
+    const written = saveDraft({
+      step: 'when',
+      draft: { ...emptyDraft(null), key: 'x_note' },
+      logic: oneLeafTree(),
+      at: '2026-10-03T06:30:00.000Z',
+    });
+    expect(written?.logic.when.children).toHaveLength(1);
+    const back = loadDraft();
+    expect(back?.step).toBe('when');
+    expect(back?.logic.when.children[0]).toMatchObject({
+      field: 'user.pointsBalance',
+      value: '10',
+    });
+    clearDraft();
+    expect(loadDraft()).toBeNull();
+  });
+
+  it('drops a stored tree that is no longer a tree, instead of rendering an empty one as saved', () => {
+    const write = (logic: unknown) =>
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({ at: '2026-10-03T06:30:00.000Z', step: 'when', draft: {}, logic }),
+      );
+    // A group without children, a leaf-shaped root, and a bare string are all refusals — none of them may
+    // come back as «a rule with no conditions», which is the silent version of the bug.
+    write({ when: { op: 'and' }, audience: { type: 'group', op: 'and', children: [] } });
+    expect(loadDraft()?.logic.when.children).toEqual([]);
+    write({ when: { type: 'leaf', field: 'user.pointsBalance' }, audience: {} });
+    expect(loadDraft()?.logic.when.children).toEqual([]);
+    write('nope');
+    expect(loadDraft()?.logic.when.children).toEqual([]);
+    clearDraft();
+  });
+});
+
+describe('wizard model: خلاصهٔ گام‌های معلق', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    userId: 'u1',
+    stepId: 'w1',
+    stepIndex: 1,
+    dueAt: '2026-10-04T06:00:00.000Z',
+    createdAt: '2026-10-03T06:00:00.000Z',
+    status: 'pending',
+    ...over,
+  });
+
+  it('counts live rows and cancelled rows apart', () => {
+    expect(
+      pendingStepsSentence({
+        items: [row(), row({ userId: 'u2', suppressed: true })],
+        shards: 8,
+        truncated: false,
+        cancelledAt: null,
+        note: '',
+      }),
+    ).toBe('در ۸ روزِ پیشِ رو ۱ گام در انتظار است · ۱ تای آن لغو شده‌اند');
+  });
+
+  it('says so when the listing hit its cap', () => {
+    expect(
+      pendingStepsSentence({
+        items: [row()],
+        shards: 3,
+        truncated: true,
+        cancelledAt: null,
+        note: '',
+      }),
+    ).toContain('فهرست به سقف سطر رسیده');
   });
 });

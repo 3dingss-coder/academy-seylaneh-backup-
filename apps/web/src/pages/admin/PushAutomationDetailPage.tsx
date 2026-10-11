@@ -11,6 +11,7 @@ import {
   History,
   Pencil,
   RotateCcw,
+  Hourglass,
   Inbox,
   Save,
   Trash2,
@@ -41,12 +42,14 @@ import {
   emptyDraft,
   incompleteSteps,
   patchFromDraft,
+  pendingStepsSentence,
   previewOf,
   toFa,
   triggerSentence,
   validateStep,
   varLabel,
   type AutomationPreview,
+  type PendingStepsResult,
   type CatalogMeta,
   type DetailMeta,
   type RunRow,
@@ -57,7 +60,8 @@ import {
   type WizardErrors,
   type WizardStepId,
 } from './automationWizardModel';
-import { LogicCard } from './AutomationRuleLogic';
+import { CreateLogicCard, LogicCard } from './AutomationRuleLogic';
+import { emptyLogic, type LogicDraft } from './automationRuleModel';
 import { Chip, EstimateDialog } from './PushAutomationsPanel';
 import { RUN_KIND_LABELS, skippedSentence } from './pushAutomationRunModel';
 import {
@@ -421,6 +425,8 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
               </p>
             </div>
           </Card>
+
+          <PendingStepsCard det={det} users={users.data ?? []} onChanged={refresh} />
 
           <TestSendCard
             users={users.data ?? []}
@@ -1334,6 +1340,10 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [draft, setDraft] = useState<WizardDraft>(() => emptyDraft(meta));
+  // The v2 logic card keeps its state beside the wizard, not inside it: the form and the tree are two
+  // views of one rule, but `createBody` below is the only place they are joined — so an unfinished tree
+  // can never be quietly replaced by a stale one, and there is still exactly one builder for the payload.
+  const [logic, setLogic] = useState<LogicDraft>(() => loadDraft()?.logic ?? emptyLogic({}));
   const [errors, setErrors] = useState<WizardErrors>({});
   const [step, setStep] = useState<WizardStepId>('what');
   /**
@@ -1383,6 +1393,7 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
             variant="secondary"
             onClick={() => {
               setDraft(saved.draft);
+              setLogic(saved.logic);
               setStep(saved.step);
               setSaved(null);
             }}
@@ -1393,6 +1404,9 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
             variant="ghost"
             onClick={() => {
               clearDraft();
+              setDraft(emptyDraft(meta));
+              setLogic(emptyLogic({}));
+              setStep('what');
               setSaved(null);
             }}
           >
@@ -1411,9 +1425,9 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
         gate={false}
         busy={create.isPending}
         onCancel={() => navigate('/admin/push-campaigns/automations')}
-        onSubmit={(d) => create.mutate(createBody(d))}
+        onSubmit={(d) => create.mutate(createBody(d, logic, meta))}
         onSaveDraft={() => {
-          const written = saveDraft(step, draft);
+          const written = saveDraft({ step, draft, logic });
           if (written) {
             setSaved(written);
             toast.show({
@@ -1431,6 +1445,13 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
         users={[]}
         createMode
       />
+      <CreateLogicCard
+        meta={meta}
+        draft={logic}
+        setDraft={setLogic}
+        body={() => createBody(draft, logic, meta)}
+      />
+
       <p className="text-xs leading-6 text-muted-fg">
         ساخته‌شدن یعنی «می‌تواند اجرا شود»، نه «اجرا می‌شود»: هیچ اتوماسیون تازه‌ای روشن فعال
         نمی‌شود و تا وقتی سوییچ را روشن نکنید، هیچ کاربری پیامی نمی‌گیرد.
@@ -1795,6 +1816,127 @@ function RevisionsCard({
             </li>
           ))}
         </ul>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * «گام‌های معلق»: the parked `wait` steps of this rule, straight from the queue. The card exists because a
+ * workflow is a promise about the future, and an operator retiring or editing a rule has to be able to see
+ * the promises still open — and because «cancel them» is one stamp, not a delete: rows the stamp already
+ * retired are shown as لغو‌شده (the engine's own `suppressed`), exactly as the drain will treat them.
+ */
+function PendingStepsCard({
+  det,
+  users,
+  onChanged,
+}: {
+  det: DetailMeta;
+  users: Array<{ id: string; name: string; role: string }>;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+  const [ask, setAsk] = useState(false);
+  const rows = useQuery({
+    queryKey: ['admin', 'push-automations', 'pending-steps', det.key],
+    queryFn: ({ signal }) =>
+      api.get<PendingStepsResult>(`/admin/push-automations/${det.key}/pending-steps`, signal),
+  });
+  const cancel = useMutation({
+    mutationFn: () => api.post(`/admin/push-automations/${det.key}/pending-steps/cancel`),
+    onSuccess: () => {
+      void rows.refetch();
+      onChanged();
+      toast.show({
+        type: 'success',
+        message: 'مُهرِ لغو زده شد: این گام‌ها در اجرای بعدی بسته می‌شوند و چیزی نمی‌فرستند.',
+      });
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'لغو انجام نشد.') }),
+  });
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
+  const data = rows.data;
+  const live = (data?.items ?? []).filter((x) => x.suppressed !== true);
+  return (
+    <Card className="flex flex-col gap-2">
+      <h2 className="flex items-center justify-between gap-2 text-sm font-extrabold text-text">
+        <span className="flex items-center gap-2">
+          <Hourglass className="size-4" aria-hidden />
+          گام‌های معلق
+        </span>
+        {!!live.length && (
+          <Button variant="ghost" onClick={() => setAsk(true)} data-testid="pending-cancel-ask">
+            لغو همه
+          </Button>
+        )}
+      </h2>
+      {rows.isPending && <Skeleton className="h-16" />}
+      {rows.isError && (
+        <p className="text-xs font-bold text-danger-fg">
+          فهرست خوانده نشد: {errMsg(rows.error, 'خطای نامشخص')}
+        </p>
+      )}
+      {data && !data.items.length && (
+        <p className="text-xs leading-6 text-muted-fg">
+          در {toFa(data.shards)} روزِ پیشِ رو هیچ گام «صبر» برای این قاعده باز نیست. این یعنی «در
+          این روزها چیزی نیست»، نه «هیچ‌جا چیزی نیست» — سطری که دیرتر از این مهلت سررسید می‌شود در
+          شارد خودش می‌ماند.
+        </p>
+      )}
+      {!!data?.items.length && (
+        <>
+          <p className="text-xs leading-6 text-text-secondary">{pendingStepsSentence(data)}</p>
+          <ul className="flex flex-col gap-2">
+            {data.items.map((r, i) => (
+              <li
+                key={`${r.userId}-${r.stepId}-${i}`}
+                className="rounded-card border border-border bg-background p-2 text-xs"
+              >
+                <p className="flex flex-wrap items-center gap-2 font-bold text-text">
+                  <span>{nameOf(r.userId)}</span>
+                  <code className="font-mono text-[11px] text-muted-fg">{r.stepId}</code>
+                  {r.suppressed === true && (
+                    <Chip
+                      tone="neutral"
+                      hint="قاعده بعد از پارک‌شدن این گام بایگانی یا لغو شده است"
+                    >
+                      لغو شده
+                    </Chip>
+                  )}
+                </p>
+                <p className="mt-0.5 text-text-secondary">
+                  سررسید {faTehranDateTime(r.dueAt)} · پارک‌شده {faTehranDateTime(r.createdAt)}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] leading-6 text-muted-fg">
+            {data.cancelledAt ? `آخرین لغو: ${faTehranDateTime(data.cancelledAt)} · ` : ''}
+            {data.note}
+          </p>
+        </>
+      )}
+      {ask && (
+        <ConfirmDialog
+          open
+          danger
+          title="لغو همه‌ی گام‌های معلق این قاعده؟"
+          confirmText="لغو کن"
+          loading={cancel.isPending}
+          onClose={() => setAsk(false)}
+          onConfirm={() => {
+            cancel.mutate();
+            setAsk(false);
+          }}
+        >
+          <p className="text-sm leading-7">
+            {toFa(live.length)} گام در انتظارِ سررسید است. لغو با یک مُهر زمان روی خودِ قاعده انجام
+            می‌شود (بدون پیمایش صف)، پس سطرها تا اجرای بعدی در فروشگاه می‌مانند و آن‌جا «لغو شد»
+            بسته می‌شوند. خودِ قاعده دست نمی‌خورد: اگر روشن باشد، از پنجره‌ی بعدی دوباره گام
+            می‌سازد.
+          </p>
+        </ConfirmDialog>
       )}
     </Card>
   );

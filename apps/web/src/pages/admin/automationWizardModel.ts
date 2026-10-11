@@ -1,3 +1,4 @@
+import { emptyLogic, emptyPolicy, logicToPatch, type LogicDraft } from './automationRuleModel';
 import type { AutomationPriority, AutomationRow } from './pushAutomationModel';
 
 /**
@@ -170,6 +171,47 @@ export interface TextRevision {
   note: string;
   message: { title: string; body: string; actionRef: string; imageUrl: string | null };
   delivery: { priority: AutomationPriority; push: boolean; cooldownMs: number };
+}
+
+/**
+ * One parked `wait` step of a rule (`GET /admin/push-automations/:key/pending-steps`). The store row is
+ * passed through as it is, so `suppressed` is the only computed field — and it is computed by the engine,
+ * from the rule's own cancel stamp, never guessed here.
+ */
+export interface PendingStepRow {
+  userId: string;
+  kind?: string;
+  stepId: string;
+  stepIndex: number;
+  dueAt: string;
+  createdAt: string;
+  status: string;
+  /** Parked before the rule was cancelled/archived: still listed, but the drain will close it. */
+  suppressed?: boolean;
+  /** Which day shard the row lives in (`YYYY-MM-DD`), for the «read only N days» note. */
+  day?: string;
+  recheckWhen?: unknown;
+  vars?: Record<string, string | number>;
+}
+
+export interface PendingStepsResult {
+  items: PendingStepRow[];
+  /** How many day shards were read — the answer is always «pending in these days», never «nothing». */
+  shards: number;
+  truncated: boolean;
+  /** When the rule was last cancelled, or null when it never was. */
+  cancelledAt: string | null;
+  note: string;
+}
+
+/** The card's one-line summary, in the panel's own voice (Persian digits, no invented numbers). */
+export function pendingStepsSentence(r: PendingStepsResult): string {
+  const live = r.items.filter((x) => x.suppressed !== true).length;
+  const dead = r.items.length - live;
+  const parts = [`در ${toFa(r.shards)} روزِ پیشِ رو ${toFa(live)} گام در انتظار است`];
+  if (dead) parts.push(`${toFa(dead)} تای آن لغو شده‌اند`);
+  if (r.truncated) parts.push('فهرست به سقف سطر رسیده');
+  return parts.join(' · ');
 }
 
 export interface TestSendResult {
@@ -636,15 +678,45 @@ export interface SavedDraft {
   at: string;
   step: WizardStepId;
   draft: WizardDraft;
+  /** The v2 card's state, kept with the form it belongs to (never a partial: see `isGroupDraft`). */
+  logic: LogicDraft;
 }
 
-const STEP_IDS: readonly string[] = WIZARD_STEPS.map((x) => x.id);
-
 /**
- * `null` for everything that is not a draft we wrote: no entry, corrupt JSON, a shape from another
- * version of the form. A half-read draft is worse than none, so the rule is to drop anything odd and let
- * `emptyDraft` supply the defaults the current `meta` needs.
+ * A stored tree is only trusted if it is still a tree. `localStorage` can hold an older shape, a half
+ * written one, or something a curious admin typed into devtools — and the editor must not be handed a
+ * value it will render as an empty rule and then *save* as one. So the check is structural and recursive
+ * (the engine's own depth limit as the bound), and anything that fails it means «no saved tree».
  */
+const isNode = (n: unknown, depth = 0): boolean => {
+  if (!n || typeof n !== 'object' || depth > 12) return false;
+  const x = n as Record<string, unknown>;
+  if (x.type === 'leaf') return true;
+  if (x.type === 'group')
+    return (
+      ['and', 'or', 'not'].includes(String(x.op)) &&
+      Array.isArray(x.children) &&
+      x.children.every((c) => isNode(c, depth + 1))
+    );
+  return false;
+};
+
+/** The step order the draft's `step` field has to be one of. */
+const STEP_IDS: WizardStepId[] = ['what', 'who', 'when', 'wording'];
+
+const readLogic = (x: unknown): LogicDraft => {
+  const l = x as
+    { when?: unknown; audience?: unknown; steps?: unknown; policy?: unknown } | null | undefined;
+  if (!l || typeof l !== 'object' || !isNode(l.when) || !isNode(l.audience)) return emptyLogic({});
+  return {
+    when: l.when as LogicDraft['when'],
+    audience: l.audience as LogicDraft['audience'],
+    steps: Array.isArray(l.steps) ? (l.steps as LogicDraft['steps']) : [],
+    policy:
+      l.policy && typeof l.policy === 'object' ? (l.policy as LogicDraft['policy']) : emptyPolicy(),
+  };
+};
+
 export function loadDraft(): SavedDraft | null {
   let raw: string | null = null;
   try {
@@ -659,8 +731,11 @@ export function loadDraft(): SavedDraft | null {
     if (!v.draft || typeof v.draft !== 'object') return null;
     return {
       at: v.at,
-      step: STEP_IDS.includes(String(v.step)) ? (v.step as WizardStepId) : 'what',
+      step: (STEP_IDS as readonly string[]).includes(String(v.step))
+        ? (v.step as WizardStepId)
+        : 'what',
       draft: { ...emptyDraft(null), ...(v.draft as WizardDraft) },
+      logic: readLogic(v.logic),
     };
   } catch {
     return null;
@@ -668,12 +743,18 @@ export function loadDraft(): SavedDraft | null {
 }
 
 /** Returns what was written (or `null` when the browser refused), so the caller's toast can be honest. */
-export function saveDraft(
-  step: WizardStepId,
-  draft: WizardDraft,
-  at = new Date().toISOString(),
-): SavedDraft | null {
-  const saved: SavedDraft = { at, step, draft };
+export function saveDraft(input: {
+  step: WizardStepId;
+  draft: WizardDraft;
+  logic?: LogicDraft | null;
+  at?: string;
+}): SavedDraft | null {
+  const saved: SavedDraft = {
+    at: input.at ?? new Date().toISOString(),
+    step: input.step,
+    draft: input.draft,
+    logic: input.logic ?? emptyLogic({}),
+  };
   try {
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(saved));
   } catch {
@@ -695,8 +776,35 @@ export function draftStepLabel(step: WizardStepId): string {
 }
 
 /** Body for `POST /admin/push-automations` — the same object plus the key, never `enabled`. */
-export function createBody(d: WizardDraft): PatchBody & { key: string; enabled: false } {
-  return { ...patchFromDraft(d), key: d.key.trim(), enabled: false };
+/**
+ * Body for `POST /admin/push-automations`. `logic` is the v2 card's state: a rule becomes `schemaVersion: 2`
+ * only when it actually carries something (a tree, a filter, steps, a policy), so a wizard left untouched
+ * still creates the plain v1 shape rather than a rule whose conditions live nowhere.
+ *
+ * `trigger.conditions` is deliberately not cleared here: for the «شرط وضعیتی» trigger both the flat list
+ * and the tree are enforced by the engine (that is what the card says out loud), and for every other kind
+ * `patchFromDraft` already sends `conditions: null`, so nothing is silently gained or lost.
+ */
+export function createBody(
+  d: WizardDraft,
+  logic?: LogicDraft | null,
+  meta: CatalogMeta | null = null,
+): Record<string, unknown> {
+  const base: Record<string, unknown> = { ...patchFromDraft(d), key: d.key.trim(), enabled: false };
+  if (!logic) return base;
+  const patch = logicToPatch(logic, meta);
+  if (!patch.when && !patch.audienceFilter && !patch.steps && !patch.repeatPolicy) return base;
+  return {
+    ...base,
+    schemaVersion: 2,
+    when: patch.when,
+    steps: patch.steps,
+    repeatPolicy: patch.repeatPolicy,
+    audience: {
+      ...(base.audience as Record<string, unknown>),
+      filter: patch.audienceFilter,
+    },
+  };
 }
 
 // ─── Preview ─────────────────────────────────────────────────────────────────

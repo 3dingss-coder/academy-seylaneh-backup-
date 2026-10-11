@@ -502,3 +502,248 @@ describe('بایگانی از صفحه قاعده', () => {
     expect(m.calls.find((c) => c.key.endsWith('/archive'))?.body).toEqual({ archived: false });
   });
 });
+
+const parked = (over: Record<string, unknown> = {}) => ({
+  items: [
+    {
+      userId: 'u1',
+      stepId: 'w1',
+      stepIndex: 1,
+      dueAt: '2026-10-04T06:00:00.000Z',
+      createdAt: '2026-10-03T06:30:00.000Z',
+      status: 'pending',
+    },
+    {
+      userId: 'u2',
+      stepId: 'w1',
+      stepIndex: 1,
+      dueAt: '2026-10-04T06:00:00.000Z',
+      createdAt: '2026-10-03T06:20:00.000Z',
+      status: 'pending',
+      suppressed: true,
+    },
+  ],
+  shards: 8,
+  truncated: false,
+  cancelledAt: '2026-10-03T06:25:00.000Z',
+  note: 'فقط شارد‌های روزهای پیشِ رو خوانده شد؛ پس «خالی» یعنی «در این روزها چیزی نیست».',
+  ...over,
+});
+
+describe('گام‌های معلق در صفحهٔ قاعده', () => {
+  it('shows the parked steps with names, and the engine’s own “cancelled” marker', async () => {
+    open({ 'GET /v1/admin/push-automations/follow_up/pending-steps': () => ({ data: parked() }) });
+    expect(await screen.findByText('گام‌های معلق', {}, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByText('لغو شده')).toBeTruthy();
+    // Names come from the user list, not from a raw id the operator has to look up elsewhere — and that
+    // list is a second query, so it arrives after the rows and replaces the bare id.
+    await waitFor(() => expect(screen.getAllByText('سارا').length).toBeGreaterThan(0));
+    expect(
+      screen.getByText(/در ۸ روزِ پیشِ رو ۱ گام در انتظار است · ۱ تای آن لغو شده‌اند/),
+    ).toBeTruthy();
+    // What the store said about its own window, quoted rather than paraphrased.
+    expect(screen.getByText(/آخرین لغو:/)).toBeTruthy();
+    expect(screen.getByText(/شارد‌های روزهای پیشِ رو خوانده شد/)).toBeTruthy();
+    expect(screen.getAllByText('w1').length).toBeGreaterThan(0);
+  });
+
+  it('cancels with one stamp and one call, and never touches the rule itself', async () => {
+    const m = open({
+      'GET /v1/admin/push-automations/follow_up/pending-steps': () => ({ data: parked() }),
+      'POST /v1/admin/push-automations/follow_up/pending-steps/cancel': () => ({
+        data: { cancelled: true, cancelBefore: '2026-10-03T06:32:00.000Z' },
+      }),
+    });
+    fireEvent.click(await screen.findByTestId('pending-cancel-ask', {}, { timeout: 5000 }));
+    const dialog = await waitFor(() => {
+      const el = document.querySelector('[role="dialog"]');
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+    expect(within(dialog).getByText(/مُهر زمان/)).toBeTruthy();
+    expect(within(dialog).getByText(/خودِ قاعده دست نمی‌خورد/)).toBeTruthy();
+    expect(m.calls.some((c) => c.key.endsWith('/pending-steps/cancel'))).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'لغو کن' }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain(
+        'POST /v1/admin/push-automations/follow_up/pending-steps/cancel',
+      ),
+    );
+    // No PATCH, no delete of queue rows: a stamp, then a re-read of the same listing.
+    expect(m.calls.some((c) => c.key === 'PATCH /v1/admin/push-automations/follow_up')).toBe(false);
+    expect(m.calls.filter((c) => c.key.endsWith('/pending-steps')).length).toBeGreaterThan(1);
+  });
+
+  it('an empty window is reported as an empty window', async () => {
+    open({
+      'GET /v1/admin/push-automations/follow_up/pending-steps': () => ({
+        data: parked({ items: [], cancelledAt: null }),
+      }),
+    });
+    expect(
+      await screen.findByText(/هیچ گام «صبر» برای این قاعده باز نیست/, {}, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(screen.getByText(/نه «هیچ‌جا چیزی نیست»/)).toBeTruthy();
+    expect(screen.queryByTestId('pending-cancel-ask')).toBeNull();
+  });
+});
+
+const openCreate = (routes: Record<string, () => unknown> = {}) => {
+  const m = mockApi(
+    baseRoutes({
+      'POST /v1/admin/push-automations': () => ({ data: { key: 'x_new' } }),
+      'POST /v1/admin/push-automations/validate': () => ({
+        data: {
+          ok: true,
+          errors: [],
+          warnings: [],
+          cost: null,
+          wouldSend: 0,
+          evaluated: 0,
+          skipped: {},
+        },
+      }),
+      ...routes,
+    }),
+  );
+  renderApp('/admin/push-campaigns/automations/new');
+  return m;
+};
+
+/** The first leaf row of the create page's tree, driven through its own labelled controls. */
+async function addLeaf(card: HTMLElement, value = '10') {
+  // The first «افزودن شرط» in the card belongs to the `when` tree; the audience filter has its own.
+  fireEvent.click(within(card).getAllByRole('button', { name: /افزودن شرط/ })[0] as HTMLElement);
+  fireEvent.change(within(card).getAllByLabelText('فیلد')[0] as HTMLSelectElement, {
+    target: { value: 'user.pointsBalance' },
+  });
+  fireEvent.change(within(card).getAllByLabelText('عملگر')[0] as HTMLSelectElement, {
+    target: { value: 'gte' },
+  });
+  fireEvent.change(within(card).getByLabelText('مقدار'), { target: { value } });
+}
+
+describe('منطق نسخهٔ ۲ در صفحهٔ ساخت', () => {
+  it('asks the server about the tree and the form in one and the same body', async () => {
+    const m = openCreate();
+    const card = await screen.findByTestId('create-logic-card', {}, { timeout: 5000 });
+    fireEvent.change(screen.getByLabelText('کلید (لاتین، یکتا)'), { target: { value: 'x_new' } });
+    fireEvent.change(screen.getByLabelText('نام (فقط برای پنل)'), {
+      target: { value: 'قاعدهٔ دست‌ساز' },
+    });
+    await addLeaf(card);
+
+    // The tree counter is the card's own proof that the leaf was taken, not only typed.
+    expect(within(card).getByText(/۲ گره/)).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole('button', { name: /اعتبارسنجی با سرور/ }));
+    await new Promise((r) => setTimeout(r, 80));
+    console.log('DBG after', JSON.stringify((document.body.textContent ?? '').slice(-300)));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain('POST /v1/admin/push-automations/validate'),
+    );
+    const body = m.calls.find((c) => c.key === 'POST /v1/admin/push-automations/validate')
+      ?.body as Record<string, unknown>;
+    // One builder: what the card shows is what «ساخت اتوماسیون» would send, form and tree together.
+    expect(body).toMatchObject({
+      key: 'x_new',
+      name: 'قاعدهٔ دست‌ساز',
+      schemaVersion: 2,
+      enabled: false,
+      when: {
+        type: 'group',
+        op: 'and',
+        children: [{ type: 'leaf', field: 'user.pointsBalance', operator: 'gte', value: 10 }],
+      },
+    });
+    // A number typed with Persian digits reaches the wire as a number, not as text.
+    expect((body.when as { children: Array<{ value: unknown }> }).children[0]?.value).toBe(10);
+  });
+
+  it('leaves the body in version 1 while the tree is empty', async () => {
+    const m = openCreate();
+    const card = await screen.findByTestId('create-logic-card', {}, { timeout: 5000 });
+    fireEvent.click(within(card).getByRole('button', { name: /اعتبارسنجی با سرور/ }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain('POST /v1/admin/push-automations/validate'),
+    );
+    const body = m.calls.find((c) => c.key === 'POST /v1/admin/push-automations/validate')
+      ?.body as Record<string, unknown>;
+    expect(body.schemaVersion).toBeUndefined();
+    expect(body.when).toBeUndefined();
+    expect(body.audience).toMatchObject({ type: 'all' });
+  });
+
+  it('shows the server’s own message next to the path it belongs to', async () => {
+    openCreate({
+      'POST /v1/admin/push-automations/validate': () => ({
+        data: {
+          ok: false,
+          errors: [{ path: 'when.children[0].value', message: 'مقدار باید عدد باشد.' }],
+          warnings: [],
+          cost: null,
+        },
+      }),
+    });
+    const card = await screen.findByTestId('create-logic-card', {}, { timeout: 5000 });
+    // A leaf the client is happy with, so the refusal below is provably the server's own words.
+    await addLeaf(card);
+    fireEvent.click(within(card).getByRole('button', { name: /اعتبارسنجی با سرور/ }));
+    // The path is quoted twice on purpose (once beside the message, once in the server's own verdict box),
+    // so the count is what proves neither place invented an error of its own.
+    expect((await within(card).findAllByText('when.children[0].value')).length).toBeGreaterThan(0);
+    expect(within(card).getAllByText(/مقدار باید عدد باشد/).length).toBeGreaterThan(0);
+    expect(within(card).getByText(/۱ مورد باید درست شود/)).toBeTruthy();
+  });
+
+  it('does not offer a tree the engine cannot read', async () => {
+    // An empty registry is the honest failure mode: the fields exist as a concept, but nothing is
+    // registered, so the panel must not draw a tree the engine would refuse to run.
+    mockApi(
+      baseRoutes({
+        'GET /v1/admin/push-automations/catalog': () => ({
+          data: { ...CATALOG, ruleFields: [], ruleOperators: [] },
+        }),
+      }),
+    );
+    renderApp('/admin/push-campaigns/automations/new');
+    expect(
+      await screen.findByText(/ساختن درختی که موتور معنایش را نمی‌داند/, {}, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('create-logic-card')).toBeNull();
+  });
+});
+
+describe('ترتیب قلم‌ها در درخت', () => {
+  it('«پایین» و «بالا» ترتیب شرط‌ها را عوض می‌کنند و همان ترتیب به سرور می‌رود', async () => {
+    const m = openCreate();
+    const card = await screen.findByTestId('create-logic-card', {}, { timeout: 5000 });
+    await addLeaf(card);
+    // a second leaf, on the text field
+    fireEvent.click(within(card).getAllByRole('button', { name: /افزودن شرط/ })[0] as HTMLElement);
+    const fields = () => within(card).getAllByLabelText('فیلد') as HTMLSelectElement[];
+    const ops = () => within(card).getAllByLabelText('عملگر') as HTMLSelectElement[];
+    const values = () => within(card).getAllByLabelText('مقدار') as HTMLInputElement[];
+    fireEvent.change(fields()[1] as HTMLSelectElement, { target: { value: 'user.role' } });
+    fireEvent.change(ops()[1] as HTMLSelectElement, { target: { value: 'eq' } });
+    fireEvent.change(values()[1] as HTMLInputElement, { target: { value: 'mentor' } });
+    expect(fields().map((x) => x.value)).toEqual(['user.pointsBalance', 'user.role']);
+
+    // the first row's «پایین», and nothing else
+    fireEvent.click(within(card).getAllByRole('button', { name: 'پایین' })[0] as HTMLElement);
+    expect(fields().map((x) => x.value)).toEqual(['user.role', 'user.pointsBalance']);
+    // bounds: at the top there is no «بالا» to press
+    expect(
+      (within(card).getAllByRole('button', { name: 'بالا' })[0] as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    fireEvent.click(within(card).getByRole('button', { name: /اعتبارسنجی با سرور/ }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain('POST /v1/admin/push-automations/validate'),
+    );
+    const body = m.calls.find((c) => c.key === 'POST /v1/admin/push-automations/validate')
+      ?.body as { when: { children: Array<{ field: string }> } };
+    expect(body.when.children.map((c) => c.field)).toEqual(['user.role', 'user.pointsBalance']);
+  });
+});

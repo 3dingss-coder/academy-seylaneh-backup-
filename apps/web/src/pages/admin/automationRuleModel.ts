@@ -164,6 +164,32 @@ export function removeChild(root: GroupDraft, path: string, index: number): Grou
     n.type === 'group' ? { ...n, children: n.children.filter((_, i) => i !== index) } : n,
   );
 }
+/**
+ * Reorder one item inside a list (a group's children, or the steps array). `and`/`or` do not care about
+ * order for the verdict, but the engine reports the *first* failing child — so this is the order of «چرا
+ * رد شد», and in a flow it is the execution order itself. It exists because the alternative was deleting a
+ * condition and typing it again.
+ */
+export function moveItem<T>(items: T[], index: number, delta: -1 | 1): T[] {
+  const to = index + delta;
+  if (to < 0 || to >= items.length) return items;
+  const next = [...items];
+  const [x] = next.splice(index, 1);
+  next.splice(to, 0, x as T);
+  return next;
+}
+
+export function moveChild(
+  root: GroupDraft,
+  path: string,
+  index: number,
+  delta: -1 | 1,
+): GroupDraft {
+  return updateTree(root, path, (n) =>
+    n.type === 'group' ? { ...n, children: moveItem(n.children, index, delta) } : n,
+  );
+}
+
 export function setGroupOp(root: GroupDraft, path: string, op: 'and' | 'or' | 'not'): GroupDraft {
   return updateTree(root, path, (n) => (n.type === 'group' ? { ...n, op } : n));
 }

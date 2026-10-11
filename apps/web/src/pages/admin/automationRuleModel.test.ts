@@ -8,6 +8,8 @@ import {
   emptyStep,
   fromExpr,
   logicToPatch,
+  moveChild,
+  moveItem,
   nestGroup,
   newGroup,
   policyFromExpr,
@@ -25,7 +27,7 @@ import {
   validateTree,
 } from './automationRuleModel';
 import type { CatalogMeta } from './automationWizardModel';
-import type { LogicDraft, StepDraft } from './automationRuleModel';
+import type { GroupDraft, LogicDraft, StepDraft } from './automationRuleModel';
 
 /**
  * The draft model behind the v2 editors. These are the tests that make the panel claim honest: the tree
@@ -374,5 +376,52 @@ describe('one save, one verdict', () => {
       ),
     ).toEqual([]);
     expect(logicToPatch(ok, META).when).toMatchObject({ type: 'group', op: 'and' });
+  });
+});
+
+describe('جابه‌جایی قلم‌ها (بالا/پایین)', () => {
+  it('در دو سر فهرست، همان فهرست را برمی‌گرداند', () => {
+    expect(moveItem(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
+    expect(moveItem(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
+    expect(moveItem(['a', 'b', 'c'], 1, -1)).toEqual(['b', 'a', 'c']);
+    expect(moveItem<string>([], 0, 1)).toEqual([]);
+  });
+
+  it('فقط فرزندانِ همان مسیر جابه‌جا می‌شوند، نه کل درخت', () => {
+    const root: GroupDraft = {
+      type: 'group',
+      op: 'and',
+      children: [
+        leaf('user.pointsBalance', 'gte', '1'),
+        {
+          type: 'group',
+          op: 'or',
+          children: [leaf('user.role', 'eq', 'mentor'), leaf('user.hasTeam', 'eq', 'true')],
+        },
+      ],
+    };
+    const moved = moveChild(root, '', 0, 1);
+    expect(moved.children.map((c) => c.type)).toEqual(['group', 'leaf']);
+    // The nested group travels intact — a move at the top must not touch what lives inside it.
+    expect(moved.children[0]).toEqual(root.children[1]);
+    // A move inside the nested group is addressed by its own path, and leaves the root's order alone.
+    const inner = moveChild(root, '1', 0, 1);
+    expect(
+      (inner.children[1] as GroupDraft).children.map((c) => (c as { field?: string }).field),
+    ).toEqual(['user.hasTeam', 'user.role']);
+    expect(inner.children[0]).toEqual(root.children[0]);
+  });
+
+  it('گام که جابه‌جا می‌شود، شناسه‌اش با خودش می‌رود', () => {
+    // Otherwise every per-step repeat policy would silently point at its neighbour.
+    const steps: StepDraft[] = [
+      { ...emptyStep('notify', 'g1'), title: 'اول', body: 'متن' },
+      { ...emptyStep('wait', 'g2'), minutes: '30' },
+    ];
+    const moved = moveItem(steps, 1, -1);
+    expect(moved.map((x) => x.id)).toEqual(['g2', 'g1']);
+    const expr = logicToPatch({ ...emptyLogic({}), steps: moved }, META).steps;
+    expect(expr?.map((x) => x.id)).toEqual(['g2', 'g1']);
+    expect(expr?.[0]).toMatchObject({ type: 'wait', minutes: 30 });
   });
 });

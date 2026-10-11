@@ -239,6 +239,21 @@ describe('ادیتور با ?template=', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not ask for confirmation when switching between untouched templates twice', async () => {
+    mockApi(asAdmin());
+    renderApp('/admin/push-campaigns/new?template=new-course');
+    await screen.findByLabelText('عنوان اعلان');
+    for (const id of ['event', 'offer']) {
+      fireEvent.click(screen.getByRole('button', { name: /قالب آماده/ }));
+      const list = await screen.findByTestId('template-picker-list');
+      fireEvent.click(within(list).getByTestId(`template-option-${id}`));
+      expect(
+        screen.queryByRole('dialog', { name: 'جایگزینی متن‌های فعلی؟' }),
+      ).not.toBeInTheDocument();
+    }
+    expect(screen.getByLabelText('عنوان اعلان')).toHaveValue('پیشنهاد ویژه برای تو');
+  });
+
   it('replaces directly when the form is untouched', async () => {
     mockApi(asAdmin());
     renderApp('/admin/push-campaigns/new?template=new-course');

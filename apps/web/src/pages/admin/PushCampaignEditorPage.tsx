@@ -123,7 +123,7 @@ function Editor({
   const [templateId, setTemplateId] = useState<string | null>(initialTemplate?.id ?? null);
   // The copy as it was when the editor opened — used to decide whether replacing the template
   // would throw away work the admin typed.
-  const [openingCopy] = useState<TemplateCopy>(() => templateCopy(form));
+  const [openingCopy, setOpeningCopy] = useState<TemplateCopy>(() => templateCopy(form));
   const [pendingTemplate, setPendingTemplate] = useState<PushTemplate | null>(null);
   const template = findTemplate(templateId) ?? null;
   const templateEdited = !sameTemplateCopy(openingCopy, templateCopy(form));
@@ -156,6 +156,8 @@ function Editor({
       return Object.fromEntries(Object.entries(e).filter(([key]) => !copyKeys.includes(key)));
     });
     setTemplateId(t.id);
+    // The applied template is the new baseline: only edits made AFTER it count as «edited».
+    setOpeningCopy(templateCopy(formFromTemplate(t)));
     setPendingTemplate(null);
     toast.show({ type: 'info', message: `قالب «${t.category}» روی فرم اعمال شد.` });
   };

@@ -15,7 +15,9 @@ import { deadConditions, usesInheritedPolicy, withDefaults } from './automation/
 import { allOperators } from './automation/operators';
 import { POLICY_LIMITS, validateRepeatPolicy } from './automation/repeat';
 import {
+  STEP_LIMITS,
   describeSteps,
+  stepDefs,
   needsFlowEngine,
   unknownStepPolicyKeys,
   validateSteps,
@@ -1430,6 +1432,9 @@ export function catalogMeta() {
     })),
     ruleLimits: RULE_LIMITS,
     repeatLimits: POLICY_LIMITS,
+    /** The step registry, so the workflow builder offers the actions the runner can actually perform. */
+    stepDefs: stepDefs(),
+    stepLimits: STEP_LIMITS,
     eventProducers: PRODUCED_EVENTS,
     unproducedEvents: unproducedEvents(),
     weekdays: WEEKDAYS,

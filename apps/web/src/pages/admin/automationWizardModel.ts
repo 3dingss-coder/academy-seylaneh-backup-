@@ -59,6 +59,15 @@ export interface DetailMeta extends AutomationRow {
   canDelete: boolean;
   needsCriticalConfirm: boolean;
   audienceRole: AudienceRole;
+  /** v2 logic, as stored — read here so the editor edits the rule's real definition, not an impression. */
+  schemaVersion?: 1 | 2;
+  when?: unknown;
+  steps?: unknown;
+  repeatPolicy?: unknown;
+  policySource?: 'rule' | 'inherited';
+  usesFlow?: boolean;
+  stepsSummary?: string | null;
+  deadConditions?: Array<{ field: string; operator: string; value: unknown }>;
 }
 
 export interface CatalogMeta {
@@ -79,6 +88,51 @@ export interface CatalogMeta {
   events: Record<string, string>;
   weekdays: string[];
   limits: { titleMax: number; bodyMax: number };
+  /**
+   * The live registries, so the builder offers what the evaluator can run — no hand-copied list in the
+   * page. All optional: a panel talking to an older deploy hides the v2 card instead of guessing.
+   */
+  ruleFields?: Array<{
+    id: string;
+    label: string;
+    kind: 'number' | 'text' | 'boolean' | 'enum' | 'date' | 'presence';
+    group?: string;
+    source?: string;
+    sweep?: boolean;
+    audience?: boolean;
+    hint?: string | null;
+    min?: number | null;
+    max?: number | null;
+    options?: unknown[];
+  }>;
+  ruleOperators?: Array<{ id: string; label: string; kinds: string[]; arity: 1 | 2 }>;
+  ruleLimits?: {
+    maxNodes: number;
+    maxDepth: number;
+    maxLeaves: number;
+    maxChildren: number;
+    maxSteps: number;
+  };
+  repeatLimits?: {
+    minIntervalFloorMs: number;
+    maxPerDay: number;
+    maxPerWeek: number;
+    maxPerMonth: number;
+  };
+  eventProducers?: string[];
+  unproducedEvents?: string[];
+  stepDefs?: Array<{
+    type: 'notify' | 'wait' | 'stop';
+    label: string;
+    summary: string;
+    fields: Array<{ name: string; kind: 'text' | 'number' | 'condition' | 'enum'; label: string }>;
+  }>;
+  stepLimits?: {
+    maxSteps: number;
+    minWaitMinutes: number;
+    maxWaitMinutes: number;
+    maxPolicyKeys: number;
+  };
 }
 
 export interface RunRow {

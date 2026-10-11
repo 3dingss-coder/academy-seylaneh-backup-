@@ -37,6 +37,7 @@ import {
   type WizardErrors,
   type WizardStepId,
 } from './automationWizardModel';
+import { LogicCard } from './AutomationRuleLogic';
 import { Chip, EstimateDialog } from './PushAutomationsPanel';
 import { RUN_KIND_LABELS, skippedSentence } from './pushAutomationRunModel';
 import {
@@ -378,6 +379,17 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
           سند تعریف حذف می‌شود. اعلان‌ها و پوش‌های فرستاده‌شده پاک نمی‌شوند و دلایل ردِ امروز تا
           پایان بازه‌شان در تاریخچه می‌مانند.
         </ConfirmDialog>
+      )}
+
+      {!det.isGate && (
+        <LogicCard
+          det={det}
+          meta={meta}
+          onSaved={() => {
+            refresh();
+            setEditing(false);
+          }}
+        />
       )}
 
       {dry && (

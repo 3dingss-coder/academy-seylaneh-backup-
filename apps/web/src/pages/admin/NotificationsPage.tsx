@@ -17,6 +17,7 @@ import { useNotifications } from '@/lib/queries';
 import { cn } from '@/lib/cn';
 import type { NotificationTemplate } from '@/lib/types';
 import { useTeams, useUsers } from './adminQueries';
+import { PushTemplatePicker } from './PushTemplatePicker';
 
 const KEY_LABEL: Record<string, string> = {
   welcome: 'خوش‌آمد ثبت‌نام',
@@ -295,10 +296,16 @@ function ManualSend() {
           برای ساخت پیش‌نویس، زمان‌بندی، پیش‌نمایش کامل و گزارش نتیجه ارسال، از کمپین‌های Push
           استفاده کنید.
         </p>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => navigate('/admin/push-campaigns/new')}>
             ساخت کمپین Push
           </Button>
+          <PushTemplatePicker
+            label="شروع از قالب آماده"
+            variant="ghost"
+            onPick={(t) => navigate(`/admin/push-campaigns/new?template=${t.id}`)}
+            hint="قالب انتخابی فرم کمپین Push را پر می‌کند؛ متن و تصویر را می‌توانید تغییر دهید."
+          />
         </div>
       </Card>
       <Card className="flex flex-col gap-3">

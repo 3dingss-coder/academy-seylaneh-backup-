@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
 import type { Me } from '@/lib/types';
@@ -450,5 +450,89 @@ describe('admin: جزئیات و ویزارد اتوماسیون', () => {
       key: 'weekly_note',
       enabled: false,
     });
+  });
+
+  const DRAFT = JSON.stringify({
+    at: '2026-10-03T06:30:00.000Z',
+    step: 'wording',
+    draft: {
+      key: 'weekly_note',
+      name: 'یادداشت هفتگی',
+      description: 'خلاصه هفته را یادآوری می‌کند',
+      message: { title: 'هفته نو شد', body: 'سه مرحله مانده', actionRef: '/learn', imageUrl: null },
+    },
+  });
+  const DRAFT_KEY = 'ssl.pus…**aft';
+
+  it('offers the browser-local draft on the create page and refills the form from it', async () => {
+    localStorage.setItem(DRAFT_KEY, DRAFT);
+    const m = mockApi(ROUTES());
+    renderApp('/admin/push-campaigns/automations/new');
+    const banner = await screen.findByTestId('draft-banner', {}, { timeout: 5000 });
+    expect(banner.textContent).toContain('weekly_note');
+    // Where the draft lives is said out loud, because «draft» otherwise reads as «saved on the server».
+    expect(banner.textContent).toMatch(/به سرور فرستاده نشده/);
+    expect(m.calls.some((c) => c.key === 'POST /v1/admin/push-automations')).toBe(false);
+
+    fireEvent.click(within(banner).getByRole('button', { name: 'ادامهٔ پیش‌نویس' }));
+    // It opens on the step it was left on — «متن و ارسال», not back at the first question.
+    expect(screen.getByLabelText('عنوان اعلان')).toBeInTheDocument();
+    expect(screen.queryByTestId('draft-banner')).toBeNull();
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: 'قبلی' }));
+    expect((screen.getByLabelText('کلید (لاتین، یکتا)') as HTMLInputElement).value).toBe(
+      'weekly_note',
+    );
+    expect((screen.getByLabelText('نام (فقط برای پنل)') as HTMLInputElement).value).toBe(
+      'یادداشت هفتگی',
+    );
+  });
+
+  it('throws the draft away on request, leaving an untouched form', async () => {
+    localStorage.setItem(DRAFT_KEY, DRAFT);
+    mockApi(ROUTES());
+    renderApp('/admin/push-campaigns/automations/new');
+    const banner = await screen.findByTestId('draft-banner', {}, { timeout: 5000 });
+    fireEvent.click(within(banner).getByRole('button', { name: 'دور انداختن' }));
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeNull());
+    expect(screen.queryByTestId('draft-banner')).toBeNull();
+    expect((screen.getByLabelText('کلید (لاتین، یکتا)') as HTMLInputElement).value).toBe('');
+  });
+
+  it('«ذخیره پیش‌نویس» writes to this browser and asks the server for nothing', async () => {
+    const m = mockApi(ROUTES());
+    renderApp('/admin/push-campaigns/automations/new');
+    const name = await screen.findByLabelText('نام (فقط برای پنل)', {}, { timeout: 5000 });
+    fireEvent.change(name, { target: { value: 'یادداشت هفتگی' } });
+    fireEvent.click(screen.getByTestId('draft-save'));
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeTruthy());
+    const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? '{}') as Record<string, unknown>;
+    expect((raw.draft as Record<string, unknown>)?.name).toBe('یادداشت هفتگی');
+    expect(raw.step).toBe('what');
+    expect(await screen.findByText(/هیچ قاعده‌ای ساخته نشد/)).toBeInTheDocument();
+    expect(m.calls.some((c) => c.key.startsWith('POST /v1/admin/push-automations'))).toBe(false);
+  });
+
+  it('a finished create leaves no draft behind', async () => {
+    localStorage.setItem(DRAFT_KEY, DRAFT);
+    const m = mockApi(ROUTES());
+    renderApp('/admin/push-campaigns/automations/new');
+    expect(await screen.findByTestId('draft-banner', {}, { timeout: 5000 })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('کلید (لاتین، یکتا)'), {
+      target: { value: 'weekly_note' },
+    });
+    fireEvent.change(screen.getByLabelText('نام (فقط برای پنل)'), {
+      target: { value: 'یادداشت هفتگی' },
+    });
+    fireEvent.change(screen.getByLabelText('توضیح: این قانون چه کاری می‌کند'), {
+      target: { value: 'خلاصه هفته را یادآوری می‌کند' },
+    });
+    toLastStep();
+    fireEvent.change(screen.getByLabelText('عنوان اعلان'), { target: { value: 'هفته نو شد' } });
+    fireEvent.change(screen.getByLabelText('متن اعلان'), { target: { value: 'سه مرحله مانده' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ساخت اتوماسیون (خاموش)' }));
+    await waitFor(() =>
+      expect(m.calls.some((c) => c.key === 'POST /v1/admin/push-automations')).toBe(true),
+    );
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeNull());
   });
 });

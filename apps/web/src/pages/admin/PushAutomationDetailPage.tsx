@@ -11,6 +11,7 @@ import {
   History,
   Pencil,
   RotateCcw,
+  Inbox,
   Save,
   Trash2,
   Wand2,
@@ -30,8 +31,12 @@ import {
   TRIGGER_FIELDS,
   WIZARD_STEPS,
   allErrors,
+  clearDraft,
   createBody,
   deliverySummary,
+  draftStepLabel,
+  loadDraft,
+  saveDraft,
   draftFromDetail,
   emptyDraft,
   incompleteSteps,
@@ -47,6 +52,7 @@ import {
   type RunRow,
   type TestSendResult,
   type TextRevision,
+  type SavedDraft,
   type WizardDraft,
   type WizardErrors,
   type WizardStepId,
@@ -63,6 +69,7 @@ import {
   type AutomationRow,
   type DryRunResult,
 } from './pushAutomationModel';
+import { faTehranDateTime } from './pushCampaignModel';
 import { useTeams, useUsers } from './adminQueries';
 
 /**
@@ -642,6 +649,7 @@ function Wizard({
   teams,
   users,
   createMode,
+  onSaveDraft,
 }: {
   draft: WizardDraft;
   setDraft: (fn: (d: WizardDraft) => WizardDraft) => void;
@@ -656,6 +664,8 @@ function Wizard({
   onReload?: () => void;
   onCancel: () => void;
   onSubmit: (d: WizardDraft) => void;
+  /** Only the create page passes it: an in-progress edit of a live rule has the saved rule to go back to. */
+  onSaveDraft?: () => void;
   teams: Array<{ id: string; name: string }>;
   users: Array<{ id: string; name: string }>;
   createMode?: boolean;
@@ -1141,6 +1151,16 @@ function Wizard({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
         <p className="text-xs text-muted-fg">{WIZARD_STEPS[idx]?.hint}</p>
         <div className="flex items-center gap-2">
+          {!!onSaveDraft && (
+            <Button
+              variant="ghost"
+              icon={<Inbox className="size-4" aria-hidden />}
+              onClick={onSaveDraft}
+              data-testid="draft-save"
+            >
+              ذخیره پیش‌نویس
+            </Button>
+          )}
           <Button variant="ghost" onClick={onCancel}>
             انصراف
           </Button>
@@ -1316,9 +1336,17 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
   const [draft, setDraft] = useState<WizardDraft>(() => emptyDraft(meta));
   const [errors, setErrors] = useState<WizardErrors>({});
   const [step, setStep] = useState<WizardStepId>('what');
+  /**
+   * A draft is browser-local on purpose: `localStorage`, never the rule collection. Offering «save the
+   * half-written rule» as a server write would put an unvalidatable document next to the live ones, and
+   * the panel would have to explain the difference forever; here the banner says it in one line.
+   */
+  const [saved, setSaved] = useState<SavedDraft | null>(() => loadDraft());
   const create = useMutation({
     mutationFn: (body: ReturnType<typeof createBody>) => api.post('/admin/push-automations', body),
     onSuccess: (data) => {
+      // The draft's whole job was to survive until here; past the create it is stale.
+      clearDraft();
       void qc.invalidateQueries({ queryKey: ['admin', 'push-automations'] });
       toast.show({
         type: 'success',
@@ -1340,6 +1368,38 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
         subtitle="اگر سناریویی در کاتالوگ نیست، همین‌جا ساخته می‌شود — و خاموش می‌ماند"
         back="/admin/push-campaigns/automations"
       />
+      {saved && (
+        <Card
+          className="flex flex-wrap items-center gap-2 border-primary/30 bg-soft-brand"
+          data-testid="draft-banner"
+        >
+          <p className="flex-1 text-xs leading-6 text-text-secondary">
+            پیش‌نویسی از همین مرورگر پیدا شد — کلید{' '}
+            <b className="font-mono text-text">{saved.draft.key.trim() || '—'}</b>، گام «
+            {draftStepLabel(saved.step)}»، آخرین ویرایش {faTehranDateTime(saved.at)}. این پیش‌نویس
+            به سرور فرستاده نشده و در دستگاه دیگری نیست؛ ادامه‌دادنش فقط فرم را پر می‌کند.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDraft(saved.draft);
+              setStep(saved.step);
+              setSaved(null);
+            }}
+          >
+            ادامهٔ پیش‌نویس
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              clearDraft();
+              setSaved(null);
+            }}
+          >
+            دور انداختن
+          </Button>
+        </Card>
+      )}
       <Wizard
         draft={draft}
         setDraft={setDraft}
@@ -1352,6 +1412,21 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
         busy={create.isPending}
         onCancel={() => navigate('/admin/push-campaigns/automations')}
         onSubmit={(d) => create.mutate(createBody(d))}
+        onSaveDraft={() => {
+          const written = saveDraft(step, draft);
+          if (written) {
+            setSaved(written);
+            toast.show({
+              type: 'success',
+              message: 'پیش‌نویس در همین مرورگر ماند؛ سرور چیزی نمی‌داند و هیچ قاعده‌ای ساخته نشد.',
+            });
+          } else {
+            toast.show({
+              type: 'warning',
+              message: 'این مرورگر اجازهٔ ذخیرهٔ محلی نداد (حالت خصوصی یا حافظهٔ پر).',
+            });
+          }
+        }}
         teams={[]}
         users={[]}
         createMode

@@ -3,13 +3,18 @@ import {
   AUDIENCE_TYPE_LABELS,
   TRIGGER_FIELDS,
   WIZARD_STEPS,
+  DRAFT_STORAGE_KEY,
   allErrors,
+  clearDraft,
   conditionLabel,
+  draftStepLabel,
   createBody,
   deliverySummary,
   draftFromDetail,
   emptyDraft,
   eventLabel,
+  loadDraft,
+  saveDraft,
   incompleteSteps,
   opLabel,
   patchFromDraft,
@@ -367,5 +372,50 @@ describe('wizard model: sentences and previews', () => {
 
   it('the four steps are the four questions an admin has to answer, in order', () => {
     expect(WIZARD_STEPS.map((s) => s.id)).toEqual(['what', 'when', 'who', 'wording']);
+  });
+});
+
+describe('wizard model: پیش‌نویسِ محلی', () => {
+  it('writes what the form holds and reads it back', () => {
+    const written = saveDraft(
+      'who',
+      { ...emptyDraft(null), key: 'x_note' },
+      '2026-10-03T06:30:00.000Z',
+    );
+    expect(written).toMatchObject({ at: '2026-10-03T06:30:00.000Z', step: 'who' });
+    const back = loadDraft();
+    expect(back?.draft.key).toBe('x_note');
+    expect(back?.step).toBe('who');
+    clearDraft();
+    expect(loadDraft()).toBeNull();
+  });
+
+  it('fills the gaps instead of trusting whatever is in there', () => {
+    localStorage.setItem(
+      DRAFT_STORAGE_KEY,
+      JSON.stringify({ at: 'x', step: 'nope', draft: { key: 'k' } }),
+    );
+    const back = loadDraft();
+    expect(back?.step).toBe('what');
+    // Every field the current form expects is present, so an old/partial draft cannot `undefined` its way
+    // into the wizard — and the one field it did store survives untouched.
+    expect(Object.keys(back?.draft ?? {}).sort()).toEqual(Object.keys(emptyDraft(null)).sort());
+    expect(back?.draft).toMatchObject({ key: 'k', title: emptyDraft(null).title });
+    expect(draftStepLabel(back?.step ?? 'what')).toBe('چیست');
+  });
+
+  it('drops anything it does not recognise, rather than half-applying it', () => {
+    for (const raw of [
+      '',
+      'not json',
+      '[]',
+      'null',
+      '{"at":1}',
+      '{"at":"x"}',
+      '{"at":"x","draft":3}',
+    ]) {
+      localStorage.setItem(DRAFT_STORAGE_KEY, raw);
+      expect(loadDraft()).toBeNull();
+    }
   });
 });

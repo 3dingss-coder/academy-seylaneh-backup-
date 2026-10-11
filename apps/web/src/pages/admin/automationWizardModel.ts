@@ -623,6 +623,77 @@ export function patchFromDraft(d: WizardDraft): PatchBody & { expectedVersion?: 
   };
 }
 
+/**
+ * A work-in-progress of the create form, kept in *this browser* only. It is not a server-side draft:
+ * nothing is stored in the rule collection, nothing is exported, nothing can be seen from another device,
+ * and no validation is implied by it. It exists for one failure mode — someone starts a rule, the tab
+ * closes, and the work is gone.
+ */
+export const DRAFT_STORAGE_KEY = 'ssl.pus…**aft';
+
+export interface SavedDraft {
+  /** When it was saved, ISO — the banner shows it in Tehran time. */
+  at: string;
+  step: WizardStepId;
+  draft: WizardDraft;
+}
+
+const STEP_IDS: readonly string[] = WIZARD_STEPS.map((x) => x.id);
+
+/**
+ * `null` for everything that is not a draft we wrote: no entry, corrupt JSON, a shape from another
+ * version of the form. A half-read draft is worse than none, so the rule is to drop anything odd and let
+ * `emptyDraft` supply the defaults the current `meta` needs.
+ */
+export function loadDraft(): SavedDraft | null {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<SavedDraft> | null;
+    if (!v || typeof v !== 'object' || typeof v.at !== 'string') return null;
+    if (!v.draft || typeof v.draft !== 'object') return null;
+    return {
+      at: v.at,
+      step: STEP_IDS.includes(String(v.step)) ? (v.step as WizardStepId) : 'what',
+      draft: { ...emptyDraft(null), ...(v.draft as WizardDraft) },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Returns what was written (or `null` when the browser refused), so the caller's toast can be honest. */
+export function saveDraft(
+  step: WizardStepId,
+  draft: WizardDraft,
+  at = new Date().toISOString(),
+): SavedDraft | null {
+  const saved: SavedDraft = { at, step, draft };
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(saved));
+  } catch {
+    return null;
+  }
+  return saved;
+}
+
+export function clearDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+export function draftStepLabel(step: WizardStepId): string {
+  return WIZARD_STEPS.find((x) => x.id === step)?.label ?? step;
+}
+
 /** Body for `POST /admin/push-automations` — the same object plus the key, never `enabled`. */
 export function createBody(d: WizardDraft): PatchBody & { key: string; enabled: false } {
   return { ...patchFromDraft(d), key: d.key.trim(), enabled: false };

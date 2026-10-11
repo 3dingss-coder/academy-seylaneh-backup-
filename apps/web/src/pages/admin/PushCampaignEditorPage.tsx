@@ -1,6 +1,6 @@
 import { userOptionLabel } from '@/lib/digits';
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Archive, CalendarClock, Save, Send, XCircle } from 'lucide-react';
 import { Button, Card, Input, Skeleton, useToast } from '@/components/ui';
@@ -11,9 +11,23 @@ import { Select, Textarea } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
 import { ApiError, api } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import { errMsg } from '@/lib/errors';
 import { faNumber } from '@/lib/format';
 import { useTeams, useUsers } from './adminQueries';
+import { PushPreview } from './PushPreview';
+import { PushTemplatePicker } from './PushTemplatePicker';
+import {
+  ACCENT_CLASSES,
+  TEMPLATE_COPY_FIELDS,
+  copyFromTemplate,
+  findTemplate,
+  formFromTemplate,
+  sameTemplateCopy,
+  templateCopy,
+  type PushTemplate,
+  type TemplateCopy,
+} from './pushTemplates';
 import { CampaignStatusBadge } from './PushCampaignsPage';
 import {
   AUDIENCE_TYPE_LABEL,
@@ -43,6 +57,9 @@ const qk = (id: string | undefined) => ['admin', 'push-campaign', id ?? 'new'] a
 
 export function PushCampaignEditorPage() {
   const { id } = useParams();
+  const [sp] = useSearchParams();
+  // `?template=<id>` prefills a NEW campaign. An unknown id is ignored: the form stays empty.
+  const templateParam = sp.get('template');
   const isNew = !id;
   const detail = useQuery({
     queryKey: qk(id),
@@ -53,27 +70,26 @@ export function PushCampaignEditorPage() {
   return (
     <div className="flex flex-col gap-4">
       {isNew ? (
-        <PageHeader title="کمپین جدید اعلان" back="/admin/push-campaigns" />
+        <Editor key="new" campaign={null} templateParam={templateParam} />
       ) : (
-        <QueryState query={detail} loading={<Skeleton className="h-24" />} empty={null}>
-          {(d) => (
-            <PageHeader
-              title={d.campaign.name}
-              back="/admin/push-campaigns"
-              subtitle={<CampaignStatusBadge status={d.campaign.status} />}
-            />
-          )}
-        </QueryState>
-      )}
-      {isNew ? (
-        <Editor key="new" campaign={null} />
-      ) : (
-        <QueryState query={detail} loading={<Skeleton className="h-96" />}>
+        <QueryState query={detail} loading={<Skeleton className="h-96" />} empty={null}>
           {(d) =>
             isEditable(d.campaign.status) ? (
-              <Editor key={`${d.campaign.id}-${d.campaign.version}`} campaign={d.campaign} />
+              <Editor
+                key={`${d.campaign.id}-${d.campaign.version}`}
+                campaign={d.campaign}
+                templateParam={templateParam}
+              />
             ) : (
-              <ReadOnlyResults detail={d} />
+              <>
+                {/* A campaign that already started is read-only: no form, no template picker. */}
+                <PageHeader
+                  title={d.campaign.name}
+                  back="/admin/push-campaigns"
+                  subtitle={<CampaignStatusBadge status={d.campaign.status} />}
+                />
+                <ReadOnlyResults detail={d} />
+              </>
             )
           }
         </QueryState>
@@ -82,16 +98,35 @@ export function PushCampaignEditorPage() {
   );
 }
 
-function Editor({ campaign }: { campaign: PushCampaign | null }) {
+function Editor({
+  campaign,
+  templateParam,
+}: {
+  campaign: PushCampaign | null;
+  templateParam: string | null;
+}) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const teams = useTeams();
   const users = useUsers();
+  // An existing campaign is never overwritten by `?template=`; the param only seeds a new one.
+  const initialTemplate = campaign ? undefined : findTemplate(templateParam);
   const [form, setForm] = useState<CampaignForm>(() =>
-    campaign ? formFromCampaign(campaign) : EMPTY_FORM,
+    campaign
+      ? formFromCampaign(campaign)
+      : initialTemplate
+        ? formFromTemplate(initialTemplate)
+        : EMPTY_FORM,
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [templateId, setTemplateId] = useState<string | null>(initialTemplate?.id ?? null);
+  // The copy as it was when the editor opened — used to decide whether replacing the template
+  // would throw away work the admin typed.
+  const [openingCopy] = useState<TemplateCopy>(() => templateCopy(form));
+  const [pendingTemplate, setPendingTemplate] = useState<PushTemplate | null>(null);
+  const template = findTemplate(templateId) ?? null;
+  const templateEdited = !sameTemplateCopy(openingCopy, templateCopy(form));
   const [version, setVersion] = useState<number | null>(campaign?.version ?? null);
   const [savedId, setSavedId] = useState<string | null>(campaign?.id ?? null);
   const [sendOpen, setSendOpen] = useState(false);
@@ -112,6 +147,44 @@ function Editor({ campaign }: { campaign: PushCampaign | null }) {
         return rest;
       });
     };
+
+  /** Puts a template's copy into the form. Audience, channel and schedule are left alone. */
+  const applyTemplate = (t: PushTemplate) => {
+    setForm((f) => ({ ...f, ...copyFromTemplate(t) }));
+    setErrors((e) => {
+      const copyKeys = TEMPLATE_COPY_FIELDS as readonly string[];
+      return Object.fromEntries(Object.entries(e).filter(([key]) => !copyKeys.includes(key)));
+    });
+    setTemplateId(t.id);
+    setPendingTemplate(null);
+    toast.show({ type: 'info', message: `قالب «${t.category}» روی فرم اعمال شد.` });
+  };
+
+  /** Replacing a template on a form the admin already edited needs an explicit confirmation. */
+  const requestTemplate = (t: PushTemplate) => {
+    if (templateEdited && t.id !== templateId) setPendingTemplate(t);
+    else applyTemplate(t);
+  };
+
+  /** Detach the template. Typed text is kept; untouched template copy is cleared. */
+  const removeTemplate = () => {
+    if (!template) return;
+    const keep = templateEdited;
+    setTemplateId(null);
+    if (!keep)
+      setForm((f) => ({
+        ...f,
+        name: EMPTY_FORM.name,
+        title: EMPTY_FORM.title,
+        body: EMPTY_FORM.body,
+        imageUrl: EMPTY_FORM.imageUrl,
+        actionRef: EMPTY_FORM.actionRef,
+      }));
+    toast.show({
+      type: 'info',
+      message: keep ? 'قالب حذف شد؛ متن‌های شما نگه داشته شد.' : 'قالب حذف شد.',
+    });
+  };
 
   const invalidate = (detailId: string) => {
     void qc.invalidateQueries({ queryKey: ['admin', 'push-campaigns'] });
@@ -276,196 +349,250 @@ function Editor({ campaign }: { campaign: PushCampaign | null }) {
 
   const sendable = form.title.trim().length >= 2 && form.body.trim().length >= 2;
 
+  const TemplateIcon = template?.icon;
+  const templateAccent = template ? ACCENT_CLASSES[template.accent] : null;
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      <div className="flex flex-col gap-4">
-        <Card className="flex flex-col gap-4" aria-label="اطلاعات کمپین">
-          <h2 className="text-base font-extrabold text-text">۱. اطلاعات کمپین</h2>
-          <Input
-            label="نام داخلی کمپین"
-            hint="فقط برای شناسایی در پنل است و کاربران آن را نمی‌بینند."
-            value={form.name}
-            maxLength={80}
-            onChange={(e) => set('name')(e.target.value)}
-            error={errors.name}
+    <>
+      <PageHeader
+        title={campaign ? campaign.name : 'کمپین جدید اعلان'}
+        back="/admin/push-campaigns"
+        subtitle={campaign ? <CampaignStatusBadge status={campaign.status} /> : undefined}
+        actions={
+          <PushTemplatePicker
+            label="قالب آماده"
+            onPick={requestTemplate}
+            hint="قالب فقط متن، تصویر و مقصد را پر می‌کند؛ مخاطب، کانال و زمان ارسال دست‌نخورده می‌مانند."
           />
-          <Select
-            label="مخاطبان هدف"
-            value={form.audienceType}
-            onChange={(e) => {
-              set('audienceType')(e.target.value as CampaignForm['audienceType']);
-              set('targetId')('');
-            }}
-          >
-            {(Object.keys(AUDIENCE_TYPE_LABEL) as Array<keyof typeof AUDIENCE_TYPE_LABEL>).map(
-              (k) => (
-                <option key={k} value={k}>
-                  {AUDIENCE_TYPE_LABEL[k]}
-                </option>
-              ),
-            )}
-          </Select>
-          {form.audienceType !== 'all' && (
-            <Select
-              label={
-                form.audienceType === 'team'
-                  ? 'تیم'
-                  : form.audienceType === 'role'
-                    ? 'نقش'
-                    : 'کاربر'
-              }
-              value={form.targetId}
-              onChange={(e) => set('targetId')(e.target.value)}
-              error={errors.targetId}
+        }
+      />
+
+      {template && templateAccent && TemplateIcon && (
+        <Card
+          className="flex flex-wrap items-center justify-between gap-3 border-primary/25 bg-primary-light/40"
+          aria-label="قالب انتخاب‌شده"
+          data-testid="template-banner"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={cn(
+                'flex size-9 shrink-0 items-center justify-center rounded-card border',
+                templateAccent.chip,
+              )}
+              aria-hidden
             >
-              <option value="">انتخاب کنید</option>
-              {targetOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              <TemplateIcon className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs text-text-secondary">ساخته‌شده از قالب</p>
+              <p className="truncate text-sm font-extrabold text-text">{template.category}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PushTemplatePicker
+              label="تغییر قالب"
+              variant="ghost"
+              onPick={requestTemplate}
+              hint="متن، تصویر و مقصد فعلی با قالب تازه جایگزین می‌شود."
+            />
+            <Button variant="ghost" onClick={removeTemplate}>
+              حذف قالب
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col gap-4" aria-label="اطلاعات کمپین">
+            <h2 className="text-base font-extrabold text-text">۱. اطلاعات کمپین</h2>
+            <Input
+              label="نام داخلی کمپین"
+              hint="فقط برای شناسایی در پنل است و کاربران آن را نمی‌بینند."
+              value={form.name}
+              maxLength={80}
+              onChange={(e) => set('name')(e.target.value)}
+              error={errors.name}
+            />
+            <Select
+              label="مخاطبان هدف"
+              value={form.audienceType}
+              onChange={(e) => {
+                set('audienceType')(e.target.value as CampaignForm['audienceType']);
+                set('targetId')('');
+              }}
+            >
+              {(Object.keys(AUDIENCE_TYPE_LABEL) as Array<keyof typeof AUDIENCE_TYPE_LABEL>).map(
+                (k) => (
+                  <option key={k} value={k}>
+                    {AUDIENCE_TYPE_LABEL[k]}
+                  </option>
+                ),
+              )}
+            </Select>
+            {form.audienceType !== 'all' && (
+              <Select
+                label={
+                  form.audienceType === 'team'
+                    ? 'تیم'
+                    : form.audienceType === 'role'
+                      ? 'نقش'
+                      : 'کاربر'
+                }
+                value={form.targetId}
+                onChange={(e) => set('targetId')(e.target.value)}
+                error={errors.targetId}
+              >
+                <option value="">انتخاب کنید</option>
+                {targetOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <Select
+              label="نوع دستگاه"
+              value={form.channel}
+              onChange={(e) => set('channel')(e.target.value as CampaignForm['channel'])}
+              hint="فقط کاربرانی ارسال می‌شود که دستگاه فعال از این نوع دارند."
+            >
+              {(Object.keys(CHANNEL_LABEL) as Array<keyof typeof CHANNEL_LABEL>).map((k) => (
+                <option key={k} value={k}>
+                  {CHANNEL_LABEL[k]}
                 </option>
               ))}
             </Select>
-          )}
-          <Select
-            label="نوع دستگاه"
-            value={form.channel}
-            onChange={(e) => set('channel')(e.target.value as CampaignForm['channel'])}
-            hint="فقط کاربرانی ارسال می‌شود که دستگاه فعال از این نوع دارند."
-          >
-            {(Object.keys(CHANNEL_LABEL) as Array<keyof typeof CHANNEL_LABEL>).map((k) => (
-              <option key={k} value={k}>
-                {CHANNEL_LABEL[k]}
-              </option>
-            ))}
-          </Select>
-          <AudienceEstimate preview={preview} enabled={audienceEnabled} />
-        </Card>
+            <AudienceEstimate preview={preview} enabled={audienceEnabled} />
+          </Card>
 
-        <Card className="flex flex-col gap-4" aria-label="محتوای اعلان">
-          <h2 className="text-base font-extrabold text-text">۲. محتوای اعلان</h2>
-          <Input
-            label="عنوان اعلان"
-            value={form.title}
-            maxLength={80}
-            onChange={(e) => set('title')(e.target.value)}
-            error={errors.title}
-            hint={`${faNumber(form.title.length)} / ۸۰`}
-          />
-          <Textarea
-            label="متن اعلان"
-            value={form.body}
-            maxLength={300}
-            onChange={(e) => set('body')(e.target.value)}
-            error={errors.body}
-            hint={`${faNumber(form.body.length)} / ۳۰۰`}
-          />
-          <Input
-            label="آدرس تصویر (اختیاری)"
-            value={form.imageUrl}
-            maxLength={2048}
-            ltr
-            placeholder="https://…"
-            onChange={(e) => set('imageUrl')(e.target.value)}
-            error={errors.imageUrl}
-            hint="لینک عمومی و HTTPS. نمایش تصویر به سیستم‌عامل و مرورگر بستگی دارد."
-          />
-          <Select
-            label="مقصد پس از کلیک"
-            value={form.actionRef}
-            onChange={(e) => set('actionRef')(e.target.value)}
-            error={errors.actionRef}
-            hint="فقط صفحات داخلی اپلیکیشن قابل انتخاب‌اند."
-          >
-            {DESTINATIONS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label} ({d.value})
-              </option>
-            ))}
-          </Select>
-        </Card>
-
-        <Card className="flex flex-col gap-4" aria-label="زمان ارسال">
-          <h2 className="text-base font-extrabold text-text">۳. زمان ارسال</h2>
-          <p className="text-xs text-text-secondary">
-            زمان به وقت تهران (UTC+۳:۳۰) ثبت می‌شود. زمان‌بندی روی سرور انجام می‌شود؛ بستن مرورگر یا
-            این صفحه روی اجرای آن اثری ندارد. سرور هر ۱۵ دقیقه کمپین‌های سررسیده را بررسی می‌کند.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <JalaliDateField
-              label="تاریخ ارسال"
-              mode="date"
-              value={form.scheduleDate}
-              onChange={set('scheduleDate')}
-              error={errors.scheduleDate}
+          <Card className="flex flex-col gap-4" aria-label="محتوای اعلان">
+            <h2 className="text-base font-extrabold text-text">۲. محتوای اعلان</h2>
+            <Input
+              label="عنوان اعلان"
+              value={form.title}
+              maxLength={80}
+              onChange={(e) => set('title')(e.target.value)}
+              error={errors.title}
+              hint={`${faNumber(form.title.length)} / ۸۰`}
+            />
+            <Textarea
+              label="متن اعلان"
+              value={form.body}
+              maxLength={300}
+              onChange={(e) => set('body')(e.target.value)}
+              error={errors.body}
+              hint={`${faNumber(form.body.length)} / ۳۰۰`}
             />
             <Input
-              label="ساعت ارسال (تهران)"
-              type="time"
-              value={form.scheduleTime}
-              onChange={(e) => set('scheduleTime')(e.target.value)}
+              label="آدرس تصویر (اختیاری)"
+              value={form.imageUrl}
+              maxLength={2048}
+              ltr
+              placeholder="https://…"
+              onChange={(e) => set('imageUrl')(e.target.value)}
+              error={errors.imageUrl}
+              hint="لینک عمومی و HTTPS. نمایش تصویر به سیستم‌عامل و مرورگر بستگی دارد."
             />
+            <Select
+              label="مقصد پس از کلیک"
+              value={form.actionRef}
+              onChange={(e) => set('actionRef')(e.target.value)}
+              error={errors.actionRef}
+              hint="فقط صفحات داخلی اپلیکیشن قابل انتخاب‌اند."
+            >
+              {DESTINATIONS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label} ({d.value})
+                </option>
+              ))}
+            </Select>
+          </Card>
+
+          <Card className="flex flex-col gap-4" aria-label="زمان ارسال">
+            <h2 className="text-base font-extrabold text-text">۳. زمان ارسال</h2>
+            <p className="text-xs text-text-secondary">
+              زمان به وقت تهران (UTC+۳:۳۰) ثبت می‌شود. زمان‌بندی روی سرور انجام می‌شود؛ بستن مرورگر
+              یا این صفحه روی اجرای آن اثری ندارد. سرور هر ۱۵ دقیقه کمپین‌های سررسیده را بررسی
+              می‌کند.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <JalaliDateField
+                label="تاریخ ارسال"
+                mode="date"
+                value={form.scheduleDate}
+                onChange={set('scheduleDate')}
+                error={errors.scheduleDate}
+              />
+              <Input
+                label="ساعت ارسال (تهران)"
+                type="time"
+                value={form.scheduleTime}
+                onChange={(e) => set('scheduleTime')(e.target.value)}
+              />
+            </div>
+          </Card>
+
+          <div className="sticky bottom-2 z-10 flex flex-col gap-2 rounded-card border border-border bg-surface/95 p-3 shadow-md backdrop-blur sm:flex-row sm:flex-wrap">
+            <Button
+              variant="secondary"
+              icon={<Save className="size-4" aria-hidden />}
+              loading={draft.isPending}
+              disabled={busy}
+              onClick={() => submitCheck(false) && draft.mutate()}
+            >
+              ذخیره پیش‌نویس
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<CalendarClock className="size-4" aria-hidden />}
+              loading={scheduleMut.isPending}
+              disabled={busy || !form.scheduleDate || !form.scheduleTime}
+              onClick={() => submitCheck(true) && setScheduleOpen(true)}
+            >
+              زمان‌بندی ارسال
+            </Button>
+            <Button
+              icon={<Send className="size-4" aria-hidden />}
+              disabled={busy || !sendable}
+              onClick={openSend}
+            >
+              ارسال فوری
+            </Button>
+            {campaign && (
+              <Button
+                variant="ghost"
+                icon={<Archive className="size-4" aria-hidden />}
+                onClick={() => setArchiveOpen(true)}
+                disabled={busy}
+              >
+                آرشیو
+              </Button>
+            )}
+            {campaign?.status === 'scheduled' && (
+              <Button
+                variant="ghost"
+                icon={<XCircle className="size-4" aria-hidden />}
+                onClick={() => setCancelOpen(true)}
+                disabled={busy}
+              >
+                لغو زمان‌بندی
+              </Button>
+            )}
           </div>
-        </Card>
-
-        <div className="sticky bottom-2 z-10 flex flex-col gap-2 rounded-card border border-border bg-surface/95 p-3 shadow-md backdrop-blur sm:flex-row sm:flex-wrap">
-          <Button
-            variant="secondary"
-            icon={<Save className="size-4" aria-hidden />}
-            loading={draft.isPending}
-            disabled={busy}
-            onClick={() => submitCheck(false) && draft.mutate()}
-          >
-            ذخیره پیش‌نویس
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<CalendarClock className="size-4" aria-hidden />}
-            loading={scheduleMut.isPending}
-            disabled={busy || !form.scheduleDate || !form.scheduleTime}
-            onClick={() => submitCheck(true) && setScheduleOpen(true)}
-          >
-            زمان‌بندی ارسال
-          </Button>
-          <Button
-            icon={<Send className="size-4" aria-hidden />}
-            disabled={busy || !sendable}
-            onClick={openSend}
-          >
-            ارسال فوری
-          </Button>
-          {campaign && (
-            <Button
-              variant="ghost"
-              icon={<Archive className="size-4" aria-hidden />}
-              onClick={() => setArchiveOpen(true)}
-              disabled={busy}
-            >
-              آرشیو
-            </Button>
-          )}
-          {campaign?.status === 'scheduled' && (
-            <Button
-              variant="ghost"
-              icon={<XCircle className="size-4" aria-hidden />}
-              onClick={() => setCancelOpen(true)}
-              disabled={busy}
-            >
-              لغو زمان‌بندی
-            </Button>
-          )}
         </div>
-      </div>
 
-      <div className="flex flex-col gap-4 lg:sticky lg:top-4">
-        <Card aria-label="پیش‌نمایش">
-          <h2 className="mb-3 text-base font-extrabold text-text">پیش‌نمایش زنده</h2>
-          <PushNotificationPreview
-            title={form.title}
-            body={form.body}
-            imageUrl={form.imageUrl}
-            actionRef={form.actionRef}
-          />
-        </Card>
+        <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <Card aria-label="پیش‌نمایش">
+            <h2 className="mb-3 text-base font-extrabold text-text">پیش‌نمایش زنده</h2>
+            <PushPreview
+              title={form.title}
+              body={form.body}
+              imageUrl={form.imageUrl}
+              actionRef={form.actionRef}
+            />
+          </Card>
+        </div>
       </div>
 
       <SendConfirm
@@ -510,7 +637,17 @@ function Editor({ campaign }: { campaign: PushCampaign | null }) {
       >
         کمپین از فهرست اصلی پنهان می‌شود. گزارش‌ها و سوابق ارسال حذف نمی‌شوند.
       </ConfirmDialog>
-    </div>
+      <ConfirmDialog
+        open={!!pendingTemplate}
+        title="جایگزینی متن‌های فعلی؟"
+        confirmText="جایگزین کن"
+        onClose={() => setPendingTemplate(null)}
+        onConfirm={() => pendingTemplate && applyTemplate(pendingTemplate)}
+      >
+        متن، تصویر و مقصد فعلی با قالب «{pendingTemplate?.category}» جایگزین می‌شود. مخاطب، کانال و
+        زمان ارسال تغییر نمی‌کند.
+      </ConfirmDialog>
+    </>
   );
 }
 

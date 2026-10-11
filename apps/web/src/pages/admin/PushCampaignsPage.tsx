@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
   FileEdit,
+  LayoutTemplate,
   Megaphone,
   Plus,
   Send,
@@ -15,6 +16,8 @@ import { Button, Card, EmptyState, KpiCard, TableSkeleton } from '@/components/u
 import { Tabs } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
+import { PushTemplatePicker } from './PushTemplatePicker';
+import { PushTemplatesTab } from './PushTemplatesTab';
 import { api } from '@/lib/api';
 import { faNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -46,6 +49,14 @@ interface CampaignPage {
   nextCursor: string | null;
   total: number;
 }
+
+/** Top-level page sections; kept in the URL so a refresh or a shared link lands on the same tab. */
+type PageTab = 'campaigns' | 'templates';
+
+const PAGE_TABS: Array<{ value: PageTab; label: string }> = [
+  { value: 'campaigns', label: 'کمپین‌ها' },
+  { value: 'templates', label: 'قالب‌ها' },
+];
 
 type Filter = 'all' | CampaignStatus;
 
@@ -99,6 +110,15 @@ export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
 
 export function PushCampaignsPage() {
   const navigate = useNavigate();
+  const [sp, setSp] = useSearchParams();
+  const tab: PageTab = sp.get('tab') === 'templates' ? 'templates' : 'campaigns';
+  const setTab = (next: PageTab) => {
+    const params = new URLSearchParams(sp);
+    if (next === 'templates') params.set('tab', 'templates');
+    else params.delete('tab');
+    setSp(params, { replace: true });
+  };
+  const openWithTemplate = (id: string) => navigate(`/admin/push-campaigns/new?template=${id}`);
   const [filter, setFilter] = useState<Filter>('all');
   const dash = useQuery({
     queryKey: ['admin', 'push-campaigns', 'dashboard'],
@@ -117,21 +137,9 @@ export function PushCampaignsPage() {
   });
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
 
-  return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="کمپین‌های اعلان (Push)"
-        subtitle="ساخت، زمان‌بندی، ارسال و گزارش نتیجه اعلان‌های سیستمی"
-        actions={
-          <Button
-            icon={<Plus className="size-4" aria-hidden />}
-            onClick={() => navigate('/admin/push-campaigns/new')}
-          >
-            کمپین جدید
-          </Button>
-        }
-      />
-
+  // The «کمپین‌ها» tab keeps the dashboard, the status filter and the history exactly as before.
+  const campaignsSection = (
+    <>
       <QueryState
         query={dash}
         loading={
@@ -186,6 +194,32 @@ export function PushCampaignsPage() {
         )}
       </QueryState>
 
+      <Card
+        className="flex flex-wrap items-center justify-between gap-3 border-primary/25 bg-primary-light/40"
+        aria-label="شروع سریع با قالب"
+      >
+        <div className="min-w-0">
+          <h2 className="text-sm font-extrabold text-text">شروع سریع با قالب آماده</h2>
+          <p className="mt-0.5 text-xs leading-6 text-text-secondary">
+            هشت قالب طراحی‌شده با متن، تصویر و مقصد آماده؛ همه فیلدها در فرم قابل ویرایش‌اند.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            icon={<LayoutTemplate className="size-4" aria-hidden />}
+            onClick={() => setTab('templates')}
+          >
+            دیدن همه قالب‌ها
+          </Button>
+          <PushTemplatePicker
+            label="انتخاب قالب"
+            onPick={(t) => openWithTemplate(t.id)}
+            hint="انتخاب قالب فقط فرم کمپین را پر می‌کند؛ هیچ اعلانی ارسال نمی‌شود."
+          />
+        </div>
+      </Card>
+
       <Tabs label="فیلتر وضعیت" value={filter} onChange={setFilter} items={FILTER_ITEMS} />
 
       <QueryState
@@ -225,6 +259,34 @@ export function PushCampaignsPage() {
           </section>
         )}
       </QueryState>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="کمپین‌های اعلان (Push)"
+        subtitle="ساخت، زمان‌بندی، ارسال و گزارش نتیجه اعلان‌های سیستمی"
+        actions={
+          <>
+            <PushTemplatePicker
+              label="قالب آماده"
+              onPick={(t) => openWithTemplate(t.id)}
+              hint="یک قالب طراحی‌شده را انتخاب کنید؛ متن، تصویر، مقصد و مخاطب را بعداً می‌توانید آزادانه تغییر دهید."
+            />
+            <Button
+              icon={<Plus className="size-4" aria-hidden />}
+              onClick={() => navigate('/admin/push-campaigns/new')}
+            >
+              کمپین جدید
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs label="بخش صفحه کمپین‌ها" value={tab} onChange={setTab} items={PAGE_TABS} />
+
+      {tab === 'templates' ? <PushTemplatesTab /> : campaignsSection}
     </div>
   );
 }

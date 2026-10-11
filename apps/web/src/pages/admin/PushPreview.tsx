@@ -139,7 +139,7 @@ interface NotificationParts {
   onImageError: () => void;
 }
 
-/** Chrome/Edge desktop toast: rounded card, app row on top, big picture below the text. */
+/** Chrome/Edge desktop toast: app row on top, text + a square side thumbnail (as in the design). */
 function WebNotification(p: NotificationParts) {
   return (
     <figure className="flex flex-col gap-2">
@@ -164,18 +164,31 @@ function WebNotification(p: NotificationParts) {
                   <X className="size-3" aria-hidden />
                 </span>
               </div>
-              <p className="mt-1 truncate text-sm font-bold text-text" data-testid="preview-title">
-                {p.title}
-              </p>
-              <p
-                className="mt-1 line-clamp-3 text-sm whitespace-pre-wrap break-words text-text-secondary"
-                data-testid="preview-body"
-              >
-                {p.body}
-              </p>
+              <div className="mt-1 flex items-start gap-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-text" data-testid="preview-title">
+                    {p.title}
+                  </p>
+                  <p
+                    className="mt-1 line-clamp-3 text-sm whitespace-pre-wrap break-words text-text-secondary"
+                    data-testid="preview-body"
+                  >
+                    {p.body}
+                  </p>
+                </div>
+                {p.image && (
+                  <img
+                    src={p.image}
+                    alt="تصویر اعلان"
+                    className="size-20 shrink-0 rounded-lg object-cover"
+                    onError={p.onImageError}
+                    loading="lazy"
+                  />
+                )}
+              </div>
             </div>
           </div>
-          <NotificationImage {...p} />
+          {p.imageState === 'failed' && <ImageFailed />}
         </div>
       </div>
     </figure>
@@ -224,6 +237,16 @@ function AndroidNotification(p: NotificationParts) {
   );
 }
 
+function ImageFailed() {
+  return (
+    <p className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs text-warning-fg">
+      <ImageOff className="size-4 shrink-0" aria-hidden />
+      تصویر بارگذاری نشد؛ اعلان بدون تصویر نمایش داده می‌شود. آدرس تصویر را بررسی کنید.
+    </p>
+  );
+}
+
+/** Android big-picture block under the text. */
 function NotificationImage({ image, imageState, onImageError }: NotificationParts) {
   return (
     <>
@@ -236,12 +259,7 @@ function NotificationImage({ image, imageState, onImageError }: NotificationPart
           loading="lazy"
         />
       )}
-      {imageState === 'failed' && (
-        <p className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs text-warning-fg">
-          <ImageOff className="size-4 shrink-0" aria-hidden />
-          تصویر بارگذاری نشد؛ اعلان بدون تصویر نمایش داده می‌شود. آدرس تصویر را بررسی کنید.
-        </p>
-      )}
+      {imageState === 'failed' && <ImageFailed />}
     </>
   );
 }

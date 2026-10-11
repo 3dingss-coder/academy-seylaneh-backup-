@@ -200,9 +200,13 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
       'GET /v1/admin/system-health': () => ({ data: HEALTH }),
     });
     renderApp('/admin/push-campaigns');
-    const tab = await screen.findByRole('tab', { name: /اتوماسیون اعلان/ });
+    // The tab only exists once the session bootstrap has resolved (`/auth/refresh` → `/me`), so the first
+    // query in this file gets the longer wait — CI's first render is slower than a local one.
+    const tab = await screen.findByRole('tab', { name: /اتوماسیون اعلان/ }, { timeout: 5000 });
     fireEvent.click(tab);
-    expect(await screen.findByTestId('automations-panel')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('automations-panel', {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
   it('renders the health card, the grouped switches and the per-row estimate action', async () => {
@@ -508,7 +512,7 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
       }),
     });
     renderApp('/admin/push-campaigns/automations');
-    const panel = await screen.findByTestId('automations-panel');
+    const panel = await screen.findByTestId('automations-panel', {}, { timeout: 5000 });
     expect(within(panel).getAllByText('یک روز بی‌فعالیتی').length).toBeGreaterThan(0);
     // Out of service is not «something to look at while working», so it is folded away — but counted.
     expect(screen.queryByText('قاعده بازنشسته')).toBeNull();
@@ -535,7 +539,7 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
       }),
     });
     renderApp('/admin/push-campaigns/automations');
-    const btns = await screen.findAllByTestId('archive-btn');
+    const btns = await screen.findAllByTestId('archive-btn', {}, { timeout: 5000 });
     fireEvent.click(btns[0] as HTMLElement);
     const dialog = await waitFor(() => {
       const el = document.querySelector('[role="dialog"]');
@@ -607,7 +611,9 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
       'POST /v1/admin/push-automations/migrate': () => ({ data: ++calls === 1 ? DRY : DONE }),
     });
     renderApp('/admin/push-campaigns/automations');
-    fireEvent.click(await screen.findByRole('button', { name: /تبدیل قاعده‌های قدیمی/ }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /تبدیل قاعده‌های قدیمی/ }, { timeout: 5000 }),
+    );
     expect(await screen.findByText('قابل تبدیل')).toBeInTheDocument();
     expect(screen.getByText(/۴ قاعده بررسی شد · ۲ تا قابل تبدیل · ۱ تا رد شد/)).toBeInTheDocument();
     // A live catalogue rule is not touched by default, and the report says why in the server’s own words.

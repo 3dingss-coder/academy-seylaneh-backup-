@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, EmptyState, KpiCard, TableSkeleton } from '@/components/ui';
 import { Tabs } from '@/components/common/Field';
+import { PushSectionTabs } from './PushSectionTabs';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
 import { PushTemplatePicker } from './PushTemplatePicker';
@@ -283,6 +284,8 @@ export function PushCampaignsPage() {
           </>
         }
       />
+
+      <PushSectionTabs value="campaigns" />
 
       <Tabs label="بخش صفحه کمپین‌ها" value={tab} onChange={setTab} items={PAGE_TABS} />
 

@@ -167,6 +167,41 @@ export function publicUser(u: Doc<User>) {
 }
 
 // ─── Register / Login ───────────────────────────────────────────────────────
+/**
+ * `team.member_joined` (prompt §8): one outbox row per manager of the team that gained a member, with
+ * the joiner's name carried as `{memberName}` — in the event path `{name}` is resolved from the
+ * *recipient*, so a manager would otherwise read their own name.
+ *
+ * `isListening` is checked before the query, so while no such rule is enabled this costs one read
+ * cached for 30s and writes nothing (§4.9). The emit cannot throw, and a joiner who is themselves a
+ * manager of that team is not told about themselves.
+ */
+async function announceTeamJoin(
+  d: Deps,
+  teamId: string,
+  member: { id: string; name: string },
+): Promise<void> {
+  // Lazy, like the `notify` import below: `users.ts` is on the sign-up path and the automation stack is
+  // only reached when someone actually enabled a rule.
+  const { emitAutomationEventForUsers, isListening } = await import('./push-automation-events');
+  if (!(await isListening(d, 'team.member_joined'))) return;
+  const managers = await d.store.query<User>({
+    collection: 'users',
+    where: [
+      ['teamId', '==', teamId],
+      ['role', '==', 'manager'],
+      ['status', '==', 'active'],
+    ],
+  });
+  await emitAutomationEventForUsers(
+    d,
+    'team.member_joined',
+    managers.map((m) => m.id).filter((id) => id !== member.id),
+    { memberName: member.name },
+    { dedupeKey: member.id },
+  );
+}
+
 export async function register(
   d: Deps,
   input: z.infer<typeof registerSchema>,
@@ -230,7 +265,11 @@ export async function register(
   await d.store.update(`unique_keys/${keyId}`, { uid });
   await d.auth.setClaims(uid, { role: user.role });
   await track(d, 'signup_completed', uid, { method: idf.kind });
-  return { ...user, id: uid } as Doc<User>;
+  const created = { ...user, id: uid } as Doc<User>;
+  // A self sign-up lands in the default sales team when it exists (routes/auth.ts), and that is a new
+  // member for its managers — the same hook an admin's team move fires.
+  if (created.teamId) await announceTeamJoin(d, created.teamId, { id: uid, name: user.name });
+  return created;
 }
 
 async function loginGuard(d: Deps, key: string) {
@@ -284,12 +323,65 @@ export async function login(d: Deps, input: z.infer<typeof loginSchema>) {
   return { user: publicUser(user), ...r.tokens };
 }
 
+// ─── Presence («این حساب همین حالا دیده شد») ────────────────────────────────
+
+/** How stale `lastActiveAt` has to be before a request may refresh it again. */
+export const TOUCH_THROTTLE_MS = 10 * 60_000;
+/** And how long the request is willing to wait for that write before answering without it. */
+export const TOUCH_GIVEUP_MS = 1_500;
+
+/**
+ * Refresh `users/<id>.lastActiveAt` — the stamp the inactivity ladder and the panel's «آخرین فعالیت»
+ * read. Two callers, both of which already hold the user document: `POST /me/events` with `app_opened`
+ * (the app was opened with a valid session — today the only thing that notices) and a token refresh.
+ *
+ * The throttle is the comparison itself, not a second document: a `_system/active_touch/<id>` row would
+ * cost a read *and* a write to answer a question `lastActiveAt` already answers. Writes are what D1
+ * rations here (docs/admin-push-automation-analysis.md §۵), so the cheap version wins.
+ *
+ * Best-effort by contract, in the `step('touch_user', …)` shape from `learning.ts:541`: presence must
+ * never turn a 204 into a 500, nor a login into a slow one. The store call is raced against a short
+ * give-up (the Worker's own D1 timeout is 15 s, and `deadlineAtMs` is only set for progress paths — so
+ * without this race a stalled D1 would stall the request that merely wanted to say "seen"). The write
+ * promise always carries a handler, so a late failure cannot surface as an unhandled rejection.
+ *
+ * Returns the new stamp when it landed, `null` when it was skipped — `refresh` uses that to avoid
+ * answering with a `lastActiveAt` it knows is stale. No identifier is logged: the log line is for
+ * "presence writes are failing", and the store already logs which path with its own trace.
+ */
+export async function touchUserActive(
+  d: Deps,
+  user: Pick<Doc<User>, 'id' | 'lastActiveAt'>,
+): Promise<string | null> {
+  const at = nowIso(d);
+  const prev = user.lastActiveAt ? Date.parse(user.lastActiveAt) : NaN;
+  // A stamp from the future also counts as fresh: the point is «not more than one write per 10 minutes».
+  if (Number.isFinite(prev) && d.clock().getTime() - prev < TOUCH_THROTTLE_MS) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const giveUp = new Promise<'slow'>((resolve) => {
+    timer = setTimeout(() => resolve('slow'), TOUCH_GIVEUP_MS);
+  });
+  const settled = d.store.update(`users/${user.id}`, { lastActiveAt: at }).then(
+    () => 'ok' as const,
+    () => 'fail' as const,
+  );
+  const outcome = await Promise.race([settled, giveUp]);
+  if (timer !== undefined) clearTimeout(timer);
+  if (outcome !== 'ok')
+    console.warn(JSON.stringify({ level: 'warn', msg: 'user_active_touch_incomplete', outcome }));
+  return outcome === 'ok' ? at : null;
+}
+
 export async function refresh(d: Deps, refreshToken: string) {
   const r = await d.auth.refresh(refreshToken);
   if (!r) throw new ApiError('UNAUTHENTICATED');
   const user = await d.store.get<User>(`users/${r.uid}`);
   if (!user || user.status !== 'active') throw new ApiError('UNAUTHENTICATED');
-  return { user: publicUser(user), ...r.tokens };
+  // A disabled account is refused *before* anything is written, and nothing is written for it.
+  const touched = await touchUserActive(d, user);
+  const view = publicUser(user);
+  if (touched) view.lastActiveAt = touched;
+  return { user: view, ...r.tokens };
 }
 
 export async function logout(d: Deps, userId: string) {
@@ -519,6 +611,9 @@ export async function adminUpdateUser(
     patch,
   );
   await track(d, 'admin_user_updated', actor.id, { fields: Object.keys(patch) });
+  // Joining the team is the event, whoever moved the person in — including an admin-created account.
+  if (patch.teamId && patch.teamId !== target.teamId)
+    await announceTeamJoin(d, patch.teamId, { id: userId, name: patch.name ?? target.name });
   const updated = await d.store.get<User>(`users/${userId}`);
   return { user: updated ? publicUser(updated) : null, warnings };
 }

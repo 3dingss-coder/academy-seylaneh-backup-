@@ -16,6 +16,35 @@ export default defineConfig(({ mode }) => {
     // ffmpeg.wasm ships its own worker/wasm loader; pre-bundling would break its relative URLs.
     optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
     plugins: [
+      // The Persian font is otherwise discovered only after the CSS and the app JS have run, so the
+      // first text paint waits for it (it started ~4 s into a slow-network load). Preload it so it
+      // downloads in parallel with the JS. File names are hashed, hence resolved from the bundle.
+      {
+        name: 'preload-arabic-font',
+        apply: 'build',
+        transformIndexHtml: {
+          order: 'post',
+          handler(_html, ctx) {
+            const file = Object.keys(ctx.bundle ?? {}).find((f) =>
+              /vazirmatn-arabic-wght-normal.*\.woff2$/.test(f),
+            );
+            if (!file) return [];
+            return [
+              {
+                tag: 'link',
+                attrs: {
+                  rel: 'preload',
+                  as: 'font',
+                  type: 'font/woff2',
+                  crossorigin: '',
+                  href: `/${file}`,
+                },
+                injectTo: 'head-prepend',
+              },
+            ];
+          },
+        },
+      },
       react(),
       tailwindcss(),
       // Older browsers (iOS 12+, Android WebView/Chrome 64+, Samsung Internet 9+; targets in

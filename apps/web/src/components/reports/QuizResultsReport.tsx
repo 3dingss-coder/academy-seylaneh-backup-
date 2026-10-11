@@ -20,6 +20,7 @@ import { fromZonedInput } from '@/lib/dates';
 import { toPersianDigits } from '@/lib/digits';
 import { faDate, faDateTime, faNumber, faPercent } from '@/lib/format';
 import { track } from '@/lib/telemetry';
+import { groupByPerson, personKey, type PersonGroup } from '@/lib/people';
 import type { QuizAttemptRow, QuizReport, QuizSummaryRow } from '@/lib/types';
 
 type Filter =
@@ -79,7 +80,7 @@ export function QuizResultsReport({
     for (const r of data.summary) {
       if (r.brandName) brands.set(r.brandName, r.brandName);
       if (r.productName) products.set(r.productName, r.productName);
-      users.set(r.userId, r.userName);
+      users.set(personKey(r.userName) || r.userName, r.userName);
       if (r.province) {
         provinces.add(r.province);
         const set2 = citiesByProvince.get(r.province) ?? new Set<string>();
@@ -102,6 +103,7 @@ export function QuizResultsReport({
     const from = fromStart ? Date.parse(fromStart) : null;
     const to = toStart ? Date.parse(toStart) + 86_400_000 - 1 : null;
     const base = (r: {
+      userName: string;
       brandName: string | null;
       productName: string | null;
       userId: string;
@@ -111,7 +113,7 @@ export function QuizResultsReport({
     }) =>
       !(f('brand') && r.brandName !== f('brand')) &&
       !(f('product') && r.productName !== f('product')) &&
-      !(f('user') && r.userId !== f('user')) &&
+      !(f('user') && (personKey(r.userName) || r.userName) !== f('user')) &&
       !(f('team') && r.teamId !== f('team')) &&
       !(f('province') && r.province !== f('province')) &&
       !(f('city') && r.city !== f('city'));
@@ -140,7 +142,7 @@ export function QuizResultsReport({
   }, [data, sp]);
 
   const kpis = useMemo(() => {
-    const learners = new Set(summary.map((r) => r.userId)).size;
+    const learners = new Set(summary.map((r) => personKey(r.userName) || r.userName)).size;
     const passedQuizzes = summary.filter((r) => r.passed).length;
     const scores = attempts.map((a) => a.score).filter((x): x is number => x !== null);
     const first = attempts.filter((a) => a.attemptNumber === 1);
@@ -155,6 +157,12 @@ export function QuizResultsReport({
         : null,
     };
   }, [summary, attempts]);
+
+  // One row per person: learners that share a name (different numbers) are merged.
+  const people: Array<PersonGroup<QuizSummaryRow>> = useMemo(
+    () => groupByPerson(summary, (r) => ({ name: r.userName, phone: r.phone })),
+    [summary],
+  );
 
   const summaryColumns: ExcelColumn[] = [
     { header: 'نام بازاریاب', key: 'userName', width: 22 },
@@ -418,20 +426,29 @@ export function QuizResultsReport({
         ) : (
           <DataTable
             caption="خلاصه نتایج آزمون هر کاربر"
-            rows={summary}
-            rowKey={(r) => `${r.userId}-${r.quizId}`}
-            onRowClick={(r) => nav(memberLink(r.userId))}
+            rows={people}
+            rowKey={(g) => g.key}
+            onRowClick={(g) => nav(memberLink(g.first.userId))}
             columns={[
               {
                 key: 'u',
                 header: 'نام',
-                sortValue: (r) => r.userName,
-                cell: (r) => (
+                sortValue: (g) => g.name,
+                cell: (g) => (
                   <div>
-                    <span className="font-bold">{r.userName}</span>
-                    {r.city && (
+                    <span className="font-bold">{g.name}</span>
+                    {g.phones.map((p) => (
+                      <span
+                        key={p}
+                        dir="ltr"
+                        className="block text-start text-[11px] leading-5 text-text-secondary"
+                      >
+                        {toPersianDigits(p)}
+                      </span>
+                    ))}
+                    {g.rows[0]?.city && (
                       <span className="block text-xs text-text-secondary">
-                        {r.province} • {r.city}
+                        {g.rows[0].province} • {g.rows[0].city}
                       </span>
                     )}
                   </div>
@@ -439,83 +456,60 @@ export function QuizResultsReport({
               },
               {
                 key: 'q',
-                header: 'آموزش / آزمون',
-                sortValue: (r) => r.packageTitle,
-                cell: (r) => (
-                  <div>
-                    <span>{r.packageTitle}</span>
-                    <span className="block text-xs text-text-secondary">{r.sectionTitle}</span>
-                  </div>
-                ),
-              },
-              {
-                key: 'n',
-                header: 'دفعات',
-                sortValue: (r) => r.attempts,
-                cell: (r) => fa(r.attempts),
-              },
-              {
-                key: 'ok',
-                header: 'درست',
-                hideOnMobile: true,
-                sortValue: (r) => r.lastCorrect,
-                cell: (r) => (
-                  <span className="font-bold text-success-fg">
-                    {fa(r.lastCorrect)}
-                    <span className="text-xs font-normal text-text-secondary">
-                      {' '}
-                      از {fa(r.lastTotal)}
-                    </span>
-                  </span>
-                ),
-              },
-              {
-                key: 'bad',
-                header: 'غلط',
-                hideOnMobile: true,
-                sortValue: (r) => r.lastWrong,
-                cell: (r) => <span className="font-bold text-danger">{fa(r.lastWrong)}</span>,
-              },
-              {
-                key: 'last',
-                header: 'نمره آخر',
-                sortValue: (r) => r.lastScore,
-                cell: (r) => score(r.lastScore),
-              },
-              {
-                key: 'best',
-                header: 'بهترین',
-                hideOnMobile: true,
-                sortValue: (r) => r.bestScore,
-                cell: (r) => score(r.bestScore),
-              },
-              {
-                key: 'res',
-                header: 'نتیجه',
-                sortValue: (r) => Number(r.passed),
-                cell: (r) =>
-                  r.passed ? (
-                    <span className="inline-flex items-center gap-1 font-bold text-success-fg">
-                      <CheckCircle2 className="size-4" aria-hidden /> {resultLabel(r)}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 font-bold text-danger">
-                      <XCircle className="size-4" aria-hidden /> {resultLabel(r)}
-                      {r.inProgress && (
-                        <span className="text-xs font-normal text-text-secondary">
-                          {' '}
-                          (در حال آزمون)
+                header: 'آزمون‌ها و نتیجه',
+                sortValue: (g) => g.rows.length,
+                cell: (g) => (
+                  <ul className="flex min-w-72 flex-col gap-3">
+                    {g.rows.map((r) => (
+                      <li key={`${r.userId}-${r.quizId}`} className="flex flex-col gap-0.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <span>
+                            {r.packageTitle}
+                            <span className="block text-xs text-text-secondary">
+                              {r.sectionTitle}
+                            </span>
+                          </span>
+                          {r.passed ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 font-bold text-success-fg">
+                              <CheckCircle2 className="size-4" aria-hidden /> {resultLabel(r)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center gap-1 font-bold text-danger">
+                              <XCircle className="size-4" aria-hidden /> {resultLabel(r)}
+                              {r.inProgress && (
+                                <span className="text-xs font-normal text-text-secondary">
+                                  {' '}
+                                  (در حال آزمون)
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-text-secondary">
+                          {fa(r.attempts)} دفعه · آخرین: {fa(r.lastCorrect)} درست از{' '}
+                          {fa(r.lastTotal)} ({fa(r.lastWrong)} غلط) · نمره آخر {score(r.lastScore)}{' '}
+                          · بهترین {score(r.bestScore)}
+                          {r.lastSubmittedAt ? ` · ${faDate(r.lastSubmittedAt)}` : ''}
                         </span>
-                      )}
-                    </span>
-                  ),
+                      </li>
+                    ))}
+                  </ul>
+                ),
               },
               {
                 key: 'at',
                 header: 'آخرین آزمون',
                 hideOnMobile: true,
-                sortValue: (r) => (r.lastSubmittedAt ? Date.parse(r.lastSubmittedAt) : null),
-                cell: (r) => (r.lastSubmittedAt ? faDate(r.lastSubmittedAt) : '—'),
+                sortValue: (g) =>
+                  Math.max(0, ...g.rows.map((r) => Date.parse(r.lastSubmittedAt ?? ''))) || null,
+                cell: (g) => {
+                  const last = g.rows
+                    .map((r) => r.lastSubmittedAt)
+                    .filter((x): x is string => !!x)
+                    .sort()
+                    .pop();
+                  return last ? faDate(last) : '—';
+                },
               },
             ]}
           />
@@ -533,7 +527,19 @@ export function QuizResultsReport({
               key: 'u',
               header: 'نام',
               sortValue: (r) => r.userName,
-              cell: (r) => <span className="font-bold">{r.userName}</span>,
+              cell: (r) => (
+                <div>
+                  <span className="font-bold">{r.userName}</span>
+                  {r.phone && (
+                    <span
+                      dir="ltr"
+                      className="block text-start text-[11px] leading-5 text-text-secondary"
+                    >
+                      {toPersianDigits(r.phone)}
+                    </span>
+                  )}
+                </div>
+              ),
             },
             {
               key: 'q',

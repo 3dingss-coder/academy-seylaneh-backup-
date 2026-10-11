@@ -95,6 +95,8 @@ export interface DocStore {
   update(path: string, data: Input): Promise<void>;
   /** Physical delete — only for technical docs (tokens, rate counters). Never for content/users. */
   delete(path: string): Promise<void>;
+  /** Physical delete of many docs at once (batched). Used by the archive purge to free space. */
+  deleteMany(paths: string[]): Promise<void>;
   /** Atomically add `by` to a numeric field (creates doc/field if missing). */
   increment(path: string, field: string, by: number): Promise<void>;
   /**

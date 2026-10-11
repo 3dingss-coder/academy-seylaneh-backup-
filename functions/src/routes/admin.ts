@@ -4,6 +4,7 @@ import { actorOf, h, me, requireRole } from '../http/auth';
 import { rateLimit, type RateLimiter } from '../http/rateLimit';
 import { parse } from '../http/validate';
 import type { Deps } from '../services/context';
+import * as archive from '../services/archive';
 import * as assignments from '../services/assignments';
 import * as content from '../services/content';
 import { isJobName, JOB_NAMES, runJob } from '../services/cron';
@@ -367,6 +368,11 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
       users.adminUpdateUser(d, actorOf(req), id(req), parse(users.adminPatchUserSchema, req.body)),
     ),
   );
+  // «حذف کاربر»: blacklist the number and move the account to the archive.
+  r.delete(
+    '/admin/users/:id',
+    h(async (req) => archive.blacklistUser(d, actorOf(req), id(req))),
+  );
   r.post(
     '/admin/users/:id/reset-password',
     rateLimit(limiter, 'reset', 10, 60_000, (req) => me(req).id),
@@ -389,6 +395,46 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
         id(req),
         parse(users.teamSchema.partial().extend({ archived: z.boolean().optional() }), req.body),
       ),
+    ),
+  );
+
+  // Archive (آرشیو): blacklisted users + deleted reports. Deleting from here removes the data.
+  r.get(
+    '/admin/archive/summary',
+    h(async () => archive.archiveCounts(d)),
+  );
+  r.get(
+    '/admin/archive/users',
+    h(async () => archive.listArchivedUsers(d)),
+  );
+  r.post(
+    '/admin/archive/users/:id/restore',
+    h(async (req) => archive.restoreUser(d, actorOf(req), id(req))),
+  );
+  r.delete(
+    '/admin/archive/users/:id',
+    h(async (req) => archive.purgeUser(d, actorOf(req), id(req))),
+  );
+  r.get(
+    '/admin/archive/reports',
+    h(async () => archive.listArchivedReports(d)),
+  );
+  r.post(
+    '/admin/archive/reports',
+    h(async (req) =>
+      archive.archiveReports(d, actorOf(req), parse(archive.archiveReportsSchema, req.body)),
+    ),
+  );
+  r.post(
+    '/admin/archive/reports/restore',
+    h(async (req) =>
+      archive.restoreReport(d, actorOf(req), parse(archive.reportRefSchema, req.body)),
+    ),
+  );
+  r.post(
+    '/admin/archive/reports/purge',
+    h(async (req) =>
+      archive.purgeReport(d, actorOf(req), parse(archive.reportRefSchema, req.body)),
     ),
   );
 

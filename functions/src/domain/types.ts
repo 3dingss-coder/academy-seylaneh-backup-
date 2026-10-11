@@ -1,7 +1,11 @@
 /** Firestore data model (spec §20). All timestamps are ISO strings (UTC). */
 export type Role = 'marketer' | 'manager' | 'admin' | 'superadmin';
 export const ROLES: Role[] = ['marketer', 'manager', 'admin', 'superadmin'];
-export type UserStatus = 'active' | 'inactive';
+/**
+ * `blacklisted` = deleted by an admin: the number can no longer sign in or register, and the
+ * account sits in the admin archive until it is restored (→ active) or permanently purged.
+ */
+export type UserStatus = 'active' | 'inactive' | 'blacklisted';
 
 export interface User {
   name: string;
@@ -20,6 +24,28 @@ export interface User {
   lastActiveAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set while status is `blacklisted` (archive tab «لیست سیاه»). */
+  blacklistedAt?: string | null;
+  blacklistedBy?: string | null;
+}
+
+/**
+ * A report row (one marketer × one training package) an admin removed from the reports.
+ * `purged` rows keep only ids (no names/phones): they exist solely so the row does not reappear.
+ */
+export interface ArchivedReport {
+  userId: string;
+  packageId: string;
+  userName?: string;
+  phone?: string | null;
+  packageTitle?: string;
+  brandName?: string | null;
+  productName?: string | null;
+  percent?: number;
+  status?: string;
+  archivedAt: string;
+  archivedBy: string;
+  purged: boolean;
 }
 
 export interface Team {

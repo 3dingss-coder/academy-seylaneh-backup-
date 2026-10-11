@@ -58,4 +58,37 @@ describe('CompletionReport', () => {
     await userEvent.click(screen.getByRole('button', { name: 'مهلت' }));
     expect(names()).toEqual(['user-a', 'user-b', 'user-c']);
   });
+  it('shows one row per unique name, with every number under it', () => {
+    const a = { ...row('a', null, 10), userName: 'علی عدلی', phone: '09105647497' };
+    const b = { ...row('b', null, 50), userName: 'علی  عدلی', phone: '09105648752' };
+    const c = { ...row('c', null, 90), userName: 'سارا احمدی', phone: '09120000004' };
+    render(
+      <MemoryRouter>
+        <CompletionReport rows={[a, b, c]} memberLink={(i) => `/m/${i}`} />
+      </MemoryRouter>,
+    );
+    const table = within(screen.getByRole('table'));
+    expect(table.getAllByRole('row').slice(1)).toHaveLength(2); // 2 people, not 3 accounts
+    expect(table.getAllByText('علی عدلی')).toHaveLength(1);
+    expect(table.getByText('۰۹۱۰۵۶۴۷۴۹۷')).toBeInTheDocument();
+    expect(table.getByText('۰۹۱۰۵۶۴۸۷۵۲')).toBeInTheDocument();
+    expect(table.getByText('pkg-a')).toBeInTheDocument();
+    expect(table.getByText('pkg-b')).toBeInTheDocument();
+  });
+  it('offers delete only to the admin (onArchive given)', async () => {
+    const calls: unknown[] = [];
+    render(
+      <MemoryRouter>
+        <CompletionReport
+          rows={[row('a', null, 10)]}
+          memberLink={(i) => `/m/${i}`}
+          onArchive={async (items) => void calls.push(items)}
+        />
+      </MemoryRouter>,
+    );
+    const table = within(screen.getByRole('table'));
+    await userEvent.click(table.getByRole('button', { name: /حذف گزارش pkg-a/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'حذف و انتقال به آرشیو' }));
+    expect(calls).toEqual([[{ userId: 'a', packageId: 'p-a' }]]);
+  });
 });

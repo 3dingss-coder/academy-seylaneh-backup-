@@ -104,6 +104,13 @@ export class FirestoreStore implements DocStore {
   newId() {
     return this.db.collection('_').doc().id;
   }
+  async deleteMany(paths: string[]) {
+    for (let i = 0; i < paths.length; i += 400) {
+      const batch = this.db.batch();
+      for (const p of paths.slice(i, i + 400)) batch.delete(this.db.doc(p));
+      await batch.commit();
+    }
+  }
   async batchSet(items: Array<{ path: string; data: Input; merge?: boolean }>) {
     for (let i = 0; i < items.length; i += 400) {
       const batch = this.db.batch();

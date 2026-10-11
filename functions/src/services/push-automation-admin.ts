@@ -15,6 +15,12 @@ import { deadConditions, usesInheritedPolicy, withDefaults } from './automation/
 import { allOperators } from './automation/operators';
 import { POLICY_LIMITS, validateRepeatPolicy } from './automation/repeat';
 import {
+  describeSteps,
+  needsFlowEngine,
+  unknownStepPolicyKeys,
+  validateSteps,
+} from './automation/steps';
+import {
   CATEGORY_HINTS,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
@@ -65,6 +71,8 @@ import {
   factsForRule,
   sendAutomation,
   resolveVars,
+  listPendingSteps,
+  stampFlowCancel,
   sweepUsers,
   type SweepExplain,
 } from './push-automation-engine';
@@ -233,6 +241,37 @@ export const automationSchema = z.object({
   schemaVersion: z.union([z.literal(1), z.literal(2)]).nullish(),
   when: ruleExprSchema.nullish(),
   repeatPolicy: repeatPolicySchema.nullish(),
+  /**
+   * The workflow (§2.2). The `type`/id/budget/condition checks are `validateSteps`' job — it answers in
+   * Persian with a path — but the message inside a step goes through the same schema as the rule's own
+   * message, so a step can never skip a length or an `actionRef` safety check.
+   */
+  steps: z
+    .array(
+      z.discriminatedUnion('type', [
+        z.object({
+          type: z.literal('notify'),
+          id: z.string().trim().min(1).max(40),
+          message: automationMessageSchema,
+          channel: z.enum(['any', 'web', 'android']).nullish(),
+          when: ruleExprSchema.nullish(),
+        }),
+        z.object({
+          type: z.literal('wait'),
+          id: z.string().trim().min(1).max(40),
+          minutes: z.number().int().min(1).max(43_200),
+          recheckWhen: ruleExprSchema.nullish(),
+        }),
+        z.object({
+          type: z.literal('stop'),
+          id: z.string().trim().min(1).max(40),
+          when: ruleExprSchema,
+          reason: z.string().trim().min(2).max(200),
+        }),
+      ]),
+    )
+    .max(8)
+    .nullish(),
 });
 
 export const automationPatchSchema = automationSchema
@@ -266,6 +305,7 @@ export function validateSemantics(input: {
   schemaVersion?: 1 | 2 | null;
   when?: PushAutomation['when'];
   repeatPolicy?: PushAutomation['repeatPolicy'];
+  steps?: PushAutomation['steps'];
 }): void {
   const t = input.trigger;
   const bad = (msg: string): never => {
@@ -304,6 +344,12 @@ export function validateSemantics(input: {
   }
   if (input.schemaVersion === 2 && (t.conditions ?? []).length)
     bad('قاعده‌ی نسخه ۲ شرطش را در «when» نگه می‌دارد؛ فهرست شرط‌های قدیمی را خالی بگذارید.');
+  // The workflow is also the only door through which a rule may park something in the queue, so what a
+  // `wait` may look like is decided here and not at drain time.
+  for (const issue of validateSteps(input.steps)) bad(`${issue.path}: ${issue.message}`);
+  const ghostKeys = unknownStepPolicyKeys({ steps: input.steps, repeatPolicy: input.repeatPolicy });
+  if (ghostKeys.length)
+    bad(`سیاست تکرار برای گام‌هایی نوشته شده که در این قاعده نیستند: ${ghostKeys.join('، ')}.`);
   if (input.repeatPolicy) {
     const policyBad = validateRepeatPolicy(input.repeatPolicy);
     if (policyBad.length) bad(policyBad.join(' | '));
@@ -393,9 +439,10 @@ const EXPORT_FIELDS = [
   'schemaVersion',
   'when',
   'repeatPolicy',
+  'steps',
 ] as const;
 
-export const AUTOMATION_EXPORT_FORMAT = 'seylane.push-automation/2';
+export const AUTOMATION_EXPORT_FORMAT = 'seylane.push-automation/3';
 /** Above this an "import" is a data pipeline, not a deliberate transfer between two environments. */
 export const IMPORT_MAX_ROWS = 100;
 
@@ -531,6 +578,7 @@ export async function importAutomations(
           schemaVersion: parsed.schemaVersion,
           when: parsed.when,
           repeatPolicy: parsed.repeatPolicy,
+          steps: parsed.steps,
         });
       } else if (cur) {
         const patch: Record<string, unknown> = { ...parsed };
@@ -716,6 +764,11 @@ export interface AutomationDetail extends AutomationRow {
   schemaVersion: 1 | 2;
   /** The rule's own condition tree (`null` on a v1 row, whose conditions sit in `trigger`). */
   when: PushAutomation['when'];
+  /** The stored workflow and its one-sentence Persian reading for the read-only card. */
+  steps: PushAutomation['steps'];
+  stepsSummary: string | null;
+  /** False for `steps: [notify]`: that rule still runs the legacy single-send path. */
+  usesFlow: boolean;
   /** Its own cadence policy, or `null` when the legacy global caps still govern it. */
   repeatPolicy: PushAutomation['repeatPolicy'];
   /** Where the cadence comes from — the list row and the editor must not imply a rule owns one it does not. */
@@ -782,6 +835,9 @@ export async function automationDetail(d: Deps, key: string): Promise<Automation
     trigger: a.trigger,
     audience: a.audience,
     schemaVersion: (a.schemaVersion ?? 1) as 1 | 2,
+    steps: a.steps ?? null,
+    stepsSummary: describeSteps(a.steps),
+    usesFlow: needsFlowEngine(a),
     when: a.when ?? null,
     repeatPolicy: a.repeatPolicy ?? null,
     policySource: usesInheritedPolicy(a) ? 'inherited' : 'rule',
@@ -879,6 +935,15 @@ export async function updateAutomation(
     );
   if (next.enabled && next.requiresFeature)
     throw new ApiError('VALIDATION', 'این سناریو نیازمند داده‌ای است که هنوز محاسبه نمی‌شود.');
+  // A pending step is a promise about the future that an older definition made. When the part of the rule
+  // that promise rested on moves, the promise is cancelled rather than re-interpreted; a wording-only fix
+  // does not void it, so correcting a typo does not silently eat three days of follow-ups.
+  const structural = ['steps', 'when', 'trigger', 'delivery', 'repeatPolicy'] as const;
+  const touched =
+    audienceIn !== undefined ||
+    structural.some((f) => (body as Record<string, unknown>)[f] !== undefined) ||
+    (cur.audience ?? null) !== (next.audience ?? null);
+  if (touched || (cur.enabled && !next.enabled)) await stampFlowCancel(d, key);
   await d.store.set(`${AUTOMATIONS}/${key}`, next as unknown as Record<string, unknown>);
   await d.store.set(`${TEXT_REVISIONS}/${key}/${cur.version}`, {
     key,
@@ -898,6 +963,7 @@ export async function updateAutomation(
 function describeChange(body: Record<string, unknown>): string {
   const parts: string[] = [];
   if (body.message) parts.push('متن');
+  if (body.steps) parts.push('گام‌های گردش‌کار');
   if (body.delivery) parts.push('نحوه ارسال');
   if (body.trigger) parts.push('زمان‌بندی');
   if (body.when) parts.push('شرط‌ها');
@@ -940,6 +1006,8 @@ export async function deleteAutomation(
   const cur = await mustGet(d, key);
   if (cur.isSystem)
     throw new ApiError('CONFLICT', 'سناریوی کاتالوگ حذف نمی‌شود؛ آن را خاموش کنید.');
+  // The row is gone, so nothing may keep running in its name — pending steps included.
+  await stampFlowCancel(d, key);
   await d.store.delete(`${AUTOMATIONS}/${key}`);
   await audit(d, actor, 'push_automation.deleted', AUTOMATIONS, key, cur, null);
   return { deleted: true };
@@ -1003,6 +1071,59 @@ export interface DryRunResult {
  * «چه اتفاقی می‌افتد؟» without touching anything: same evaluation path as the real sweep, with
  * `dry: true`, so no claim, no counter and no provider call. This is what the wizard's last step shows.
  */
+export interface PendingStepsResult {
+  items: Array<Record<string, unknown>>;
+  /** How many day shards were read; a `wait` longer than that is reported as `truncated`. */
+  shards: number;
+  truncated: boolean;
+  note: string;
+}
+
+/**
+ * «اقدام‌های معلق» of a rule: the `wait` steps parked for real users. Read-only, bounded by day shards —
+ * the store cannot query a prefix, so the answer is always «what is pending in the next N days», never a
+ * claim that nothing is pending anywhere.
+ */
+export async function pendingSteps(
+  d: Deps,
+  key: string,
+  q: { days?: string; userId?: string; limit?: string } = {},
+): Promise<PendingStepsResult> {
+  await mustGet(d, key);
+  const days = Math.max(1, Math.min(31, Number(q.days ?? 8) || 8));
+  const res = await listPendingSteps(d, key, {
+    days,
+    limit: Math.max(1, Math.min(500, Number(q.limit ?? 100) || 100)),
+    ...(q.userId ? { userId: String(q.userId) } : {}),
+  });
+  return {
+    ...res,
+    // No digits in the sentence: the panel formats `shards`/`items.length` itself, and a Latin «8»
+    // inside a Persian line is exactly the kind of thing users screenshot.
+    note: res.truncated
+      ? 'سقف سطرهای بازگشت‌شده پر شد؛ ممکن است بیشتر از این باشد.'
+      : 'فقط شارد‌های روزهای پیشِ رو خوانده شد (شماره‌ی روز در نام شارد است)؛ پس «خالی» یعنی «در این روزها چیزی نیست».',
+  };
+}
+
+/**
+ * Cancel every parked step of a rule right now, without touching the rule itself. The stamp is what does
+ * it — one write, no scan — and it stays in force until the rule runs again, so a drain that happens
+ * between the two cannot deliver the dead promise.
+ */
+export async function cancelPendingSteps(
+  d: Deps,
+  actor: Actor,
+  key: string,
+): Promise<{ cancelled: true; cancelBefore: string }> {
+  await mustGet(d, key);
+  await stampFlowCancel(d, key);
+  await audit(d, actor, 'push_automation.pending_cancelled', AUTOMATIONS, key, null, {
+    cancelBefore: d.clock().toISOString(),
+  });
+  return { cancelled: true, cancelBefore: d.clock().toISOString() };
+}
+
 export async function dryRun(d: Deps, key: string): Promise<DryRunResult> {
   const a = await mustGet(d, key);
   const settings = await readSettings(d);

@@ -84,7 +84,9 @@ type AutomationStep =
 ```
 
 حداکثر ۸ گام به‌ازای قاعده (`MAX_STEPS`)؛ `notify` انتهایی الزاماً یکی است (بقیه اختیاری).
-گام `wait` یک سطر در **همان** `push_automation_queue/<day>` می‌نویسد با `stepId`، و هنگام drain
+(اجرا شده در `services/automation/steps.ts` + `push-automation-engine.ts`؛ اعتبارش در `validateSemantics`
+هنگام ذخیره، و لغوِ معلق‌ها با مُهر `push_automation_flow_cancel/<key>`.) گام `wait` یک سطر در
+**همان** `push_automation_queue/<day>` — دقیق‌تر: شاردِ **روزِ سررسید** — می‌نویسد با `stepId`، و هنگام drain
 ابتدا `recheckWhen` (و `when` قاعده و `audience.filter`) دوباره ارزیابی می‌شود؛ برقرارنبودن =
 `status: 'cancelled'`، نه ارسال. لغوِ قاعده (خاموش/آرشیو/توقف) هم همان سطرهای `pending` را می‌بندد.
 
@@ -269,8 +271,10 @@ group/leaf. خروجی `nodes` (سقف ۴۰ سطر) در همان `push_automati
 | D5 | پنل: RuleTreeEditor، AudienceFilterEditor، StepsEditor، RepeatPolicyEditor، برچسب ظرفیت، duplicate/archive/rollback، dry-run با ردپا | تست‌های کامپوننت (render + تعامل) |
 **وضعیت اجرا (همین PR، به ترتیبِ جدول):** D1 ✓ `c1cbf27` (هسته ارزیابی + رجیستری‌ها + سیاست تکرار،
 ۳۲ تست) · D2 ✓ `b5a1257` (اتصال `when`/فیلتر مخاطب/ردپا به موتور و API، ۲۱ تست روی مسیر واقعی) ·
-D3 ✓ (سیاست تکرار در `gate` + شمارنده سطح قاعده + نوشتن شمارنده sweep) · D4 (گام‌ها/صفِ گام‌ها) و
-D5 (ویرایشگرهای پنل) و D6 (`/validate`، `/pending-steps`، `/migrate`) انجام **نشده‌اند**. تنها استثنا یک
+D3 ✓ (سیاست تکرار در `gate` + شمارنده سطح قاعده + نوشتن شمارنده sweep) · D4 ✓ (گام‌های `notify`/`wait`/
+`stop`، صفِ گام‌ها، بازرسی دوباره در سررسید، لغو با ویرایشِ ساختاری، claim سطح گام، `pending-steps` +
+cancel) · D5 (ویرایشگرهای پنل) و D6 (`/validate`، `/migrate`، `/duplicate`، `/archive`، rollback) انجام
+**نشده‌اند**. تنها استثنا یک
 تکه از D5 است که همین حالا در پنل کار می‌کند: ردپای «چرا» و `reviewed` در دیالوگ «چند نفر مشمول؟».
 گزارش پایانی هر کدام را صریح «انجام‌نشده» اعلام می‌کند، نه «در پنل هست ولی اجرا نمی‌شود».
 

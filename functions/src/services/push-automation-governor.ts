@@ -43,6 +43,13 @@ export const CLAIMS = 'push_automation_claims';
 export const COUNTERS = 'push_automation_counters';
 export const DECISIONS = 'push_automation_decisions';
 export const QUEUE = 'push_automation_queue';
+/**
+ * One doc per rule with a workflow: `{ cancelBefore }`. Writing it is how «cancel pending steps when the
+ * rule changes» is implemented without a scan — the store cannot query a prefix, but every pending step
+ * carries its own `createdAt`, and one read per drained shard compares them. Rows created before the
+ * stamp are dead on arrival; rows created after it belong to the new definition.
+ */
+export const FLOW_CANCEL = 'push_automation_flow_cancel';
 export const RUNS = 'push_automation_runs';
 export const PREFS = 'notification_prefs';
 export const TEXT_REVISIONS = 'push_automation_text_revs';
@@ -83,6 +90,7 @@ export type SkipReason =
   | 'superseded'
   | 'quiet'
   | 'notImplemented'
+  | 'cancelled'
   | 'error';
 
 export const SKIP_LABELS: Record<SkipReason, string> = {
@@ -107,6 +115,7 @@ export const SKIP_LABELS: Record<SkipReason, string> = {
   superseded: 'اتوماسیون جایگزین مسئول این کاربر است',
   quiet: 'ساعت سکوت — ارسال به اول بازه مجاز موکول شد',
   notImplemented: 'این اتوماسیون نیازمند داده‌ای است که هنوز محاسبه نمی‌شود',
+  cancelled: 'گام معلق لغو شد: شرط برقرار نماند یا خودِ قاعده عوض/خاموش شد',
   error: 'خطای غیرمنتظره',
 };
 
@@ -688,6 +697,13 @@ export interface GateInput {
   ignoreGap?: boolean;
   /** Dry-run must not claim, count or log. */
   dry?: boolean;
+  /**
+   * A multi-step flow sends several messages from one rule. The counter/claim bucket then has to be the
+   * *step's* (`keyTag: 'greet'`, `'after-wait'`, …): otherwise step 2 is refused as a duplicate of step 1
+   * in the same window, and a retry of one step would not be recognisable. The rule's own day/week caps
+   * stay global — `keyTag` narrows the per-rule cadence counters and the claim, nothing else.
+   */
+  keyTag?: string | null;
 }
 
 export type GateResult =
@@ -755,7 +771,8 @@ export async function gate(d: Deps, g: GateInput): Promise<GateResult> {
   if (g.lostToPriority) return { ok: false, reason: 'priority' };
 
   const cooldown = Math.max(0, a.delivery.cooldownMs ?? 0);
-  const lastForKey = counter.keys?.[a.key];
+  const bucket = g.keyTag ?? a.key;
+  const lastForKey = counter.keys?.[bucket];
 
   if (a.repeatPolicy) {
     // The rule owns its cadence. The global per-user caps are deliberately NOT consulted on this path:
@@ -764,7 +781,7 @@ export async function gate(d: Deps, g: GateInput): Promise<GateResult> {
     // `requiresFeature`, the user's status and audience, the user's own muted categories and opt-ins,
     // a missing variable, no valid device, the cooldown this rule asked for, and the idempotency
     // claim below. A policy can raise a *send count*; it cannot buy a permission.
-    const own = policyDecision(a.repeatPolicy, a.key, counter, d.clock().getTime());
+    const own = policyDecision(a.repeatPolicy, bucket, counter, d.clock().getTime());
     if (!own.allow) return { ok: false, reason: own.reason, detail: own.detail };
     // A day cap the admin set on THIS rule still binds (it is the rule's own choice, not the platform's).
     const ownDay = a.delivery.maxPerUserPerDay;
@@ -797,7 +814,7 @@ export async function gate(d: Deps, g: GateInput): Promise<GateResult> {
     return { ok: false, reason: 'gap' };
 
   const windowKey = await windowKeyFor(d, a, cooldown);
-  if (!g.dry && !(await tryClaim(d, a.key, user.id, windowKey)))
+  if (!g.dry && !(await tryClaim(d, bucket, user.id, windowKey)))
     return { ok: false, reason: 'duplicate' };
   return { ok: true, windowKey };
 }

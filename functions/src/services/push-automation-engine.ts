@@ -5,6 +5,7 @@ import type {
   DeviceToken,
   PushAutomationSettings,
   NotificationPrefs,
+  AutomationStep,
   PushAutomation,
   PushAutomationDecisionItem,
   PushAutomationRun,
@@ -27,11 +28,13 @@ import {
   firstFailure,
   type RuleData,
 } from './automation/rule';
+import { needsFlowEngine, stepLabel } from './automation/steps';
 import {
   addSkip,
   advanceCounter,
   CLAIMS,
   DECISIONS,
+  FLOW_CANCEL,
   QUEUE,
   gate,
   isSystemGate,
@@ -337,6 +340,12 @@ export interface SendCtx {
   prefs?: Map<string, NotificationPrefs>;
   /** Panel «ارسال آزمایشی»: caps, cooldown, windows and claims are all bypassed. */
   test?: boolean;
+  /** A step of a flow: which counter bucket and claim this send belongs to (see `GateInput.keyTag`). */
+  keyTag?: string | null;
+  /** Set by the flow runner so a step's send cannot re-enter it (the projection also clears `steps`). */
+  inFlow?: boolean;
+  /** Facts for a step's own condition, when the caller has them (a sweep does; an event hook does not). */
+  flowFacts?: Facts;
   dry?: boolean;
   kind?: PushAutomationRun['kind'];
 }
@@ -368,6 +377,19 @@ export async function sendAutomation(
   // `dry` is exempt because a preview delivers nothing at all and the wizard's report is the
   // membership estimate (`dryRun`'s `note` says so out loud when the engine is stopped).
   if (settings.paused && !ctx.dry) return await skip('paused');
+
+  // A rule with a workflow is not «one message»: it is a list of three effects (send / wait / stop). The
+  // runner sends each step *back through this function* with the gates re-armed, so no step can skip the
+  // kill-switch, the user's own choices, the audience re-check or the claim — a step is a send, never a
+  // permission. `needsFlowEngine` keeps a single plain notify on the legacy path, so no migrated rule's
+  // claim key or counter bucket moves under its own feet.
+  if (!ctx.inFlow && needsFlowEngine(a)) {
+    const flow = await runFlow(d, a, user, vars, { ...ctx, inFlow: true });
+    if (flow.error) return await skip('error', flow.error);
+    if (flow.sent > 0) return { sent: true, windowKey: 'flow' };
+    const bad = flow.marks.find((m) => m.reason) ?? null;
+    return await skip(bad?.reason ?? 'cancelled', bad?.detail ?? flow.stopped ?? undefined);
+  }
 
   // Re-evaluated here, at the action: a rule that parked this user in the queue three days ago, or
   // picked them in an earlier window, must not reach someone whose team/role/status changed since.
@@ -404,6 +426,7 @@ export async function sendAutomation(
           missingVariables: [],
           hasDevice: hasDeviceFor(a, user, tokens),
           ignoreGap: a.delivery.priority === 'urgent',
+          keyTag: ctx.keyTag ?? null,
         });
   if (!decision.ok) return await skip(decision.reason, decision.detail);
   if (ctx.dry) return { sent: true, windowKey: 'preview' };
@@ -422,7 +445,10 @@ export async function sendAutomation(
       ? { priority: 'high' as const, urgent: true }
       : { priority: a.delivery.priority, urgent: false }),
     ...(a.delivery.cooldownMs > 0 && !ctx.test
-      ? { throttleKey: `auto_${a.key}`, throttleMs: Math.max(60_000, a.delivery.cooldownMs) }
+      ? {
+          throttleKey: ctx.keyTag ? `auto_${a.key}_${ctx.keyTag}` : `auto_${a.key}`,
+          throttleMs: Math.max(60_000, a.delivery.cooldownMs),
+        }
       : {}),
     automationKey: a.key,
     category: a.category,
@@ -434,7 +460,7 @@ export async function sendAutomation(
 
   if (!ctx.test) {
     const now = d.clock().toISOString();
-    const next = advanceCounter(counter, a.key, true, counter.day, counter.week, now);
+    const next = advanceCounter(counter, ctx.keyTag ?? a.key, true, counter.day, counter.week, now);
     // Both, on purpose. The in-memory map keeps *this* run consistent (a second rule in the same sweep
     // must see the send the first one just did); the write is what makes the *next* run see it. Without
     // the write a scheduled rule's day counters only ever bound a single run, so a per-rule repeat
@@ -447,7 +473,9 @@ export async function sendAutomation(
     at: d.clock().toISOString(),
     key: a.key,
     reason: 'sent',
-    detail: ctx.test ? 'آزمایشی' : decision.windowKey,
+    detail: [ctx.test ? 'آزمایشی' : decision.windowKey, ctx.keyTag ? `گام «${ctx.keyTag}»` : null]
+      .filter(Boolean)
+      .join(' · '),
   });
   return { sent: true, windowKey: decision.windowKey };
 }
@@ -856,10 +884,18 @@ interface QueueItem {
   id: string;
   key: string;
   userId: string;
-  event: string;
+  event?: string;
   vars: Record<string, string | number>;
   dueAt: string;
   status: string;
+  /** `'flow'` = a `wait` step of a workflow; absent = the legacy `event_delay` row. */
+  kind?: string;
+  stepId?: string;
+  stepIndex?: number;
+  /** The rule's version when the step was parked, and its own `createdAt` for the cancel stamp. */
+  ruleVersion?: number | null;
+  createdAt?: string;
+  recheckWhen?: unknown;
 }
 
 /** Processes the due part of today's queue, re-checking that the reason for the nudge still holds. */
@@ -882,6 +918,17 @@ export async function drainQueue(
   if (!due.length) return res;
   const { automations } = await loadRunnable(d);
   const byKey = new Map(automations.map((a) => [a.key, a]));
+  // A workflow step must be re-read against live data before it continues, and its conditions need the
+  // same facts a sweep has — so one context is built for the users of the due flow rows, not per item.
+  const flowUsers = new Set(
+    due.filter((r) => r.kind === 'flow' && byKey.has(r.key)).map((r) => r.userId),
+  );
+  let flowCtx: SweepContext | null = null;
+  if (flowUsers.size) {
+    const rowsOf = await Promise.all([...flowUsers].map((id) => d.store.get<User>(`users/${id}`)));
+    const users = rowsOf.filter((u): u is Doc<User> => !!u);
+    if (users.length) flowCtx = await buildSweepContext(d, users, {});
+  }
   const users = new Map<string, Doc<User> | null>();
   for (const item of due) {
     if (budgetMs !== null && Date.now() > budgetMs) break;
@@ -902,6 +949,13 @@ export async function drainQueue(
       res.closed++;
       continue;
     }
+    if (item.kind === 'flow') {
+      const r = await resumeFlow(d, a, item, user, settings, flowCtx);
+      await closeQueueItem(d, day, item.id, r.closed);
+      res.closed++;
+      if (r.sent) res.sent++;
+      continue;
+    }
     if (!(await stillValid(d, a, user, item.vars))) {
       await closeQueueItem(d, day, item.id, 'duplicate');
       await noteSkip(d, a.key, user.id, 'duplicate', 'resolved');
@@ -914,6 +968,299 @@ export async function drainQueue(
     if (r.sent) res.sent++;
   }
   return res;
+}
+
+// ─── Multi-step flows (§2.2): send / wait / stop ─────────────────────────────
+
+export interface FlowStepMark {
+  index: number;
+  id: string;
+  type: AutomationStep['type'];
+  result: 'sent' | 'skipped' | 'queued' | 'stopped' | 'conditionFalse' | 'preview';
+  reason?: SkipReason | null;
+  detail?: string | null;
+  dueAt?: string | null;
+}
+
+export interface FlowOutcome {
+  sent: number;
+  /** A `wait` parked the rest of the flow; the drain continues it after `dueAt`. */
+  queued: boolean;
+  stopped: string | null;
+  marks: FlowStepMark[];
+  error: string | null;
+}
+
+/**
+ * The rule as one `notify` step sees it: the step's own message and channel, `steps` cleared so the send
+ * below is a send and not a re-entry, and — only when the rule owns its cadence — the step's slice of the
+ * policy merged in with the step as its counter bucket. A rule on inherited caps keeps inherited caps for
+ * every step: per-step spacing is a choice a policy makes, not a way to widen a platform limit.
+ */
+function projectForStep(
+  a: PushAutomation,
+  step: Extract<AutomationStep, { type: 'notify' }>,
+): PushAutomation {
+  const perStep = a.repeatPolicy?.perStep?.[step.id];
+  return {
+    ...a,
+    steps: null,
+    message: step.message,
+    ...(step.channel ? { audience: { ...a.audience, channel: step.channel } } : {}),
+    ...(a.repeatPolicy && perStep
+      ? {
+          repeatPolicy: {
+            ...a.repeatPolicy,
+            ...(perStep.minIntervalMs !== undefined
+              ? { minIntervalMs: Math.max(a.repeatPolicy.minIntervalMs, perStep.minIntervalMs) }
+              : {}),
+            ...(perStep.maxPerDay !== undefined
+              ? {
+                  perDay:
+                    a.repeatPolicy.perDay === 0
+                      ? perStep.maxPerDay
+                      : Math.min(a.repeatPolicy.perDay, perStep.maxPerDay),
+                }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Runs a workflow from `startIndex`. Nothing here decides permissions: every send goes back through
+ * `sendAutomation`, so the kill-switch, the user's own settings, the destination check, the gates and the
+ * claim apply to each step exactly as they apply to a single-message rule.
+ *
+ * Truncation and absent data fail closed the same way they do for a rule condition: a step whose data the
+ * path cannot see does not send.
+ */
+export async function runFlow(
+  d: Deps,
+  a: PushAutomation,
+  user: Doc<User>,
+  vars: Record<string, string | number>,
+  ctx: SendCtx,
+  startIndex = 0,
+): Promise<FlowOutcome> {
+  const steps = (a.steps ?? []) as AutomationStep[];
+  const out: FlowOutcome = { sent: 0, queued: false, stopped: null, marks: [], error: null };
+  const data = {
+    facts: ctx.flowFacts ?? {},
+    user,
+    now: d.clock(),
+  };
+  for (let i = startIndex; i < steps.length; i++) {
+    const step = steps[i] as AutomationStep;
+    const mark = (result: FlowStepMark['result'], extra: Partial<FlowStepMark> = {}): void => {
+      out.marks.push({ index: i, id: step.id, type: step.type, result, ...extra });
+    };
+    if (step.type === 'stop') {
+      const r = evaluateFor(step.when, data);
+      if (r.ok && !r.truncated) {
+        out.stopped = step.reason;
+        mark('stopped', { detail: step.reason });
+        if (!ctx.dry && !ctx.test)
+          await noteSkip(
+            d,
+            a.key,
+            user.id,
+            'cancelled',
+            `توقف گردش‌کار: ${step.reason}`.slice(0, 240),
+          );
+        return out;
+      }
+      mark('conditionFalse', { detail: firstFailure(r) });
+      continue;
+    }
+    if (step.type === 'notify') {
+      // A step's own condition is a branch: it does not skip the step, it ends the flow (§2.2).
+      if (step.when) {
+        const r = evaluateFor(step.when, data);
+        if (!r.ok || r.truncated) {
+          mark('conditionFalse', {
+            detail: r.truncated
+              ? 'بودجه‌ی ارزیابی گام تمام شد'
+              : (firstFailure(r) ?? 'شرط این گام برقرار نبود'),
+          });
+          return out;
+        }
+      }
+      const r = await sendAutomation(d, projectForStep(a, step), user, vars, {
+        ...ctx,
+        inFlow: true,
+        keyTag: step.id,
+      });
+      if (r.sent) {
+        out.sent++;
+        mark(ctx.dry ? 'preview' : 'sent');
+      } else {
+        mark('skipped', { reason: r.reason, detail: stepLabel(step) });
+      }
+      continue;
+    }
+    // wait
+    const dueMs = d.clock().getTime() + step.minutes * 60_000;
+    const dueAt = new Date(dueMs).toISOString();
+    if (ctx.dry) {
+      // A preview cannot see the future: it reports the wait and stops there, honestly.
+      mark('queued', { dueAt });
+      out.queued = true;
+      return out;
+    }
+    if (ctx.test) {
+      mark('preview', { dueAt, detail: 'در «ارسال آزمایشی» گام‌های بعد از صبر اجرا نمی‌شوند' });
+      return out;
+    }
+    await parkFlowStep(d, a, user, step, i, dueMs, vars);
+    mark('queued', { dueAt });
+    out.queued = true;
+    return out;
+  }
+  return out;
+}
+
+/**
+ * Park the rest of a flow. The row goes into the shard of the DAY IT IS DUE, not of today, so a wait that
+ * crosses midnight is still found by the drain (the legacy `event_delay` rows are minute-scale and stay
+ * in today's shard, exactly as before). `store.set` on a deterministic id is the idempotency: re-running
+ * the same step overwrites its own row instead of queueing a second one.
+ */
+async function parkFlowStep(
+  d: Deps,
+  a: PushAutomation,
+  user: Doc<User>,
+  step: Extract<AutomationStep, { type: 'wait' }>,
+  index: number,
+  dueMs: number,
+  vars: Record<string, string | number>,
+): Promise<void> {
+  const policy = await getPolicy(d);
+  const day = dayKey(new Date(dueMs), policy.timezone);
+  const path = `${QUEUE}/${day}/${a.key}__${user.id}__f${index}`;
+  // One open step per (rule, user, index) — never two. Without this a later run that re-starts the flow
+  // would resurrect the row the drain just closed, and a completed follow-up would fire a second time.
+  const open = await d.store.get<{ status?: string; dueAt?: string; stepId?: string }>(path);
+  if (open?.status === 'pending' && open.stepId === step.id) return;
+  await d.store.set(path, {
+    key: a.key,
+    userId: user.id,
+    kind: 'flow',
+    stepId: step.id,
+    stepIndex: index,
+    ruleVersion: a.version ?? null,
+    recheckWhen: step.recheckWhen ?? null,
+    vars,
+    dueAt: new Date(dueMs).toISOString(),
+    createdAt: d.clock().toISOString(),
+    status: 'pending',
+    expireAt: new Date(dueMs + 7 * DAY).toISOString(),
+  });
+}
+
+/**
+ * Continue a parked step — or close it. Order matters: cheap authoritative checks first (does the rule
+ * still exist, is the step still the step we parked, has the rule been edited since), then the conditions,
+ * then the send path that re-checks everything else.
+ */
+async function resumeFlow(
+  d: Deps,
+  a: PushAutomation,
+  item: QueueItem,
+  user: Doc<User>,
+  settings: Awaited<ReturnType<typeof readSettings>>,
+  flowCtx: SweepContext | null,
+): Promise<{ sent: boolean; closed: string }> {
+  const close = async (status: string, detail?: string) => {
+    await noteSkip(d, a.key, user.id, 'cancelled', detail);
+    return { sent: false, closed: status };
+  };
+  const index = item.stepIndex ?? -1;
+  const step = (a.steps ?? [])[index] as AutomationStep | undefined;
+  if (!step || step.id !== item.stepId)
+    return close('cancelled', 'گامی که برای این کاربر صف شده بود دیگر در تعریف قاعده نیست');
+  const cutoff = await flowCancelCutoff(d, a.key);
+  const bornAt = item.createdAt ? Date.parse(item.createdAt) : 0;
+  if (cutoff && bornAt && bornAt <= cutoff)
+    return close('cancelled', 'قاعده بعد از صف‌شدن این گام ویرایش یا خاموش شد');
+  // No version comparison here on purpose: a wording fix also bumps `version`, and cancelling a
+  // three-day follow-up because someone fixed a typo would be worse than the stale promise we are
+  // guarding against. The stamp above and the step identity below are the two real checks.
+  const facts = flowCtx ? factsForRule(a, flowCtx, user) : {};
+  const data = { facts, user, now: d.clock() };
+  const when = evaluateFor(a.when ?? null, data);
+  if (!when.ok || when.truncated)
+    return close('cancelled', firstFailure(when) ?? 'شرط قاعده در لحظه ادامه برقرار نبود');
+  if (item.recheckWhen) {
+    const rc = evaluateFor(item.recheckWhen as never, data);
+    if (!rc.ok || rc.truncated)
+      return close('cancelled', firstFailure(rc) ?? 'شرطِ خودِ گام در لحظه ادامه برقرار نبود');
+  }
+  const aud = audienceAllows(a, user, d.clock());
+  if (!aud.ok) return close('cancelled', firstFailure(aud) ?? 'کاربر دیگر در مخاطب این قاعده نیست');
+  const flow = await runFlow(
+    d,
+    a,
+    user,
+    item.vars ?? {},
+    { settings, kind: 'queue', inFlow: true, flowFacts: facts },
+    index + 1,
+  );
+  if (flow.queued) return { sent: false, closed: 'pending' };
+  if (flow.error) return { sent: false, closed: 'error' };
+  if (flow.stopped) return { sent: false, closed: 'cancelled' };
+  if (flow.sent > 0) return { sent: true, closed: 'sent' };
+  const bad = flow.marks.find((m) => m.reason) ?? null;
+  return { sent: false, closed: bad?.reason ?? 'cancelled' };
+}
+
+/** The stamp that invalidates every pending step a rule had when it was written. */
+export async function stampFlowCancel(d: Deps, key: string): Promise<void> {
+  await d.store.set(`${FLOW_CANCEL}/${key}`, {
+    cancelBefore: d.clock().toISOString(),
+    at: d.clock().toISOString(),
+  });
+}
+
+export async function flowCancelCutoff(d: Deps, key: string): Promise<number> {
+  const doc = await d.store.get<{ cancelBefore?: string }>(`${FLOW_CANCEL}/${key}`);
+  return doc?.cancelBefore ? Date.parse(doc.cancelBefore) : 0;
+}
+
+/**
+ * Pending steps of a rule, for the panel's «اقدام‌های معلق» card and for tests. The store has no prefix
+ * query, so this reads the day shards the rule could possibly have parked rows in — `days` of them, from
+ * today on. A wait longer than that is reported as `truncated`, never as «nothing pending».
+ */
+export async function listPendingSteps(
+  d: Deps,
+  key: string,
+  opts: { days?: number; userId?: string; limit?: number } = {},
+): Promise<{ items: Array<Record<string, unknown>>; shards: number; truncated: boolean }> {
+  const policy = await getPolicy(d);
+  const tz = policy.timezone;
+  const days = Math.max(1, Math.min(31, opts.days ?? 8));
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
+  const start = d.clock().getTime();
+  const items: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < days; i++) {
+    const day = dayKey(new Date(start + i * DAY), tz);
+    // Only `status` is a query: a composite index for (status, key) on a shard this small would be a
+    // permanent tax on every deploy, and the drain already reads the whole pending set the same way.
+    const rows = await d.store.query<QueueItem & Record<string, unknown>>({
+      collection: `${QUEUE}/${day}`,
+      where: [['status', '==', 'pending']],
+    });
+    for (const r of rows) {
+      if (r.key !== key || r.kind !== 'flow') continue;
+      if (opts.userId && r.userId !== opts.userId) continue;
+      items.push({ ...r, day });
+      if (items.length >= limit) return { items, shards: days, truncated: true };
+    }
+  }
+  items.sort((x, y) => String(x.dueAt ?? '').localeCompare(String(y.dueAt ?? '')));
+  return { items, shards: days, truncated: false };
 }
 
 /** Did the user already do the thing the nudge was about? Stale reminders must never fire. */

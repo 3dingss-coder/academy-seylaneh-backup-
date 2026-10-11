@@ -59,6 +59,8 @@
 | POST | `/:key/test-send` | ارسال آزمایشی به یک کاربر؛ سقف‌ها رد می‌شوند ولی در آمار و شمارنده نمی‌آیند (۱۰ بار در ساعت). **کلید توقف رد نمی‌شود**: با `paused: true` پاسخ `sent: false` و `reason: 'paused'` است و هیچ اعلانی ساخته نمی‌شود |
 | GET | `/runs?limit=&key=` | تاریخچه اجرا با دلایل رد |
 | GET | `/trace/:userId` | لاگ تصمیمات + اعلان‌های رسیده + ترجیحات و شمارنده‌های کاربر |
+| GET | `/:key/pending-steps` | گام‌های `wait` که برای کاربران صف شده‌اند (`days`، `userId`، `limit`)؛ فقط شاردِ روزهای پیشِ رو خوانده می‌شود و `note` همین را می‌گوید |
+| POST | `/:key/pending-steps/cancel` | لغو همه‌ی گام‌های معلقِ یک قاعده با یک نوشتن (بدون پیمایش)؛ خودِ قاعده دست نمی‌خورد |
 | PUT | `/settings` | اعداد سراسری که **پیش‌فرض به‌ارث‌رسیده** قاعده‌های بی‌سیاست‌اند (`maxPerUserPerDay`، `maxPerUserPerWeek`، `minGapMs`، TTL، آستانه هشدار)؛ قاعده‌ای که `repeatPolicy` داشته باشد این سه سقف را نمی‌خواند |
 | POST | `/pause` | کلید توقف (`{paused:true}`) — در همان isolate فوری اثر می‌کند |
 | POST | `/run` | اجرای دستی (`force`)؛ ۶ بار در ساعت. پنجره زمانی claim همچنان جلوی تکرار را می‌گیرد |
@@ -68,7 +70,7 @@
 
 ### ۳.۱) `/export` و `/import` — نقل‌وانتقال بین محیط‌ها (PR8)
 
-- فایل: `{ format: 'seylane.push-automation/2', exportedAt, timezone, count, rows[] }`. هر سطر فقط
+- فایل: `{ format: 'seylane.push-automation/3', exportedAt, timezone, count, rows[] }`. هر سطر فقط
   `key, name, description, category, audienceRole, enabled, trigger, audience, message, delivery,
   supersedes, optInOnly` است، و از format/2 سه فیلد موتور قاعده هم: `schemaVersion`، `when`،
   `repeatPolicy` (بدون آن‌ها یک قاعده‌ی v2 در مقصد به معنی دیگری روشن می‌شد؛ برای همین نسخه‌ی فایل بالا

@@ -793,6 +793,16 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
       ),
     ),
   );
+  r.get(
+    '/admin/push-automations/:key/pending-steps',
+    h(async (req) =>
+      automations.pendingSteps(d, id(req, 'key'), req.query as Record<string, string>),
+    ),
+  );
+  r.post(
+    '/admin/push-automations/:key/pending-steps/cancel',
+    h(async (req) => automations.cancelPendingSteps(d, actorOf(req), id(req, 'key'))),
+  );
   r.post(
     '/admin/push-automations/:key/dry-run',
     h(async (req) => automations.dryRun(d, id(req, 'key'))),

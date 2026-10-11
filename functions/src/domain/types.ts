@@ -715,6 +715,31 @@ export interface PushAutomationMessage {
   imageUrl: string | null;
 }
 
+/**
+ * One step of a rule's workflow (§2.2 of `docs/admin-push-automation-rules-engine.md`).
+ *
+ * Three effects only — say something, wait, stop — because those are the only things the engine can
+ * perform without becoming a script interpreter: `eval` and stored code are absent by construction.
+ * A new *action* is a registry entry in `services/automation/steps.ts` (label, validation, explanation)
+ * plus, when it needs a new primitive, one branch in the flow runner — never a new scenario list.
+ *
+ * `wait` is the only step that outlives its run: it writes one row into `push_automation_queue/<day>`
+ * and the drain resumes after it, re-reading the rule, the audience and its own condition. A rule
+ * edited or switched off meanwhile cancels the pending step instead of continuing on a stale promise.
+ */
+export type AutomationStep =
+  | {
+      type: 'notify';
+      id: string;
+      message: PushAutomationMessage;
+      /** Overrides the rule's channel for this one message. */
+      channel?: 'any' | 'web' | 'android' | null;
+      /** Branch: when this tree does not hold, the flow stops here (it is not "skip this step"). */
+      when?: RuleExpr | null;
+    }
+  | { type: 'wait'; id: string; minutes: number; recheckWhen?: RuleExpr | null }
+  | { type: 'stop'; id: string; when: RuleExpr; reason: string };
+
 export interface PushAutomationDelivery {
   priority: AutomationPriority;
   push: boolean;
@@ -766,6 +791,12 @@ export interface PushAutomation {
   when?: RuleExpr | null;
   /** v2: cadence of this rule. Absent on a v1 row means "the legacy global caps", exactly as before. */
   repeatPolicy?: RepeatPolicy | null;
+  /**
+   * v2: the workflow. Absent/empty means "the single message in `message`", which is every v1 rule and
+   * the behaviour `withDefaults()` preserves — a rule with one `notify` step is deliberately NOT
+   * rewritten into a flow, so no claim key or counter bucket moves under an existing rule's feet.
+   */
+  steps?: AutomationStep[] | null;
   /** Seeded but needing data that v1 does not compute (Q3): never enable-able, explained in UI. */
   requiresFeature?: string | null;
   /** Only for users who explicitly opted in (`notification_prefs`) — e.g. the evening nudge. */

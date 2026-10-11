@@ -69,6 +69,10 @@ export function meRouter(d: Deps, limiter: RateLimiter): LightRouter {
         req.body,
       );
       await track(d, e.name, me(req).id, e.props ?? {});
+      // The one place that knows the app was opened with a working session. Presence, not learning:
+      // `touchUserActive` only refreshes `lastActiveAt`, and `todayActive` is deliberately NOT built from
+      // it (push-automation-engine.ts) so a quick app open cannot silence «زنجیره در خطر».
+      if (e.name === 'app_opened') await users.touchUserActive(d, me(req));
     }, 204),
   );
 

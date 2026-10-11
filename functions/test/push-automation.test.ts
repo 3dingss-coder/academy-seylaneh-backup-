@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DAY, dayKey } from '../src/lib/time';
+import { CATEGORY_ORDER } from '../src/domain/notification-categories';
 import { CRON_JOBS, runCron } from '../src/services/cron';
 import { notifyTemplate, flushDeferredPush } from '../src/services/notify';
 import {
@@ -108,12 +109,49 @@ async function inactiveFor(days: number, userId = marketer.id) {
   });
 }
 
+/** Everything `seedCatalog` leaves switched on: the system gates, and only them (see `toAutomation`). */
+const SEEDED_ENABLED_KEYS = [
+  'welcome',
+  'new_assignment',
+  'reminder',
+  'deadline_warning',
+  'deadline_passed',
+  'quiz_passed',
+  'quiz_failed',
+  'badge_earned',
+  'weekly_digest',
+  'manager_message',
+  'retake_request',
+  'retake_reviewed',
+  'escalation',
+];
+
 describe('catalogue seeding', () => {
   it('seeds all 27+ scenarios disabled, and never overwrites an admin edit', async () => {
     expect(PUSH_AUTOMATION_CATALOG.length).toBe(CATALOG_KEYS.length);
     const all = await listAutomations(ctx.deps);
     expect(all.counts.total).toBe(CATALOG_KEYS.length);
-    // The gates may be on (they mirror today's behaviour); nothing else may.
+    // The exact set that is switched on after a seed. This list is the boundary of «nothing starts
+    // sending because something was deployed» in one place: 13 system gates, each only keeping an
+    // existing template's behaviour alive, and nothing else. A new gate has to appear here on purpose —
+    // which is the point of writing the keys out instead of deriving them from `templateKey`.
+    expect(
+      all.rows
+        .filter((r) => r.enabled)
+        .map((r) => r.key)
+        .sort(),
+    ).toEqual([...SEEDED_ENABLED_KEYS].sort());
+    expect(
+      all.rows
+        .filter((r) => r.isGate)
+        .map((r) => r.key)
+        .sort(),
+    ).toEqual([...SEEDED_ENABLED_KEYS].sort());
+    expect(all.rows.filter((r) => !r.enabled)).toHaveLength(
+      CATALOG_KEYS.length - SEEDED_ENABLED_KEYS.length,
+    );
+    // The one place where the two halves of the sentence above meet: a gate is enabled *because* it is a
+    // gate, and no scenario row arrives on.
     for (const row of all.rows) {
       if (row.isGate) {
         // A gate keeps today's behaviour, so it arrives on — turning it off would delete an
@@ -420,6 +458,30 @@ describe('engine: one send per window, with reasons', () => {
     expect(other?.skipped).toBeGreaterThan(0);
   });
 
+  it('app presence closes one inactivity episode, and a new absence restarts the ladder', async () => {
+    await buildFixture(ctx);
+    await device();
+    for (const key of ['inactive_1d', 'inactive_2d', 'inactive_3d', 'inactive_7d'])
+      await enable(key);
+    await inactiveFor(3);
+    const first = await runPushAutomations(ctx.deps, { force: true });
+    expect(first.sweeps.filter((x) => x.sent > 0).map((x) => x.key)).toEqual(['inactive_3d']);
+
+    // `touchUserActive` (the app was opened with a valid session) ends the episode: `inactiveDays` is
+    // derived from the same stamp the ladder reads, so no further step piles on today.
+    await store().update(`users/${marketer.id}`, { lastActiveAt: ctx.deps.clock().toISOString() });
+    const second = await runPushAutomations(ctx.deps, { force: true });
+    expect(second.sweeps.reduce((n, x) => n + x.sent, 0)).toBe(0);
+
+    // Absence again, one day later: the ladder starts at the bottom, not at step 4 — this is the
+    // `inactiveEpoch` behaviour §۴ of the analysis asked for, arriving for free because the epoch *is*
+    // `lastActiveAt` (ladderFilter, push-automation-engine.ts).
+    ctx.advance(DAY);
+    await inactiveFor(1);
+    const third = await runPushAutomations(ctx.deps, { force: true });
+    expect(third.sweeps.filter((x) => x.sent > 0).map((x) => x.key)).toEqual(['inactive_1d']);
+  });
+
   it('an inactive account never receives a push', async () => {
     await buildFixture(ctx);
     await device();
@@ -609,6 +671,98 @@ describe('user preferences', () => {
         prefsSchema.parse({ mutedCategories: ['everything'], optIns: {} }),
       ),
     ).rejects.toThrow();
+  });
+
+  it("the profile view arrives with defaults, the server's category list, and no phantom opt-ins", async () => {
+    // No `notification_prefs/<id>` document exists for a real account until the first save — so the
+    // defaults have to come from the server, not from a UI that invents them.
+    const r = await ctx.api(marketer.token).get('/v1/me/notification-prefs').expect(200);
+    const v = r.body.data as Record<string, unknown>;
+    expect(v.prefs).toMatchObject({ mutedCategories: [], preferredHour: null, optIns: {} });
+    // Nothing is switched on yet, so there is nothing to offer. An empty list here is what makes the UI
+    // hide the section instead of promising a preference nobody honours.
+    expect(v.optInOptions).toEqual([]);
+    const cats = v.categories as Array<{
+      key: string;
+      label: string;
+      hint: string;
+      mutable: boolean;
+    }>;
+    expect(cats.map((c) => c.key)).toEqual(CATEGORY_ORDER.slice());
+    expect(cats.find((c) => c.key === 'deadlines')).toMatchObject({ mutable: false });
+    expect(cats.find((c) => c.key === 'health')?.mutable).toBe(false);
+    expect(cats.find((c) => c.key === 'quizzes')?.mutable).toBe(true);
+    // Labels and hints come from the domain module, in Persian, and no id ever leaks into them.
+    for (const c of cats) {
+      expect(c.label).toMatch(/[\u0600-\u06FF]/);
+      expect(c.hint.length).toBeGreaterThan(4);
+    }
+    expect(JSON.stringify(r.body)).not.toContain(marketer.id);
+  });
+
+  it('the opt-in list follows what is actually runnable — enabled, archived, feature-gated', async () => {
+    await enable('evening_nudge');
+    const on = await ctx.api(marketer.token).get('/v1/me/notification-prefs').expect(200);
+    expect(on.body.data.optInOptions).toEqual([
+      {
+        key: 'evening_nudge',
+        name: 'یادآوری عصرگاهی (فقط برای علاقه‌مندان)',
+        description: expect.stringContaining('۱۸:۰۰'),
+      },
+    ]);
+
+    // A rule the admin switched off again is not something to offer.
+    await ctx
+      .api(admin.token)
+      .patch('/v1/admin/push-automations/evening_nudge', { enabled: false });
+    const off = await ctx.api(marketer.token).get('/v1/me/notification-prefs').expect(200);
+    expect(off.body.data.optInOptions).toEqual([]);
+
+    // …and neither is a retired one: archive removes it from the offer even though its row stays.
+    await ctx
+      .api(admin.token)
+      .post('/v1/admin/push-automations/evening_nudge/archive', {})
+      .expect(200);
+    const arch = await ctx.api(marketer.token).get('/v1/me/notification-prefs').expect(200);
+    expect(arch.body.data.optInOptions).toEqual([]);
+  });
+
+  it('the user path mutes a category for real: card kept, push skipped, protected ones refused', async () => {
+    await device();
+    const put = await ctx
+      .api(marketer.token)
+      .put('/v1/me/notification-prefs', { mutedCategories: ['quizzes'], optIns: {} });
+    expect(put.status, JSON.stringify(put.body)).toBe(200);
+    // `PUT` replaces the document — the same whole-write the automation PATCH follows — so a field the
+    // screen does not offer is *cleared* unless it is carried back. Pinned both ways, because the profile
+    // card must obey it: `preferredHour` has no UI (`preferred_time` is not runnable) and survives a save
+    // only while the client keeps re-sending it.
+    await writePrefs(ctx.deps, marketer.id, {
+      mutedCategories: ['quizzes'],
+      preferredHour: 18,
+      optIns: {},
+    });
+    const dropped = await ctx
+      .api(marketer.token)
+      .put('/v1/me/notification-prefs', { mutedCategories: ['quizzes'], optIns: {} });
+    expect(dropped.body.data.preferredHour).toBeNull();
+    const kept = await ctx
+      .api(marketer.token)
+      .put('/v1/me/notification-prefs', {
+        mutedCategories: ['quizzes'],
+        preferredHour: 18,
+        optIns: {},
+      })
+      .expect(200);
+    expect(kept.body.data.preferredHour).toBe(18);
+    expect(kept.body.data.mutedCategories).toEqual(['quizzes']);
+
+    const notesBefore = (await notifications(marketer.id)).length;
+    await notifyTemplate(ctx.deps, [marketer.id], 'retake_request', { title: 'زنجیره' });
+    const note = (await notifications(marketer.id)).find((x) => x.type === 'retake_request');
+    expect((await notifications(marketer.id)).length).toBe(notesBefore + 1);
+    expect(note?.pushStatus).toBe('skipped');
+    expect(ctx.deps.push.sent).toHaveLength(0);
   });
 
   it('an opt-in-only rule stays silent until the user opts in', async () => {

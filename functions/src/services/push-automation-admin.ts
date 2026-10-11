@@ -470,8 +470,17 @@ function toAutomation(entry: CatalogEntry, actor: Actor, now: string): PushAutom
 }
 
 /**
- * Creates the catalogue documents that do not exist yet — never touches an existing one, so a
- * re-deploy cannot undo an admin's edit. Everything arrives `enabled: false` (spec §4.1). Idempotent.
+ * Creates the catalogue documents that do not exist yet — never touches an existing one, so a re-deploy
+ * cannot undo an admin's edit. Idempotent.
+ *
+ * What arrives switched on, in words rather than by accident: **everything is seeded off except the
+ * system gates** — the entries that carry a `templateKey` (`toAutomation` above). That is not an
+ * exception to spec §4.1 («nothing starts sending because something was deployed»); it is the same rule
+ * seen from the user's side, because a gate only decides whether a notification the product sends *today*
+ * keeps being sent. Turning one off at seeding would silently delete a behaviour that exists right now,
+ * which is a larger change than deploying a panel. No scenario message, no cron rule and no v2 rule ever
+ * switches itself on here — see `test/push-automation.test.ts` › «catalogue seeding», which pins the exact
+ * key set so a new gate has to be a decision and not a side effect.
  */
 export async function seedCatalog(
   d: Deps,

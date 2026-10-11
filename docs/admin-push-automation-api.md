@@ -111,8 +111,17 @@
 - `dryRun: true` همان قاعده‌ها را می‌چکد، هیچ چیزی نمی‌نویسد و audit هم ثبت نمی‌کند؛ `results[].action`
   می‌گوید قرار است چه شود. برای خودِ عملیات یک رکورد `push_automation.imported` با شمارش‌ها نوشته می‌شود.
 
-کاربری (بازاریاب/مدیر): `GET|PUT /v1/me/notification-prefs`. خاموش‌کردن دسته `deadlines` یا `health`
-ممنوع است (۴۰۰ با پیام فارسی)؛ بقیه دسته‌ها آزاد.
+- **کاربر**: `GET|PUT /v1/me/notification-prefs`. `GET` سه چیز می‌دهد: `prefs` (اسنادِ ذخیره‌شده؛ نبودِ سند
+  یعنی پیش‌فرض، و پیش‌فرض هرگز «خاموش» نیست)، `categories` از `domain/notification-categories.ts`
+  (`{ key, label, hint, mutable }` — صفحهٔ پروفایل هیچ فهرستی از خودش ندارد، پس یک دستهٔ جدید فقط با یک
+  تغییر در سرور ظاهر می‌شود)، و `optInOptions` — خودکارسازی‌هایی که واقعاً قابل ارائه‌اند: `optInOnly` و
+  `enabled` و بایگانی‌نشده و بدون `requiresFeature` و غیر gate (`optInOfferings`,
+  `push-automation-governor.ts:635`). فهرست خالی یعنی UI بخش «اعلان‌های انتخابی» را اصلاً نمی‌سازد.
+  `PUT` سند را **جایگزین** می‌کند (نه patch): بدنۀ کامل بفرستید، وگرنه `preferredHour` پاک می‌شود — UI‌اش
+  ساخته نشده چون `preferred_time` هنوز مجرای اجرا ندارد. خاموش‌کردن `deadlines` یا `health` رد می‌شود
+  (۴۰۰ با پیام فارسی)؛ بقیهٔ دسته‌ها آزاد است. هر دو مسیر هیچ PII/توکنی برنمی‌گردانند.
+  صفحهٔ کاربر: `apps/web/src/components/common/NotificationPrefsCard.tsx` (زیر `PushOptIn`)؛ رضایت مرورگر
+  را دست نمی‌زند و فقط پوش را قطع می‌کند — اعلان داخل اپ همیشه ساخته می‌شود.
 
 ## ۴) اجرا
 

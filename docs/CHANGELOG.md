@@ -1,5 +1,56 @@
 # Changelog
 
+## ۲۰۲۶-۱۰-۱۱ — لایه D7: «حضور» در `lastActiveAt`، «تنظیمات اعلان» برای کاربر، و قفلِ «چه چیزی روشن seed می‌شود»
+
+سه کار کوچک که همراه PR #84 می‌آیند؛ هیچ‌کدام اعلان جدیدی را روشن نمی‌کند، هیچ push واقعی ارسال نمی‌شود،
+و هیچ تغییری در `wrangler.toml`، مدل دادهٔ اتوماسیون، کمپین‌های دستی یا `PushOptIn` نمی‌دهد.
+
+- **۱) `lastActiveAt` حالا «باز کردن اپ» را هم می‌شمارد** (طرح §۴.۹ سند تحلیل، که تا امروز فقط روی کاغذ
+  بود). تا دیروز همین فیلد را فقط ورود با رمز/تلفن و ذخیرهٔ پیشرفت درس جابه‌جا می‌کردند، پس
+  «یک روز است سایت را باز نکرده» با «یک روز است درس نخوانده» یکی اندازه‌گیری می‌شد — و نردبان
+  بی‌فعالیتی دقیقاً همان عدد را می‌خواند. دو مسیر نوشتن اضافه شد، هر دو best‑effort و بدون کد کلاینت
+  جدید: `POST /me/events` فقط برای `app_opened` (`routes/me.ts:75`؛ رویداد از `App.tsx:54` می‌آید) و
+  `users.refresh()` بعد از بررسی `active` (`users.ts:380`). throttle سند جدا ندارد: اگر مهر نبود یا
+  کهنه‌تر از `TOUCH_THROTTLE_MS` (۱۰ دقیقه) بود دقیقاً **یک** `UPDATE` روی همان یک فیلد، وگرنه هیچ کوئری.
+  خطا و کُندی بلعیده می‌شود (`TOUCH_GIVEUP_MS = 1.5s` + `try/catch` + لاگ بدون PII)؛ ۲۰۴ هرگز به ۵۰۰
+  تبدیل نمی‌شود. حساب غیرفعال قبل از هر نوشتن رد می‌شود.
+  **تصمیم streak:** `lastLearnedAt` اضافه نشد — `streakDays` از مهر `lastActivityAt`/`completedAt`
+  بسته‌ها می‌آید (`behavior.ts:220-233`)، پس باز کردن اپ `streak_5` را زنده نمی‌کند. تنها نشتی،
+  `todayActive` بود که از `user.lastActiveAt` حساب می‌شد و یک «فقط باز کردن اپ» می‌توانست `streak_at_risk`
+  را خاموش کند؛ حالا از همان مهرهای بسته حساب می‌شود (`push-automation-engine.ts:144`) و برچسبش در پنل
+  «امروز آموزش دیده است» شد (`automation/fields.ts:97`، بدون تغییر id).
+- **۲) «تنظیمات اعلان» برای خودِ کاربر** — `apps/web/src/components/common/NotificationPrefsCard.tsx`
+  درست زیر `PushOptIn` در `pages/m/ProfilePage.tsx` (رفتار `PushOptIn` دست‌نخورده). `GET
+  /v1/me/notification-prefs` سازگارِ عقب‌رو اضافه کرد: `categories` با `label`/`hint`/`mutable` از
+  `domain/notification-categories.ts` و `optInOptions` از `optInOfferings()` (فقط `optInOnly` +
+  `enabled` + بایگانی‌نشده + بدون `requiresFeature`)؛ UI هیچ فهرستی از خودش ندارد و اگر `optInOptions`
+  خالی بود، آن بخش اصلاً ساخته نمی‌شود. هر دسته یک `role="switch"`/`aria-checked` با برچسب و راهنمای
+  فارسی؛ `deadlines` و `health` قفل‌اند با «همیشه روشن» و هرگز در `mutedCategories` نمی‌روند (PUT همان
+  ۴۰۰ همیشگی را می‌دهد). جملهٔ ثابت روی کارت: «خاموش‌کردن فقط پوش را قطع می‌کند؛ اعلان داخل اپ همیشه
+  می‌رسد.» ذخیره per-switch و خوش‌بینانه است با rollback و پیام فارسی، سوئیچ‌ها حین ذخیره غیرفعالند،
+  حالت بارگذاری و «تلاش دوباره» دارد، و `preferredHour` (که UI ندارد) در هر PUT دوباره فرستاده می‌شود تا
+  پاک نشود. بدنهٔ PUT همیشه `mutedCategories` **کامل** است، چون `writePrefsSafe` سند را جایگزین می‌کند.
+- **۳) دو کامنت که خلاف واقع می‌گفتند، و یک قفل تستی.** `seedCatalog` می‌گفت «Everything arrives
+  `enabled: false`» و هدر `push-automation-catalog.ts` می‌گفت «every scenario seeds disabled» — در حالی که
+  `toAutomation` دروازه‌های سیستمی را روشن می‌کند. هر دو به «همه خاموش، به‌جز دروازه‌های سیستمی (و دلیلش)»
+  اصلاح شد، و تست «catalogue seeding» حالا **مجموعه کلیدهای روشن** را قفل می‌کند: سیزده کلید
+  (`welcome`, `new_assignment`, `reminder`, `deadline_warning`, `deadline_passed`, `quiz_passed`,
+  `quiz_failed`, `manager_message`, `retake_request`, `retake_reviewed`, `weekly_digest`, `badge_earned`,
+  `escalation`) و بیست‌وپنج سطرِ خاموش — پس یک gate جدید باید آگاهانه در این فهرست بیاید، نه به‌عنوان
+  اثر جانبی.
+
+تست‌ها: `functions/test/user-presence.test.ts` (۱۰ تست: throttle، نبودِ مهر، مهر آینده‌نگر، فقط
+`app_opened`، ۲۰۴ با store خراب، stall، refresh، حساب غیرفعال، و مرز حضور/آموزش روی `factsFor`)؛
+در `functions/test/push-automation.test.ts` (+۵: نردبان با اپ‑اوپن و شروع دوباره، GET بدون سند،
+`optInOptions` با enable/disable/archive، مسیر کاربر برای mute، و «PUT جایگزین سند است»);
+وب: `NotificationPrefsCard.test.tsx` (۸ تست) و دو ورودی `pages/a11y.test.tsx` (axe روی پروفایل با کارت،
+و بعد از یک کلیک). `npm run typecheck`، `npm test` (فانکشن + وب)، `npm run check:indexes`،
+`d1-hang`/`d1-timeout`/`manager-query-count` سبز؛ `functions/lib/seed-snapshot.json` با build بازتولید شد.
+
+**چه چیزی انجام نشد:** هیچ اتوماسیونی روشن نشد و هیچ push واقعی نرفت؛ cron و `wrangler.toml` دست‌نخورده‌اند؛
+UI برای `preferredHour` ساخته نشد؛ توضیح `evening_nudge` («امروز آموزشی ندیده‌اید») هنوز شرط نیست —
+افزودن شرط به کاتالوگ خارج از محدوده بود و به‌عنوان یافته در §۴.۹ سند تحلیل ثبت شد.
+
 ## ۲۰۲۶-۱۰-۱۰ — لایه D6 (بخش چهارم): گام‌های معلق در پنل، منطق نسخهٔ ۲ در صفحهٔ ساخت، ترتیب قلم‌ها، پیام zodِ فارسی
 
 چهار تکه‌ای که «مدیریت کامل از پنل» را تمام می‌کند؛ هیچ‌کدام موتور، مدل داده، یا رفتار ارسال را عوض نمی‌کند —

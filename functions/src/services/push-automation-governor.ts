@@ -13,7 +13,14 @@ import type {
   User,
 } from '../domain/types';
 import { isSafeImageUrl, isSafeInternalPath } from './push-campaigns';
-import { isCategory, isMutable, PROTECTED_CATEGORIES } from '../domain/notification-categories';
+import {
+  CATEGORY_HINTS,
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  isCategory,
+  isMutable,
+  PROTECTED_CATEGORIES,
+} from '../domain/notification-categories';
 import { ApiError } from '../http/errors';
 import { AUTOMATION_PATH_VARS } from './push-automation-catalog';
 import { withDefaults } from './automation/migrate';
@@ -613,12 +620,49 @@ export async function writePrefsSafe(
   return writePrefs(d, userId, input);
 }
 
-/** The panel/admin view: current prefs with the categories the user may still mute. */
+/**
+ * What a user may switch *on* themselves. Three filters, each load-bearing: `optInOnly` (an ordinary
+ * rule is not a preference the user has to consent to), `enabled` (offering a rule the engine will not
+ * run turns a preference into a broken promise), and `!requiresFeature` — the panel-selectable vs
+ * runtime-supported line of the brief, applied here to the *user's* screen as well, so «ساعت ترجیحی»
+ * cannot be promised before its producer exists. Archived rules and system gates are out for the same
+ * reason they are out of the sweep: neither is a message this account would receive.
+ *
+ * A globally paused engine does NOT hide the option: the kill-switch is an operator's emergency brake
+ * that is lifted again, and a tick box that vanishes and reappears with it teaches people that their
+ * settings are not theirs.
+ */
+export async function optInOfferings(
+  d: Deps,
+): Promise<Array<{ key: string; name: string; description: string }>> {
+  const all = await loadAutomations(d);
+  return all
+    .filter(
+      (a) => !!a.optInOnly && a.enabled && !a.archivedAt && !a.requiresFeature && !isSystemGate(a),
+    )
+    .map((a) => ({ key: a.key, name: a.name, description: a.description }));
+}
+
+/**
+ * The user's own view of their preferences — the profile screen is built entirely from this response,
+ * which is why the category list (labels, hints, what is mutable) comes from the server: the vocabulary
+ * lives in `domain/notification-categories.ts` and a web copy of it would be a second authority.
+ *
+ * A missing document is not an error and is not empty: a user who never opened the screen has today's
+ * defaults, and defaults must never mean «muted».
+ */
 export async function readPrefsView(d: Deps, userId: string) {
-  const prefs = await readPrefs(d, userId);
+  const [prefs, optInOptions] = await Promise.all([readPrefs(d, userId), optInOfferings(d)]);
   return {
     prefs: prefs ?? { mutedCategories: [], preferredHour: null, optIns: {}, updatedAt: null },
     protectedCategories: PROTECTED_CATEGORIES.slice(),
+    categories: CATEGORY_ORDER.map((key) => ({
+      key,
+      label: CATEGORY_LABELS[key],
+      hint: CATEGORY_HINTS[key],
+      mutable: isMutable(key),
+    })),
+    optInOptions,
   };
 }
 

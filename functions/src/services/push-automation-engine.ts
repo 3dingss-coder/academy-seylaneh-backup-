@@ -137,7 +137,15 @@ export function factsFor(user: Doc<User>, packages: PackageView[], now: Date): F
     ).length,
     startedEver: packages.some((p) => p.status !== 'new'),
     accountAgeDays: Math.max(0, Math.floor((now.getTime() - Date.parse(user.createdAt)) / DAY)),
-    todayActive: !!user.lastActiveAt && dayKey(new Date(last), 'Asia/Tehran') === today,
+    // «آموزش امروز» — and deliberately not «اپ باز شده امروز». The same package stamps `streakDays` is
+    // built from (behavior.ts `annotateActivity`), because presence now also moves on app open
+    // (`touchUserActive`): a learner who only opened the app must still be told their chain is at risk,
+    // and a bare app open must not be able to hold `streak_at_risk` off all day.
+    todayActive: packages.some((p) =>
+      [p.lastActivityAt, p.completedAt].some(
+        (iso) => !!iso && dayKey(new Date(iso), 'Asia/Tehran') === today,
+      ),
+    ),
     hasDeadlineSoon: active.some(
       (p) =>
         p.deadlineAt &&

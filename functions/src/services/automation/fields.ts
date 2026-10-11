@@ -94,7 +94,7 @@ const FACT_FIELDS: FieldDef[] = [
   F('completedLast7d', 'آموزش کامل‌شده در ۷ روز اخیر', 'number', { min: 0, max: 999 }),
   F('startedEver', 'حتی یک قسمت را باز کرده است', 'boolean'),
   F('accountAgeDays', 'سن حساب (روز)', 'number', { min: 0, max: 3650, group: 'حساب کاربر' }),
-  F('todayActive', 'امروز فعال بوده است', 'boolean'),
+  F('todayActive', 'امروز آموزش دیده است', 'boolean'),
   F('hasDeadlineSoon', 'مهلت نزدیک (۷۲ ساعت)', 'boolean'),
   F('failureRatePct', 'نرخ شکست پوش (٪)', 'number', {
     min: 0,

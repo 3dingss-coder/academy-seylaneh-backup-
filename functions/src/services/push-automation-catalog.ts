@@ -14,7 +14,11 @@ import type { NotificationCategory } from '../domain/notification-categories';
  * templates, so they are seeded as *gates* rather than duplicated messages (decision Q1-a).
  *
  * Rules encoded here (see docs/admin-push-automation-analysis.md):
- *  • every scenario seeds with `enabled: false`. A send never happens because something was deployed;
+ *  • every scenario seeds with `enabled: false` — except the *system gates* (the entries with a
+ *    `templateKey`), which arrive enabled because they only keep an existing template's behaviour alive.
+ *    A deploy must never start a send; a deploy must also never delete one. `seedCatalog` in
+ *    `push-automation-admin.ts` is where that is applied, and the «catalogue seeding» test locks the key
+ *    set;
  *  • a `templateKey` entry is a *gate*: it owns enable/priority/caps/stats of an existing template and
  *    never carries its own text (the template editor keeps that, so nothing is duplicated);
  *  • `requiresFeature` entries are seeded so the admin can see and edit them, but the engine refuses to
@@ -180,7 +184,7 @@ export const FACT_FIELDS: Array<{ field: string; label: string; kind: 'number' |
   { field: 'completedLast7d', label: 'آموزش کامل‌شده در ۷ روز اخیر', kind: 'number' },
   { field: 'startedEver', label: 'حتی یک قسمت را باز کرده است', kind: 'boolean' },
   { field: 'accountAgeDays', label: 'سن حساب (روز)', kind: 'number' },
-  { field: 'todayActive', label: 'امروز فعال بوده است', kind: 'boolean' },
+  { field: 'todayActive', label: 'امروز آموزش دیده است', kind: 'boolean' },
   { field: 'hasDeadlineSoon', label: 'مهلت نزدیک (۷۲ ساعت)', kind: 'boolean' },
   { field: 'failureRatePct', label: 'نرخ شکست پوش (٪)', kind: 'number' },
   { field: 'cronStalenessMin', label: 'دقیقه از آخرین اجرای زمان‌بندی', kind: 'number' },
@@ -217,7 +221,7 @@ function conditionSentence(cs: { field: string; op: string; value: unknown }[]):
     streakDays: 'روز پیوسته',
     inactiveDays: 'روز بی‌فعالیتی',
     completedLast7d: 'آموزش کامل‌شده در ۷ روز',
-    todayActive: 'فعالیت امروز',
+    todayActive: 'آموزش امروز',
     failureRatePct: 'نرخ شکست پوش (٪)',
     cronStalenessMin: 'دقایق از آخرین اجرای زمان‌بندی',
     avgScoreDropPct: 'افت میانگین نمره تیم (٪)',

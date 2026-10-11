@@ -323,12 +323,65 @@ export async function login(d: Deps, input: z.infer<typeof loginSchema>) {
   return { user: publicUser(user), ...r.tokens };
 }
 
+// ─── Presence («این حساب همین حالا دیده شد») ────────────────────────────────
+
+/** How stale `lastActiveAt` has to be before a request may refresh it again. */
+export const TOUCH_THROTTLE_MS = 10 * 60_000;
+/** And how long the request is willing to wait for that write before answering without it. */
+export const TOUCH_GIVEUP_MS = 1_500;
+
+/**
+ * Refresh `users/<id>.lastActiveAt` — the stamp the inactivity ladder and the panel's «آخرین فعالیت»
+ * read. Two callers, both of which already hold the user document: `POST /me/events` with `app_opened`
+ * (the app was opened with a valid session — today the only thing that notices) and a token refresh.
+ *
+ * The throttle is the comparison itself, not a second document: a `_system/active_touch/<id>` row would
+ * cost a read *and* a write to answer a question `lastActiveAt` already answers. Writes are what D1
+ * rations here (docs/admin-push-automation-analysis.md §۵), so the cheap version wins.
+ *
+ * Best-effort by contract, in the `step('touch_user', …)` shape from `learning.ts:541`: presence must
+ * never turn a 204 into a 500, nor a login into a slow one. The store call is raced against a short
+ * give-up (the Worker's own D1 timeout is 15 s, and `deadlineAtMs` is only set for progress paths — so
+ * without this race a stalled D1 would stall the request that merely wanted to say "seen"). The write
+ * promise always carries a handler, so a late failure cannot surface as an unhandled rejection.
+ *
+ * Returns the new stamp when it landed, `null` when it was skipped — `refresh` uses that to avoid
+ * answering with a `lastActiveAt` it knows is stale. No identifier is logged: the log line is for
+ * "presence writes are failing", and the store already logs which path with its own trace.
+ */
+export async function touchUserActive(
+  d: Deps,
+  user: Pick<Doc<User>, 'id' | 'lastActiveAt'>,
+): Promise<string | null> {
+  const at = nowIso(d);
+  const prev = user.lastActiveAt ? Date.parse(user.lastActiveAt) : NaN;
+  // A stamp from the future also counts as fresh: the point is «not more than one write per 10 minutes».
+  if (Number.isFinite(prev) && d.clock().getTime() - prev < TOUCH_THROTTLE_MS) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const giveUp = new Promise<'slow'>((resolve) => {
+    timer = setTimeout(() => resolve('slow'), TOUCH_GIVEUP_MS);
+  });
+  const settled = d.store.update(`users/${user.id}`, { lastActiveAt: at }).then(
+    () => 'ok' as const,
+    () => 'fail' as const,
+  );
+  const outcome = await Promise.race([settled, giveUp]);
+  if (timer !== undefined) clearTimeout(timer);
+  if (outcome !== 'ok')
+    console.warn(JSON.stringify({ level: 'warn', msg: 'user_active_touch_incomplete', outcome }));
+  return outcome === 'ok' ? at : null;
+}
+
 export async function refresh(d: Deps, refreshToken: string) {
   const r = await d.auth.refresh(refreshToken);
   if (!r) throw new ApiError('UNAUTHENTICATED');
   const user = await d.store.get<User>(`users/${r.uid}`);
   if (!user || user.status !== 'active') throw new ApiError('UNAUTHENTICATED');
-  return { user: publicUser(user), ...r.tokens };
+  // A disabled account is refused *before* anything is written, and nothing is written for it.
+  const touched = await touchUserActive(d, user);
+  const view = publicUser(user);
+  if (touched) view.lastActiveAt = touched;
+  return { user: view, ...r.tokens };
 }
 
 export async function logout(d: Deps, userId: string) {

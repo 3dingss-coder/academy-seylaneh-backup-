@@ -193,9 +193,51 @@ claim = `store.create` که روی `StoreConflictError` رد می‌شود — �
 
 `JobName += 'push-automations'`؛ `CRON_JOBS['*/15 * * * *']` و `wrangler.toml` **بدون تغییر تعداد cron** (روی همان `*/15`) → `cron.test.ts:19-40` سبز می‌ماند. `functions/src/index.ts` هم یک `scheduled('every 15 minutes','push-automations')` می‌گیرد تا دو بک‌اند واگرا نشوند (بخش ۱، ردیف ۴ب).
 
-### ۴.۹ `lastActiveAt` هنگام باز شدن اپ
+### ۴.۹ `lastActiveAt` هنگام باز شدن اپ — **پیاده‌شد (لایهٔ «حضور»)**
 
-بدون کد کلاینت جدید: `POST /me/events` با `app_opened` امروز از `App.tsx:44` (`NativeBridge`) زده می‌شود. در همان هندلر (`routes/me.ts:52-64`) یک `touchUserActive(d, userId)` best‑effort با throttle ۱۰ دقیقه‌ای (`_system/active_touch/<userId>`) نوشته می‌شود + همان‌طور که `learning.ts:534` الگوی best‑effort را رعایت می‌کند. **و** در `users.refresh()` (`users.ts:279-285`) که سند کاربر را همین حالا می‌خواند، اگر `lastActiveAt` کهنه بود یک نوشتن اضافه می‌شود. هزینه: ≈۱ خواندن + ۱ نوشتن به ازای هر کاربر هر ۱۰ دقیقه.
+`lastActiveAt` تنها منبع «حضور» است و نردبان بی‌فعالیتی همین یک فیلد را روز می‌شمارد
+(`push-automation-engine.ts` › `factsFor` → `inactiveDays`). تا پیش از این لایه فقط ورود با رمز، ورود با
+تلفن و ذخیرهٔ پیشرفت درس جابه‌زایش می‌کردند — یعنی «یک روز است سایت را باز نکرده» با «یک روز است درس
+نخوانده» یکی اندازه‌گیری می‌شد. `inactiveEpoch` جدا هم لازم نشد: اپیزود بی‌فعالیتی همان `lastActiveAt` است،
+پس یک باز‌کردنِ اپ اپیزود را تمام می‌کند و بی‌فعالیتیِ تازه نردبان را از پلهٔ اول شروع می‌کند
+(تست: «app presence closes one inactivity episode…» در `functions/test/push-automation.test.ts`).
+
+**نوشتن‌ها — دو مسیر، هر دو best‑effort، بدون هیچ کد کلاینت جدید:**
+
+* `POST /me/events` — فقط وقتی `e.name === 'app_opened'` (`routes/me.ts:75`). همین رویداد امروز از
+  `apps/web/src/App.tsx:54` (`track('app_opened', …)`) فرستاده می‌شود؛ بقیهٔ `CLIENT_EVENTS` حضور را ثبت
+  نمی‌کنند (تست: «POST /me/events moves the stamp for app_opened and for nothing else»).
+* `users.refresh()` (`services/users.ts:380`) — بلافاصله بعد از اعتبارسنجی `status === 'active'`، یعنی
+  حساب خاموش‌شده **هیچ نوشتنی** نمی‌گیرد و همان `UNAUTHENTICATED` را می‌بیند. سند کاربر در همین مسیر خوانده
+  شده، پس هزینه فقط یک نوشتن است؛ پاسخ refresh هم مقدار تازه را نشان می‌دهد، نه نسخهٔ پیش‌از‑نوشتن را.
+
+**throttle یک سند جدا نیست.** طرح اولیه `_system/active_touch/<userId>` نوشته بود؛ پیاده‌سازی نفسِ مقایسه
+با `lastActiveAt` است: `TOUCH_THROTTLE_MS = 10 دقیقه` (`users.ts:329`) — مهر کهنه‌تر از ۱۰ دقیقه (یا
+بی‌مهر) → یک `UPDATE` روی همان یک فیلد؛ تازه‌تر → هیچ کوئری. مهرِ آینده هم «تازه» حساب می‌شود تا skew ساعت
+در هر درخواست یک نوشتن نسازد. هزینه: ≤ ۱ نوشتن به‌ازای هر کاربر فعال هر ۱۰ دقیقه، بدون خواندن اضافه، بدون
+migration، بدون backfill (ستون از `0001_init.sql` هست و برای ۱۴۱ کاربر موجود لازم نیست).
+`test/manager-query-count.test.ts` سبز می‌ماند، چون این نوشتن در مسیر sweep نیست.
+
+**چرا race با تایم‌اوت کوتاه:** `TOUCH_GIVEUP_MS = 1_500` + `try/catch` + یک خط لاگ بدون PII
+(`user_active_touch_incomplete`) — الگوی `step('touch_user', …)` در `learning.ts:547-551`. دلیلش:
+`deadlineAtMs` فقط در مسیرهای پیشرفت و cron بسته می‌شود (`cloudflare-worker.ts:199,257`) و
+`D1_CALL_TIMEOUT_MS = 15s` (`store/d1.ts:162`) می‌تواند یک ورود را ۱۵ ثانیه نگه دارد؛
+`test/d1-hang.test.ts` همان مکانیزم را در سطح store نشان می‌دهد (و مستقیماً از `D1Store` رد می‌شود، نه از
+`refresh`/`/me/events`، پس رفتار تایم‌اوت واقعی‌اش دست‌نخورده است). حضور هیچ‌وقت نباید پاسخ کاربر را بشکند
+یا طولانی‌تر کند: خطا ۲۰۴ را به ۵۰۰ تبدیل نمی‌کند (تست‌های `functions/test/user-presence.test.ts`).
+
+**تصمیم «حضور ≠ زنجیره»:** `streakDays` از مهرهای خودِ بسته‌ها می‌آید (`behavior.ts:220-233` ›
+`annotateActivity` روی `p.lastActivityAt`/`p.completedAt`، و `engine.ts:131` همان را به `facts.streakDays`
+می‌برد) — پس `streak_5` (`push-automation-catalog.ts:690-698`) با باز کردن اپ دروغ نمی‌گوید و **ستون
+`lastLearnedAt` لازم نشد**: نه فیلد جدید، نه migration، نه کوئری اضافه. تنها جایی که حضور به یک تصمیمِ
+«آموزش» نشت کرده بود `todayActive` بود که از `user.lastActiveAt` حساب می‌شد؛ حالا از همان مهرهای بسته
+محاسبه می‌شود (`engine.ts:144`) تا «امروز اپ را باز کردم» مانعِ `streak_at_risk` («زنجیره‌ات در خطر است»،
+`push-automation-catalog.ts:715-735`) نشود. برچسب قلم در پنل هم به «امروز آموزش دیده است» عوض شد
+(`automation/fields.ts:97`) چون اندازه‌گیری‌اش همین است — شناسهٔ `todayActive` دست‌نخورده ماند تا قاعده‌های
+ذخیره‌شده نشکنند. `evening_nudge` تغییر نکرد و نیازش هم نبود: `schedule_daily 18:00` + `optInOnly` بدون
+`trigger.conditions` است و `matchesTrigger` برای kind زمان‌بندی‌شده `true` برمی‌گرداند؛ جملهٔ «امروز آموزشی
+ندیده‌اید» در توضیحش امروز آرزوست، نه شرط — افزودن شرط به کاتالوگ خارج از محدودهٔ این لایه بود و همین‌جا
+گزارش شده است.
 
 ---
 

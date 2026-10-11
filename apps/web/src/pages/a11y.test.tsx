@@ -58,7 +58,7 @@ const signedIn = () => {
         ],
       },
     }),
-    'PUT /v1/me/notification-prefs': (body) => ({
+    'PUT /v1/me/notification-prefs': (body: unknown) => ({
       data: { ...(body as object), updatedAt: 'now' },
     }),
     'GET /v1/me/sections/seed-pkg-formi-s1': () => ({ data: sectionDetail }),

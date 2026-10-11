@@ -150,7 +150,7 @@ function WebNotification(p: NotificationParts) {
         <div className="mx-auto w-full max-w-[22rem] overflow-hidden rounded-xl border border-border bg-surface shadow-md">
           <div className="flex items-start gap-2.5 p-3">
             <img
-              src="/icons/icon-192.png"
+              src="/push-icons/push-icon-192.png"
               alt=""
               className="size-8 shrink-0 rounded-lg"
               width={32}
@@ -210,7 +210,7 @@ function AndroidNotification(p: NotificationParts) {
         <div className="overflow-hidden rounded-xl bg-surface shadow-sm">
           <div className="flex items-center gap-2 px-3 pt-2 text-[11px] text-muted-fg">
             <img
-              src="/icons/icon-192.png"
+              src="/push-icons/push-icon-192.png"
               alt=""
               className="size-4 shrink-0 rounded"
               width={16}

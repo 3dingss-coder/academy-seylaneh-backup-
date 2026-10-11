@@ -34,7 +34,11 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         // Registered manually in main.tsx so the Android (Capacitor) build skips the service worker.
         injectRegister: false,
-        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+        includeAssets: [
+          'push-icons/push-icon-192.png',
+          'push-icons/push-icon-512.png',
+          'push-icons/maskable-512.png',
+        ],
         manifest: {
           name: 'آکادمی سیلانه',
           short_name: 'آکادمی سیلانه',
@@ -46,11 +50,27 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           // 'any': tablets/desktops (admin panel) must be able to rotate; phones follow the device.
           orientation: 'any',
-          background_color: '#F8FAFC',
+          background_color: '#0F5338',
           theme_color: '#177A50',
           icons: [
-            { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-            { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            {
+              src: 'push-icons/push-icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'push-icons/push-icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'push-icons/maskable-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
           ],
         },
         workbox: {

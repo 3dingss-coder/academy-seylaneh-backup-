@@ -53,4 +53,8 @@ void initNativeSession()
         <App />
       </StrictMode>,
     );
+    // Hand over from the boot screen (public/boot.js) once React has painted.
+    requestAnimationFrame(() =>
+      (window as unknown as { __bootReady?: () => void }).__bootReady?.(),
+    );
   });

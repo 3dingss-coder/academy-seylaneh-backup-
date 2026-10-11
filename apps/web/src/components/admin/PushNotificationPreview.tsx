@@ -110,7 +110,7 @@ function NotificationCard({
     >
       <div className="flex items-start gap-2.5 p-2.5">
         <img
-          src="/icons/icon-192.png"
+          src="/push-icons/push-icon-192.png"
           alt=""
           className="size-9 shrink-0 rounded-lg"
           width={36}

@@ -233,7 +233,7 @@ export async function loadAutomations(d: Deps): Promise<Array<Doc<PushAutomation
   return rows.map(withDefaults);
 }
 
-/** Only what the engine may act on now: enabled, not paused, not awaiting a v2 feature. */
+/** Only what the engine may act on now: enabled, not paused, not awaiting a v2 feature, not archived. */
 export async function loadRunnable(d: Deps): Promise<{
   settings: PushAutomationSettings;
   automations: Array<Doc<PushAutomation>>;
@@ -242,7 +242,7 @@ export async function loadRunnable(d: Deps): Promise<{
   const all = await loadAutomations(d);
   const automations = settings.paused
     ? []
-    : all.filter((a) => a.enabled && !a.requiresFeature && !isSystemGate(a));
+    : all.filter((a) => a.enabled && !a.requiresFeature && !isSystemGate(a) && !a.archivedAt);
   return { settings, automations };
 }
 

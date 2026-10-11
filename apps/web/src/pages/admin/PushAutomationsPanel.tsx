@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  Archive,
+  ArchiveRestore,
+  ArrowRightLeft,
   BellOff,
   Gauge,
   History,
@@ -24,13 +27,17 @@ import { errMsg } from '@/lib/errors';
 import { cn } from '@/lib/cn';
 import { faTehranDateTime } from './pushCampaignModel';
 import {
+  ARCHIVE_NOTE,
   PRIORITY_META,
+  UNARCHIVE_NOTE,
+  MIGRATE_ACTION_META,
   capsSummary,
   draftFromSettings,
   estimateChip,
   estimateSentence,
   faNum,
   groupRows,
+  migrateSummary,
   healthItems,
   needsCriticalConfirm,
   settingsFromDraft,
@@ -40,6 +47,7 @@ import {
   type AutomationRow,
   type CapDraft,
   type DryRunResult,
+  type MigrateReport,
   type SystemHealth,
   type Tone,
 } from './pushAutomationModel';
@@ -95,6 +103,13 @@ export function PushAutomationsPanel() {
   /** Which row's switch is in flight — only that one shows a spinner, not the whole table. */
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<{ row: AutomationRow; dry: DryRunResult } | null>(null);
+  /** Which row is being archived / restored — the dialog states it, the button only asks. */
+  const [archiveAsk, setArchiveAsk] = useState<{ row: AutomationRow; archived: boolean } | null>(
+    null,
+  );
+  /** Archived rules are out of service, so they are not noise in the working view by default. */
+  const [showArchived, setShowArchived] = useState(false);
+  const [migrateOpen, setMigrateOpen] = useState(false);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['admin', 'push-automations'] });
@@ -124,6 +139,26 @@ export function PushAutomationsPanel() {
     onError: (e) => {
       refresh();
       toast.show({ type: 'error', message: errMsg(e, 'تغییر وضعیت انجام نشد.') });
+    },
+  });
+
+  // Archive is not the switch. `enabled: true` is refused on an archived rule by the server, so the panel
+  // never shows a row that is archived *and* live — and restoring never lights one up either.
+  const archive = useMutation({
+    mutationFn: (v: { key: string; archived: boolean }) =>
+      api.post(`/admin/push-automations/${v.key}/archive`, { archived: v.archived }),
+    onSuccess: (_r, v) => {
+      refresh();
+      toast.show({
+        type: v.archived ? 'warning' : 'info',
+        message: v.archived
+          ? 'بایگانی شد: قاعده خاموش است و گام‌های معلقش لغو شد.'
+          : 'از بایگانی بیرون آمد؛ هنوز خاموش است، تا خودتان روشنش کنید.',
+      });
+    },
+    onError: (e) => {
+      refresh();
+      toast.show({ type: 'error', message: errMsg(e, 'تغییر وضعیت بایگانی انجام نشد.') });
     },
   });
 
@@ -195,6 +230,30 @@ export function PushAutomationsPanel() {
               >
                 سقف‌ها و تنظیمات کلی
               </Button>
+              {(data.counts.archived ?? 0) > 0 && (
+                <Button
+                  variant="ghost"
+                  icon={<Archive className="size-4" aria-hidden />}
+                  onClick={() => setShowArchived((v) => !v)}
+                  data-testid="archived-toggle"
+                >
+                  {showArchived
+                    ? 'پنهان‌کردن قاعده‌های بایگانی‌شده'
+                    : `نمایش ${faNum(data.counts.archived ?? 0)} قاعده بایگانی‌شده`}
+                </Button>
+              )}
+              {/* The legacy rules are counted by the server, so the label never promises a migration
+                  that the report cannot answer for. */}
+              {(data.counts.legacy ?? 0) > 0 && (
+                <Button
+                  variant="ghost"
+                  icon={<ArrowRightLeft className="size-4" aria-hidden />}
+                  onClick={() => setMigrateOpen(true)}
+                  data-testid="migrate-open"
+                >
+                  تبدیل قاعده‌های قدیمی ({faNum(data.counts.legacy ?? 0)})
+                </Button>
+              )}
               {/* History and trace are the read-only half of the same product: they answer «what did
                   it do» and «why not for this person», so they live next to the switches. */}
               <Link
@@ -245,7 +304,7 @@ export function PushAutomationsPanel() {
             </Card>
           )}
 
-          {groupRows(data.rows).map((g) => (
+          {groupRows(data.rows.filter((r) => showArchived || !r.archived)).map((g) => (
             <section
               key={g.category}
               aria-label={`گروه ${g.label}`}
@@ -266,6 +325,7 @@ export function PushAutomationsPanel() {
                   enable.mutate({ key: row.key, enabled: next });
                 }}
                 onEstimate={(row) => dryRun.mutate(row)}
+                onArchive={(row) => setArchiveAsk({ row, archived: !row.archived })}
               />
             </section>
           ))}
@@ -328,6 +388,39 @@ export function PushAutomationsPanel() {
             />
           )}
 
+          {archiveAsk && (
+            <ConfirmDialog
+              open
+              danger={archiveAsk.archived}
+              title={archiveAsk.archived ? 'بایگانی‌کردن این قاعده؟' : 'خروج از بایگانی'}
+              confirmText={archiveAsk.archived ? 'بایگانی کن' : 'بازگردان'}
+              loading={archive.isPending}
+              onClose={() => setArchiveAsk(null)}
+              onConfirm={() => {
+                archive.mutate({ key: archiveAsk.row.key, archived: archiveAsk.archived });
+                setArchiveAsk(null);
+              }}
+            >
+              <p className="text-sm leading-7">
+                {archiveAsk.archived ? ARCHIVE_NOTE : UNARCHIVE_NOTE}
+              </p>
+              {archiveAsk.archived && archiveAsk.row.enabled && (
+                <p className="mt-2 text-sm font-bold leading-7 text-danger-fg">
+                  این قاعده الان روشن است؛ با بایگانی خاموش می‌شود و اعلانی از آن ساخته نخواهد شد.
+                </p>
+              )}
+              <p className="mt-2 text-xs leading-6 text-muted-fg">
+                «{archiveAsk.row.name}» —{' '}
+                {archiveAsk.row.isSystem ? 'قاعده سیستمی' : 'قاعده دست‌ساز'} · نسخه{' '}
+                {faNum(archiveAsk.row.version)}
+              </p>
+            </ConfirmDialog>
+          )}
+
+          {migrateOpen && (
+            <MigrateDialog onClose={() => setMigrateOpen(false)} onChanged={refresh} />
+          )}
+
           {capsOpen && (
             <CapsDialog
               list={data}
@@ -364,6 +457,12 @@ function KpiStrip({ data }: { data: AutomationList }) {
           ? ` · ${faNum(Object.values(data.today.skipped).reduce((a, b) => a + b, 0))} رد با دلیل`
           : ''}
       </span>
+      {(data.counts.archived ?? 0) > 0 && (
+        <span className="inline-flex items-center gap-1">
+          <Archive className="size-3.5" aria-hidden />
+          {faNum(data.counts.archived ?? 0)} بایگانی‌شده
+        </span>
+      )}
       <span>{capsSummary(data.settings)}</span>
     </div>
   );
@@ -409,12 +508,14 @@ function AutomationTable({
   estimating,
   onToggle,
   onEstimate,
+  onArchive,
 }: {
   rows: AutomationRow[];
   busy: string | null;
   estimating: string | null;
   onToggle: (row: AutomationRow, next: boolean) => void;
   onEstimate: (row: AutomationRow) => void;
+  onArchive: (row: AutomationRow) => void;
 }) {
   const columns: Column<AutomationRow>[] = [
     {
@@ -510,6 +611,21 @@ function AutomationTable({
             data-testid="estimate-btn"
           >
             چند نفر مشمول؟
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => onArchive(r)}
+            data-testid="archive-btn"
+            title={r.archived ? UNARCHIVE_NOTE : ARCHIVE_NOTE}
+            icon={
+              r.archived ? (
+                <ArchiveRestore className="size-4" aria-hidden />
+              ) : (
+                <Archive className="size-4" aria-hidden />
+              )
+            }
+          >
+            {r.archived ? 'بازگردانی' : 'بایگانی'}
           </Button>
         </div>
       ),
@@ -748,6 +864,128 @@ function CapsDialog({
           {field('decisionTtlDays', 'مدت نگه‌داشتن دلایل رد (روز)', 'پیش‌فرض ۳۰')}
           {field('failureAlertPct', 'آستانه هشدار نرخ شکست (٪)', 'پیش‌فرض ۲۰')}
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * The migration dialog. It opens on a *report*, because the endpoint's own default is a dry run: the
+ * operator reads which rules would move and why the others will not, and only then presses the button that
+ * writes. Nothing in here can enable a rule — a conversion moves the definition, not the switch, and the
+ * server's note is shown verbatim rather than paraphrased so the two cannot drift apart.
+ */
+/**
+ * The dialog stays open after a real run, because the report it just wrote is the thing to read; `onChanged`
+ * only tells the panel to re-read its list.
+ */
+function MigrateDialog({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+  const toast = useToast();
+  const [includeEnabled, setIncludeEnabled] = useState(false);
+  /** The report that was *written*, once the button has been pressed — kept apart from the dry run. */
+  const [applied, setApplied] = useState<MigrateReport | null>(null);
+  const report = useQuery({
+    queryKey: ['admin', 'push-automations', 'migrate-report', includeEnabled],
+    queryFn: () =>
+      api.post<MigrateReport>('/admin/push-automations/migrate', { dryRun: true, includeEnabled }),
+  });
+  const apply = useMutation({
+    mutationFn: () =>
+      api.post<MigrateReport>('/admin/push-automations/migrate', { dryRun: false, includeEnabled }),
+    onSuccess: (r) => {
+      setApplied(r);
+      void report.refetch();
+      onChanged();
+      toast.show({
+        type: r.migrated > 0 ? 'success' : 'info',
+        message:
+          r.migrated > 0
+            ? 'تبدیل انجام شد؛ هیچ قاعده‌ای با این کار روشن نشد.'
+            : 'چیزی برای تبدیل نبود.',
+      });
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'مهاجرت انجام نشد.') }),
+  });
+  const shown = applied ?? report.data;
+  const rows = shown?.results ?? [];
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="تبدیل قاعده‌های قدیمی به ساختار نسخه ۲"
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            بستن
+          </Button>
+          <Button
+            loading={apply.isPending}
+            disabled={!shown || shown.wouldMigrate === 0 || !!applied}
+            icon={<ArrowRightLeft className="size-4" aria-hidden />}
+            onClick={() => apply.mutate()}
+            data-testid="migrate-apply"
+          >
+            {applied ? 'تبدیل انجام شد' : 'اجرای تبدیل روی همین فهرست'}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs leading-6 text-text-secondary">
+          قاعده‌هایی که شرط‌هایشان را در فهرست تخت قدیمی نگه داشته‌اند، به درخت شرط نسخه ۲ منتقل
+          می‌شوند. این کار فقط شکل ذخیره‌سازی را عوض می‌کند: روشن‌کردن، خاموش‌کردن یا بایگانی‌کردن
+          هیچ قاعده‌ای در این مسیر انجام نمی‌شود و اگر تبدیل‌ای معادل همان رفتار نباشد، همان قاعده
+          رد می‌شود.
+        </p>
+        {report.isPending && <Skeleton className="h-20" />}
+        {report.isError && (
+          <p className="text-sm font-bold text-danger-fg">
+            گزارش خوانده نشد: {errMsg(report.error, 'خطای نامشخص')}
+          </p>
+        )}
+        {shown && (
+          <>
+            <p className="text-xs font-bold text-text">{migrateSummary(shown)}</p>
+            <p className="rounded-card border border-border bg-background p-2 text-[11px] leading-6 text-muted-fg">
+              {shown.note}
+            </p>
+            <label className="flex items-start gap-2 text-xs leading-6 text-text-secondary">
+              <input
+                type="checkbox"
+                checked={includeEnabled}
+                onChange={(e) => {
+                  setIncludeEnabled(e.target.checked);
+                  setApplied(null);
+                }}
+                className="mt-1 size-4"
+              />
+              <span>
+                قاعده‌های روشن را هم تبدیل کن («includeEnabled»). رفتار فرمت عوض می‌شود ولی
+                ارسال‌هایش قطع نمی‌شود؛ اگر مطمئن نیستید، اول قاعده را موقتاً خاموش کنید.
+              </span>
+            </label>
+            <ul className="flex flex-col gap-2">
+              {rows.map((r) => (
+                <li
+                  key={r.key}
+                  className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-2"
+                >
+                  <span className="text-xs font-extrabold text-text">{r.name}</span>
+                  <code className="text-[11px] text-muted-fg">{r.key}</code>
+                  <Chip tone={MIGRATE_ACTION_META[r.action]?.tone ?? 'neutral'}>
+                    {MIGRATE_ACTION_META[r.action]?.label ?? r.action}
+                  </Chip>
+                  {r.enabled && <Chip tone="warning">روشن</Chip>}
+                  {r.isSystem && <Chip tone="neutral">سیستمی</Chip>}
+                  {r.message && (
+                    <span className="text-[11px] leading-6 text-text-secondary">{r.message}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </Modal>
   );

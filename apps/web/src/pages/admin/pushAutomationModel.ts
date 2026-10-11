@@ -47,6 +47,11 @@ export interface AutomationRow {
   sent7d: number;
   skipped7d: number;
   version: number;
+  /**
+   * Out of service (`archivedAt` on the rule). Optional because a panel talking to an older deploy gets
+   * no such field: the absence means «not archived», never «unknown».
+   */
+  archived?: boolean;
 }
 
 export interface AutomationSettings {
@@ -65,7 +70,18 @@ export interface AutomationList {
   rows: AutomationRow[];
   paused: boolean;
   settings: AutomationSettings;
-  counts: { total: number; enabled: number; gates: number; v2: number };
+  /**
+   * `legacy` is how many rules still live in the flat v1 condition list and `archived` how many are out of
+   * service — both optional for the same reason as `AutomationRow.archived`.
+   */
+  counts: {
+    total: number;
+    enabled: number;
+    gates: number;
+    v2: number;
+    legacy?: number;
+    archived?: number;
+  };
   today: { sent: number; skipped: Record<string, number> };
 }
 
@@ -194,6 +210,13 @@ export function groupRows(rows: AutomationRow[]): AutomationGroup[] {
 
 /** One badge that says what the row *is*, so an admin never thinks a gate is a duplicate scenario. */
 export function stateOf(row: AutomationRow): { tone: Tone; label: string; hint: string } {
+  // First, on purpose: an archived rule is not «off for now», and the switch next to it is not the truth.
+  if (row.archived)
+    return {
+      tone: 'neutral',
+      label: 'بایگانی‌شده',
+      hint: 'از سرویس خارج شده است. از بایگانی درآوردن آن را روشن نمی‌کند؛ باید دوباره روشنش کنید.',
+    };
   if (row.requiresFeature)
     return {
       tone: 'neutral',
@@ -261,6 +284,57 @@ export function estimateSentence(dry: DryRunResult): string {
 }
 
 /** The number shown on the row after an estimate, so the table answers «چند نفر؟» without a dialog. */
+/**
+ * The two sentences the panel and the detail page must agree on, so they live next to `stateOf` instead of
+ * being typed twice. Archive is not a pause and un-archive is not an enable: that difference is the whole
+ * point of the feature, so it is said in the button's confirm dialog and in the card's hint.
+ */
+export const ARCHIVE_NOTE =
+  'بایگانی یعنی خروج از سرویس: قاعده خاموش می‌شود، گام‌های معلقش لغو می‌شود و با بازنشانی کلیدِ روشن دوباره فعال نمی‌شود. متن، شرط‌ها و تاریخچه‌اش می‌مانند تا بعداً بتوان همان قاعده را از نو ساخت.';
+export const UNARCHIVE_NOTE =
+  'خارج‌کردن از بایگانی قاعده را زنده می‌کند ولی خاموش نگهش می‌دارد؛ روشن‌کردن تصمیم جداگانه‌ی شماست. گام‌هایی که در دوران بایگانی لغو شده‌اند برنمی‌گردند.';
+
+/** One row of the migration report (`POST /admin/push-automations/migrate`). */
+export interface MigrateRowResult {
+  key: string;
+  name: string;
+  isSystem: boolean;
+  enabled: boolean;
+  action: 'migrated' | 'would-migrate' | 'skipped' | 'failed';
+  fields: string[];
+  message: string | null;
+}
+
+export interface MigrateReport {
+  dryRun: boolean;
+  checked: number;
+  migrated: number;
+  wouldMigrate: number;
+  skipped: number;
+  failed: number;
+  includeEnabled: boolean;
+  results: MigrateRowResult[];
+  note: string;
+}
+
+export const MIGRATE_ACTION_META: Record<
+  MigrateRowResult['action'],
+  { label: string; tone: Tone }
+> = {
+  migrated: { label: 'تبدیل شد', tone: 'success' },
+  'would-migrate': { label: 'قابل تبدیل', tone: 'info' },
+  skipped: { label: 'رد شد', tone: 'neutral' },
+  failed: { label: 'ناموفق', tone: 'danger' },
+};
+
+/** The one sentence the dialog header says, built here so the numbers and the words cannot drift apart. */
+export function migrateSummary(r: MigrateReport): string {
+  const head = r.dryRun
+    ? `${faNum(r.checked)} قاعده بررسی شد · ${faNum(r.wouldMigrate)} تا قابل تبدیل · ${faNum(r.skipped)} تا رد شد`
+    : `${faNum(r.migrated)} قاعده تبدیل شد · ${faNum(r.skipped)} تا رد شد`;
+  return r.failed ? `${head} · ${faNum(r.failed)} ناموفق` : head;
+}
+
 export function estimateChip(dry: DryRunResult): string {
   return `${faNum(dry.wouldSend)} نفر مشمول ارسال`;
 }

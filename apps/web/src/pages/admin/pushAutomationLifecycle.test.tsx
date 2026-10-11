@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
 import type { Me } from '@/lib/types';
@@ -367,5 +367,138 @@ describe('تکثیر قاعده', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: /ساخت کپی \(خاموش\)/ }));
     expect(await screen.findByText('اتوماسیونی با همین کلید وجود دارد.')).toBeTruthy();
+  });
+});
+
+const REV = [
+  {
+    version: 1,
+    at: '2026-10-01T06:30:00.000Z',
+    by: 'a1',
+    note: 'متن',
+    message: {
+      title: 'ادامه بده',
+      body: 'متنی که در نسخه اول ذخیره شده است.',
+      actionRef: '/learn',
+      imageUrl: null,
+    },
+    delivery: { priority: 'normal', push: true, cooldownMs: 0 },
+  },
+  {
+    version: 3,
+    at: '2026-10-02T06:30:00.000Z',
+    by: 'a1',
+    note: 'متن و نحوه ارسال',
+    message: {
+      title: 'یک مرحله دیگر',
+      body: 'متنی که بعد از آن نوشته شد.',
+      actionRef: '/learn',
+      imageUrl: null,
+    },
+    delivery: { priority: 'high', push: false, cooldownMs: 60000 },
+  },
+];
+
+describe('بازگردانی متن از تاریخچه', () => {
+  it('opens the list, asks once, then posts a versioned restore', async () => {
+    const m = open({
+      'GET /v1/admin/push-automations/follow_up/revisions': () => ({ data: REV }),
+      'POST /v1/admin/push-automations/follow_up/revisions/1/restore': () => ({
+        data: detail({ version: 6 }),
+      }),
+    });
+    const toggle = await screen.findByRole('button', { name: 'نمایش ۲' }, { timeout: 5000 });
+    fireEvent.click(toggle);
+    // The card says what a text revision holds, so «rollback» is not read as «roll back the conditions».
+    expect(
+      await screen.findByText(/بازگردانی فقط همین متن و «نحوه ارسال» را برمی‌گرداند/),
+    ).toBeTruthy();
+    expect(screen.getByText(/ارسال: پوش و داخل اپ · اولویت/)).toBeTruthy();
+    expect(m.calls.some((c) => c.key.includes('/restore'))).toBe(false);
+
+    fireEvent.click(screen.getByTestId('restore-ask-1'));
+    fireEvent.click(screen.getByTestId('restore-1'));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain(
+        'POST /v1/admin/push-automations/follow_up/revisions/1/restore',
+      ),
+    );
+    // …and it is an ordinary edit: the version the page was reading goes along as the guard.
+    expect(m.calls.find((c) => c.key.endsWith('/revisions/1/restore'))?.body).toEqual({
+      expectedVersion: 4,
+    });
+    expect(m.calls.some((c) => c.key === 'PATCH /v1/admin/push-automations/follow_up')).toBe(false);
+  });
+
+  it('offers the older text of every revision, not only the newest one', async () => {
+    open({ 'GET /v1/admin/push-automations/follow_up/revisions': () => ({ data: REV }) });
+    fireEvent.click(await screen.findByRole('button', { name: 'نمایش ۲' }, { timeout: 5000 }));
+    expect(await screen.findByTestId('restore-ask-1')).toBeTruthy();
+    expect(screen.getByTestId('restore-ask-3')).toBeTruthy();
+    // The current version is shown as the row that is *not* offered for restore.
+    expect(screen.queryByTestId('restore-ask-4')).toBeNull();
+  });
+});
+
+describe('بایگانی از صفحه قاعده', () => {
+  it('confirms first and says that a live rule is switched off by it', async () => {
+    const m = open({
+      'GET /v1/admin/push-automations/follow_up': () => ({ data: detail({ enabled: true }) }),
+      'POST /v1/admin/push-automations/follow_up/archive': () => ({
+        data: detail({ version: 5, enabled: false, archived: true }),
+      }),
+    });
+    // The card explains the difference before anything is clicked, so the button is never a mystery.
+    const hint = await screen.findByTestId('detail-archive-hint');
+    expect(hint.textContent).toMatch(/بایگانی یعنی خروج از سرویس/);
+    fireEvent.click(await screen.findByTestId('detail-archive'));
+    const dialog = await waitFor(() => {
+      const el = document.querySelector('[role="dialog"]');
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+    expect(within(dialog).getByText(/گام‌های معلقش لغو می‌شود/)).toBeTruthy();
+    expect(within(dialog).getByText(/این قاعده الان روشن است/)).toBeTruthy();
+    expect(m.calls.some((c) => c.key.endsWith('/archive'))).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'بایگانی کن' }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain(
+        'POST /v1/admin/push-automations/follow_up/archive',
+      ),
+    );
+    expect(m.calls.find((c) => c.key.endsWith('/archive'))?.body).toEqual({ archived: true });
+  });
+
+  it('turns into the way back out, which does not switch the rule on', async () => {
+    const m = open({
+      'GET /v1/admin/push-automations/follow_up': () => ({
+        data: detail({ enabled: false, archived: true }),
+      }),
+      'POST /v1/admin/push-automations/follow_up/archive': () => ({
+        data: detail({ version: 6, enabled: false, archived: false }),
+      }),
+    });
+    expect(await screen.findByText('بایگانی‌شده')).toBeTruthy();
+    const btn = await screen.findByTestId('detail-archive');
+    expect(btn.textContent).toContain('خروج از بایگانی');
+    expect(btn.textContent).not.toContain('بایگانی‌کردن');
+    // The hint says the second half of the story, so «بازگردان» is not read as «روشن کن».
+    expect((await screen.findByTestId('detail-archive-hint')).textContent).toMatch(
+      /روشن‌کردن تصمیم جداگانه‌ی شماست/,
+    );
+    fireEvent.click(btn);
+    const dialog = await waitFor(() => {
+      const el = document.querySelector('[role="dialog"]');
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'بازگردان' }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain(
+        'POST /v1/admin/push-automations/follow_up/archive',
+      ),
+    );
+    expect(m.calls.find((c) => c.key.endsWith('/archive'))?.body).toEqual({ archived: false });
   });
 });

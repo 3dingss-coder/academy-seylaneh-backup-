@@ -1145,8 +1145,19 @@ async function parkFlowStep(
   const path = `${QUEUE}/${day}/${a.key}__${user.id}__f${index}`;
   // One open step per (rule, user, index) — never two. Without this a later run that re-starts the flow
   // would resurrect the row the drain just closed, and a completed follow-up would fire a second time.
-  const open = await d.store.get<{ status?: string; dueAt?: string; stepId?: string }>(path);
-  if (open?.status === 'pending' && open.stepId === step.id) return;
+  const open = await d.store.get<{
+    status?: string;
+    dueAt?: string;
+    stepId?: string;
+    createdAt?: string;
+  }>(path);
+  // …but only while that open row is still a live promise. A rule that was cancelled after the row was
+  // parked has a row the drain will refuse to run, so reusing it would park the new flow behind a dead
+  // promise and the step would never fire; such a row is overwritten instead.
+  const cutoff = await flowCancelCutoff(d, a.key);
+  const retired =
+    cutoff > 0 && open?.createdAt !== undefined && Date.parse(open.createdAt) <= cutoff;
+  if (open?.status === 'pending' && open.stepId === step.id && !retired) return;
   await d.store.set(path, {
     key: a.key,
     userId: user.id,
@@ -1236,17 +1247,30 @@ export async function flowCancelCutoff(d: Deps, key: string): Promise<number> {
  * Pending steps of a rule, for the panel's «اقدام‌های معلق» card and for tests. The store has no prefix
  * query, so this reads the day shards the rule could possibly have parked rows in — `days` of them, from
  * today on. A wait longer than that is reported as `truncated`, never as «nothing pending».
+ *
+ * A cancellation is a stamp on the rule, not a rewrite of every row (see `stampFlowCancel`), so a row the
+ * drain has not reached yet is still `status: 'pending'` in the store. It is reported here with
+ * `suppressed: true`, because «pending but already retired» is what the operator needs to see; a row parked
+ * after the stamp is pending in the real sense and stays `suppressed: false`.
  */
 export async function listPendingSteps(
   d: Deps,
   key: string,
   opts: { days?: number; userId?: string; limit?: number } = {},
-): Promise<{ items: Array<Record<string, unknown>>; shards: number; truncated: boolean }> {
+): Promise<{
+  items: Array<Record<string, unknown>>;
+  shards: number;
+  truncated: boolean;
+  /** The rule's cancel stamp, or null when there is none — the line each row was judged against. */
+  cancelledAt: string | null;
+}> {
   const policy = await getPolicy(d);
   const tz = policy.timezone;
   const days = Math.max(1, Math.min(31, opts.days ?? 8));
   const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
   const start = d.clock().getTime();
+  const cutoff = await flowCancelCutoff(d, key);
+  const cancelledAt = cutoff > 0 ? new Date(cutoff).toISOString() : null;
   const items: Array<Record<string, unknown>> = [];
   for (let i = 0; i < days; i++) {
     const day = dayKey(new Date(start + i * DAY), tz);
@@ -1259,12 +1283,18 @@ export async function listPendingSteps(
     for (const r of rows) {
       if (r.key !== key || r.kind !== 'flow') continue;
       if (opts.userId && r.userId !== opts.userId) continue;
-      items.push({ ...r, day });
-      if (items.length >= limit) return { items, shards: days, truncated: true };
+      items.push({
+        ...r,
+        day,
+        // `<=`, not `<`: the drain closes a row with the very same comparison (see `runFlow`), and a
+        // listing that disagreed with it would tell the operator something the engine will not do.
+        suppressed: cutoff > 0 && Date.parse(String(r.createdAt ?? '')) <= cutoff,
+      });
+      if (items.length >= limit) return { items, shards: days, truncated: true, cancelledAt };
     }
   }
   items.sort((x, y) => String(x.dueAt ?? '').localeCompare(String(y.dueAt ?? '')));
-  return { items, shards: days, truncated: false };
+  return { items, shards: days, truncated: false, cancelledAt };
 }
 
 /** Did the user already do the thing the nudge was about? Stale reminders must never fire. */

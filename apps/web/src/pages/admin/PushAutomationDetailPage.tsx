@@ -3,11 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  Archive,
+  ArchiveRestore,
   Copy,
   Eye,
   FlaskConical,
   History,
   Pencil,
+  RotateCcw,
   Save,
   Trash2,
   Wand2,
@@ -52,6 +55,9 @@ import { LogicCard } from './AutomationRuleLogic';
 import { Chip, EstimateDialog } from './PushAutomationsPanel';
 import { RUN_KIND_LABELS, skippedSentence } from './pushAutomationRunModel';
 import {
+  ARCHIVE_NOTE,
+  PRIORITY_META,
+  UNARCHIVE_NOTE,
   estimateChip,
   stateOf,
   type AutomationRow,
@@ -107,6 +113,8 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
   const [step, setStep] = useState<WizardStepId>('what');
   const [dry, setDry] = useState<DryRunResult | null>(null);
   const [askDelete, setAskDelete] = useState(false);
+  /** `true` = about to archive, `false` = about to restore, `null` = no dialog. */
+  const [askArchive, setAskArchive] = useState<boolean | null>(null);
   const [testUserId, setTestUserId] = useState('');
   const users = useUsers();
   const teams = useTeams();
@@ -201,6 +209,40 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
       navigate('/admin/push-campaigns/automations');
     },
     onError: (e) => toast.show({ type: 'error', message: errMsg(e) }),
+  });
+
+  // Archive and restore both go through the same versioned write path as an ordinary edit, so the panel
+  // refreshes the exact same way it does after a save — no local state to keep in sync.
+  const archive = useMutation({
+    mutationFn: (archived: boolean) =>
+      api.post(`/admin/push-automations/${det.key}/archive`, { archived }),
+    onSuccess: (_r, archived) => {
+      refresh();
+      toast.show({
+        type: archived ? 'warning' : 'info',
+        message: archived
+          ? 'بایگانی شد: قاعده خاموش است و گام‌های معلقش لغو شد.'
+          : 'از بایگانی بیرون آمد؛ هنوز خاموش است.',
+      });
+    },
+    onError: (e) =>
+      toast.show({ type: 'error', message: errMsg(e, 'تغییر وضعیت بایگانی انجام نشد.') }),
+  });
+  const restore = useMutation({
+    mutationFn: (version: number) =>
+      api.post(`/admin/push-automations/${det.key}/revisions/${version}/restore`, {
+        expectedVersion: det.version,
+      }),
+    onSuccess: () => {
+      refresh();
+      void revisions.refetch();
+      toast.show({
+        type: 'success',
+        message: 'متن قدیمی برگردانده شد؛ متنِ جای‌رفته هم به تاریخچه اضافه شد.',
+      });
+    },
+    // A stale `expectedVersion` is the 409 the panel cannot resolve by itself: the other edit wins.
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e, 'بازگردانی انجام نشد.') }),
   });
 
   const state = stateOf(det as AutomationRow);
@@ -310,6 +352,8 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
               revisions={revisions.data}
               loading={revisions.isPending}
               current={det.message}
+              busy={restore.isPending ? (restore.variables ?? null) : null}
+              onRestore={(v) => restore.mutate(v)}
             />
           </div>
         </div>
@@ -346,6 +390,29 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
               روشن/خاموش کردن، نوشته‌ها را پاک نمی‌کند: فقط از اجراي بعدی، اعلانی از این قانون ساخته
               نمی‌شود.
             </p>
+            {/* The other half of «taking a rule out of service»: a pause keeps the promises a workflow made,
+                an archive retires the rule and cancels them. Both live here so the difference is visible
+                next to the switch it is often confused with. */}
+            <div className="flex flex-col gap-1 border-t border-border pt-3">
+              <Button
+                variant={det.archived ? 'secondary' : 'ghost'}
+                loading={archive.isPending}
+                icon={
+                  det.archived ? (
+                    <ArchiveRestore className="size-4" aria-hidden />
+                  ) : (
+                    <Archive className="size-4" aria-hidden />
+                  )
+                }
+                onClick={() => setAskArchive(!det.archived)}
+                data-testid="detail-archive"
+              >
+                {det.archived ? 'خروج از بایگانی' : 'بایگانی‌کردن این قاعده'}
+              </Button>
+              <p className="text-[11px] leading-6 text-muted-fg" data-testid="detail-archive-hint">
+                {det.archived ? UNARCHIVE_NOTE : ARCHIVE_NOTE}
+              </p>
+            </div>
           </Card>
 
           <TestSendCard
@@ -393,6 +460,28 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
         >
           سند تعریف حذف می‌شود. اعلان‌ها و پوش‌های فرستاده‌شده پاک نمی‌شوند و دلایل ردِ امروز تا
           پایان بازه‌شان در تاریخچه می‌مانند.
+        </ConfirmDialog>
+      )}
+
+      {askArchive !== null && (
+        <ConfirmDialog
+          open
+          danger={askArchive}
+          title={askArchive ? 'بایگانی‌کردن این قاعده؟' : 'خروج از بایگانی'}
+          confirmText={askArchive ? 'بایگانی کن' : 'بازگردان'}
+          loading={archive.isPending}
+          onClose={() => setAskArchive(null)}
+          onConfirm={() => {
+            archive.mutate(askArchive);
+            setAskArchive(null);
+          }}
+        >
+          <p className="text-sm leading-7">{askArchive ? ARCHIVE_NOTE : UNARCHIVE_NOTE}</p>
+          {askArchive && det.enabled && (
+            <p className="mt-2 text-sm font-bold leading-7 text-danger-fg">
+              این قاعده الان روشن است؛ با بایگانی خاموش می‌شود.
+            </p>
+          )}
         </ConfirmDialog>
       )}
 
@@ -1539,12 +1628,18 @@ function RevisionsCard({
   revisions,
   loading,
   current,
+  busy,
+  onRestore,
 }: {
   revisions: TextRevision[] | undefined;
   loading: boolean;
   current: DetailMeta['message'];
+  /** Which version's restore call is in flight — only that row shows a spinner. */
+  busy?: number | null;
+  onRestore?: (version: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [asked, setAsked] = useState<number | null>(null);
   return (
     <Card className="flex flex-col gap-2">
       <h2 className="flex items-center justify-between gap-2 text-sm font-extrabold text-text">
@@ -1566,6 +1661,12 @@ function RevisionsCard({
       )}
       {!loading && open && (
         <ul className="flex flex-col gap-2">
+          <p className="text-[11px] leading-6 text-muted-fg">
+            بازگردانی فقط همین متن و «نحوه ارسال» را برمی‌گرداند؛ شرط‌ها و گام‌های قاعده در تاریخچهٔ
+            متن نیستند و دست نمی‌خورند. خودِ بازگردانی هم یک ویرایش جدید است، پس از آن هم می‌شود
+            برگشت.
+            {onRestore ? ' اگر نحوه ارسال عوض شود، گام‌های معلق این قاعده لغو می‌شوند.' : ''}
+          </p>
           <li className="rounded-card border border-primary/30 bg-soft-brand p-2 text-xs">
             <p className="font-bold text-text">نسخه فعلی</p>
             <p className="mt-0.5 text-text-secondary">{current.title}</p>
@@ -1581,6 +1682,41 @@ function RevisionsCard({
               </p>
               <p className="mt-0.5 text-text-secondary">{r.message.title}</p>
               <p className="text-[11px] leading-6 text-muted-fg">{r.message.body}</p>
+              <p className="mt-1 text-[11px] text-muted-fg">
+                ارسال: {r.delivery.push ? 'پوش و داخل اپ' : 'فقط داخل اپ'} · اولویت{' '}
+                {PRIORITY_META[r.delivery.priority]?.label ?? r.delivery.priority}
+              </p>
+              {!!onRestore && (
+                <span className="mt-1 flex flex-wrap items-center gap-2">
+                  {asked === r.version ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        loading={busy === r.version}
+                        onClick={() => {
+                          onRestore(r.version);
+                          setAsked(null);
+                        }}
+                        data-testid={`restore-${r.version}`}
+                      >
+                        بازگردانی این متن
+                      </Button>
+                      <Button variant="ghost" onClick={() => setAsked(null)}>
+                        انصراف
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      icon={<RotateCcw className="size-3.5" aria-hidden />}
+                      onClick={() => setAsked(r.version)}
+                      data-testid={`restore-ask-${r.version}`}
+                    >
+                      بازگردانی این نسخه
+                    </Button>
+                  )}
+                </span>
+              )}
             </li>
           ))}
         </ul>

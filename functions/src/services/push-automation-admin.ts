@@ -725,13 +725,24 @@ export interface AutomationRow {
   sent7d: number;
   skipped7d: number;
   version: number;
+  /** Out of service (`archivedAt`): never runnable, and shown apart from a merely disabled rule. */
+  archived: boolean;
 }
 
 export interface AutomationList {
   rows: AutomationRow[];
   paused: boolean;
   settings: PushAutomationSettings;
-  counts: { total: number; enabled: number; gates: number; v2: number };
+  counts: {
+    total: number;
+    enabled: number;
+    gates: number;
+    /** Rules written in the v2 shape (`schemaVersion: 2`). */
+    v2: number;
+    /** Rules still carrying flat `trigger.conditions` that their trigger kind actually reads. */
+    legacy: number;
+    archived: number;
+  };
   today: { sent: number; skipped: Record<string, number> };
 }
 
@@ -773,11 +784,20 @@ export async function listAutomations(d: Deps): Promise<AutomationList> {
   let enabled = 0;
   let gates = 0;
   let v2 = 0;
+  let legacy = 0;
+  let archived = 0;
   for (const a of all) {
     const gate = isSystemGate(a);
     if (a.enabled) enabled++;
     if (gate) gates++;
-    if (a.requiresFeature) v2++;
+    if (a.schemaVersion === 2) v2++;
+    if (
+      a.schemaVersion !== 2 &&
+      a.trigger.kind === 'condition' &&
+      (a.trigger.conditions ?? []).length
+    )
+      legacy++;
+    if (a.archivedAt) archived++;
     rows.push({
       key: a.key,
       name: a.name,
@@ -801,6 +821,7 @@ export async function listAutomations(d: Deps): Promise<AutomationList> {
       sent7d: a.stats?.sent7d ?? 0,
       skipped7d: a.stats?.skipped7d ?? 0,
       version: a.version,
+      archived: !!a.archivedAt,
     });
   }
   rows.sort((x, y) => rank(x) - rank(y) || x.key.localeCompare(y.key));
@@ -808,7 +829,7 @@ export async function listAutomations(d: Deps): Promise<AutomationList> {
     rows,
     paused: settings.paused,
     settings,
-    counts: { total: all.length, enabled, gates, v2 },
+    counts: { total: all.length, enabled, gates, v2, legacy, archived },
     today: { sent: sentToday, skipped: runAgg },
   };
 }
@@ -990,6 +1011,11 @@ export async function updateAutomation(
     );
   if (next.enabled && next.requiresFeature)
     throw new ApiError('VALIDATION', 'این سناریو نیازمند داده‌ای است که هنوز محاسبه نمی‌شود.');
+  if (next.enabled && cur.archivedAt)
+    throw new ApiError(
+      'VALIDATION',
+      'قاعده بایگانی‌شده روشن نمی‌شود؛ اگر لازم دارید اول آن را از بایگانی خارج کنید.',
+    );
   // A pending step is a promise about the future that an older definition made. When the part of the rule
   // that promise rested on moves, the promise is cancelled rather than re-interpreted; a wording-only fix
   // does not void it, so correcting a typo does not silently eat three days of follow-ups.
@@ -1419,6 +1445,238 @@ export interface AutomationPreviewResult {
  * caps, the gate or the user's devices: those are the sweep's business and `/dry-run` reports them for the
  * whole audience in one pass.
  */
+
+export const archiveSchema = z.object({
+  /** `true` puts the rule out of service; `false` takes it back out of the archive, still switched off. */
+  archived: z.boolean().default(true),
+});
+
+/**
+ * Archive is the non-destructive end of a rule's life: catalogue rows cannot be deleted at all, and a
+ * custom row that produced pushes has a history worth keeping. `enabled` is forced off, `loadRunnable`
+ * skips the row (so a parked flow step is not resumed either), and the pending steps are cancelled because
+ * a retirement — unlike a pause — is not supposed to be resumed on old promises.
+ *
+ * Un-archiving deliberately does **not** re-enable — and while a row is archived the switch is refused
+ * outright (see `updateAutomation`), so `enabled: true` can never quietly mean «ready to fire the moment
+ * the archive is lifted». Bringing a retired rule back is two deliberate acts, not one plus a surprise.
+ */
+export async function archiveAutomation(
+  d: Deps,
+  actor: Actor,
+  key: string,
+  archived: boolean,
+): Promise<Doc<PushAutomation>> {
+  const cur = await mustGet(d, key);
+  const at = d.clock().toISOString();
+  const next: PushAutomation = {
+    ...cur,
+    archivedAt: archived ? at : null,
+    archivedBy: archived ? actor.id : null,
+    // Off in both directions: archiving retires the rule, and lifting the archive hands it back disabled.
+    enabled: false,
+    version: (cur.version ?? 1) + 1,
+    updatedAt: at,
+    updatedBy: actor.id,
+  };
+  if (archived) await stampFlowCancel(d, key);
+  await d.store.set(`${AUTOMATIONS}/${key}`, next as unknown as Record<string, unknown>);
+  await audit(
+    d,
+    actor,
+    archived ? 'push_automation.archived' : 'push_automation.unarchived',
+    AUTOMATIONS,
+    key,
+    { enabled: cur.enabled, archivedAt: cur.archivedAt ?? null },
+    { enabled: next.enabled, archivedAt: next.archivedAt ?? null },
+  );
+  return { ...next, id: key } as Doc<PushAutomation>;
+}
+
+export const migrateSchema = z.object({
+  /** Without a list, every rule the engine can still read in its old shape is considered. */
+  keys: z.array(z.string().max(40)).max(50).optional(),
+  /** The default is the safe one: a migration is *reported* before it is done. */
+  dryRun: z.boolean().default(true),
+  /**
+   * A live rule's conversion is the one case where «same answer from the engine» is not enough — the
+   * operator has to ask for it explicitly, because the rule keeps sending while its definition moves.
+   */
+  includeEnabled: z.boolean().default(false),
+});
+
+export interface MigrateRowResult {
+  key: string;
+  action: 'would-migrate' | 'migrated' | 'skipped';
+  /** What moved, in the field names the panel can show next to the rule. */
+  fields: string[];
+  message: string | null;
+}
+
+export interface MigrateReport {
+  dryRun: boolean;
+  checked: number;
+  migrated: number;
+  wouldMigrate: number;
+  skipped: number;
+  results: MigrateRowResult[];
+  note: string;
+}
+
+/**
+ * The explicit v1 → v2 conversion (`conditionsToExpr`), rule by rule, with a report. This is the only place
+ * the flat list is *rewritten*; `withDefaults()` at read time stays the invisible compatibility layer, so
+ * an operator can move a rule over when they choose to and see exactly what changed.
+ *
+ * Three promises, each with a test: nothing is enabled by a migration (`enabled` is never touched), a rule
+ * whose legacy list the engine would read differently is skipped instead of guessed, and a dry run writes
+ * no document, no revision and no audit row.
+ */
+export async function migrateRules(
+  d: Deps,
+  actor: Actor,
+  input: z.infer<typeof migrateSchema>,
+): Promise<MigrateReport> {
+  const dryRun = input.dryRun !== false;
+  const wanted = input.keys?.length ? new Set(input.keys) : null;
+  const at = d.clock().toISOString();
+  const report: MigrateReport = {
+    dryRun,
+    checked: 0,
+    migrated: 0,
+    wouldMigrate: 0,
+    skipped: 0,
+    results: [],
+    note: dryRun
+      ? 'این فقط گزارش است: هیچ سندی نوشته نشد. برای اجرای واقعی، dryRun را خاموش کنید.'
+      : 'هر قاعده با همان اعتبارسنجی ذخیره تبدیل شد؛ هیچ قاعده‌ای روشن یا خاموش نشد.',
+  };
+  for (const a of await loadAutomations(d)) {
+    if (wanted && !wanted.has(a.key)) continue;
+    report.checked++;
+    const fields: string[] = [];
+    if (a.schemaVersion === 2) {
+      report.skipped++;
+      report.results.push({
+        key: a.key,
+        action: 'skipped',
+        fields,
+        message: 'از قبل نسخه ۲ است.',
+      });
+      continue;
+    }
+    if (a.enabled && !input.includeEnabled) {
+      report.skipped++;
+      report.results.push({
+        key: a.key,
+        action: 'skipped',
+        fields,
+        message:
+          'روشن است؛ برای تبدیلِ یک قاعدهٔ روشن، includeEnabled را بفرستید (همان اول dryRun را بزنید).',
+      });
+      continue;
+    }
+    const tree = conditionsToExpr(a.trigger.conditions ?? []);
+    if (!tree) {
+      report.skipped++;
+      report.results.push({
+        key: a.key,
+        action: 'skipped',
+        fields,
+        message: (a.trigger.conditions ?? []).length
+          ? 'شرط‌های این قاعده برای نوع فعال‌سازی‌اش خوانده نمی‌شود؛ چیزی برای تبدیل نیست.'
+          : 'شرطی ندارد که تبدیل شود.',
+      });
+      continue;
+    }
+    const next: PushAutomation = {
+      ...a,
+      schemaVersion: 2,
+      when: tree,
+      // The flat list goes away in the same write the tree arrives, so no rule can ever be read twice —
+      // that is what «the same answer» means here, and `validateSemantics` refuses a v2 row that keeps it.
+      trigger: { ...a.trigger, conditions: [] },
+      version: (a.version ?? 1) + 1,
+      updatedAt: at,
+      updatedBy: actor.id,
+    };
+    try {
+      validateSemantics(next);
+    } catch (e) {
+      report.skipped++;
+      report.results.push({
+        key: a.key,
+        action: 'skipped',
+        fields,
+        message: issuesFrom(e)
+          .map((i) => i.message)
+          .join(' | '),
+      });
+      continue;
+    }
+    fields.push('schemaVersion', 'when', 'trigger.conditions');
+    if (dryRun) {
+      report.wouldMigrate++;
+      report.results.push({ key: a.key, action: 'would-migrate', fields, message: null });
+      continue;
+    }
+    await d.store.set(`${AUTOMATIONS}/${a.key}`, next as unknown as Record<string, unknown>);
+    await audit(
+      d,
+      actor,
+      'push_automation.migrated',
+      AUTOMATIONS,
+      a.key,
+      {
+        schemaVersion: a.schemaVersion ?? 1,
+        conditions: a.trigger.conditions ?? [],
+      },
+      { schemaVersion: 2, when: tree },
+    );
+    report.migrated++;
+    report.results.push({ key: a.key, action: 'migrated', fields, message: null });
+  }
+  return report;
+}
+
+/** The `:version` path param, kept as a schema so the route file stays a list of «what is callable». */
+export const revisionParamSchema = z.object({
+  version: z.coerce.number().int().min(1).max(100_000),
+});
+
+export const restoreSchema = z.object({
+  /** The version the panel has open, so a rollback cannot overwrite an edit made meanwhile. */
+  expectedVersion: z.number().int().min(1).optional(),
+});
+
+/**
+ * Back to an older text: the stored revision of `/:key` is written forward through `updateAutomation`,
+ * which means a rollback is itself a versioned, audited, validated edit — and is itself reversible.
+ *
+ * The scope is honest: a text revision keeps `message` and `delivery` only. Logic (`when`, `steps`,
+ * `audience.filter`, `repeatPolicy`) is not in the revision store, so it is not restored; and because
+ * `delivery` counts as a structural field, a rollback that changes it cancels the rule's parked steps.
+ */
+export async function restoreRevision(
+  d: Deps,
+  actor: Actor,
+  key: string,
+  version: number,
+  expectedVersion?: number,
+): Promise<Doc<PushAutomation>> {
+  await mustGet(d, key);
+  const row = await d.store.get<{
+    message?: PushAutomation['message'];
+    delivery?: PushAutomation['delivery'];
+  }>(`${TEXT_REVISIONS}/${key}/${version}`);
+  if (!row?.message)
+    throw new ApiError('NOT_FOUND', 'این نسخه در تاریخچهٔ متن این قاعده نیست (یا پاک شده است).');
+  return updateAutomation(d, actor, key, {
+    message: row.message,
+    ...(row.delivery ? { delivery: { ...row.delivery } } : {}),
+    ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+  });
+}
 export async function previewForUsers(
   d: Deps,
   key: string,
@@ -1569,10 +1827,14 @@ export interface DryRunResult {
  * `dry: true`, so no claim, no counter and no provider call. This is what the wizard's last step shows.
  */
 export interface PendingStepsResult {
+  /** A parked row plus `suppressed`: rows the rule's cancel stamp already retired are pending in the
+   * store and dead in practice, and the panel must say which of the two the operator is looking at. */
   items: Array<Record<string, unknown>>;
   /** How many day shards were read; a `wait` longer than that is reported as `truncated`. */
   shards: number;
   truncated: boolean;
+  /** When the rule was last cancelled, or null if it never was — the line rows are compared against. */
+  cancelledAt: string | null;
   note: string;
 }
 
@@ -1597,9 +1859,13 @@ export async function pendingSteps(
     ...res,
     // No digits in the sentence: the panel formats `shards`/`items.length` itself, and a Latin «8»
     // inside a Persian line is exactly the kind of thing users screenshot.
-    note: res.truncated
-      ? 'سقف سطرهای بازگشت‌شده پر شد؛ ممکن است بیشتر از این باشد.'
-      : 'فقط شارد‌های روزهای پیشِ رو خوانده شد (شماره‌ی روز در نام شارد است)؛ پس «خالی» یعنی «در این روزها چیزی نیست».',
+    note:
+      (res.truncated
+        ? 'سقف سطرهای بازگشت‌شده پر شد؛ ممکن است بیشتر از این باشد.'
+        : 'فقط شارد‌های روزهای پیشِ رو خوانده شد (شماره‌ی روز در نام شارد است)؛ پس «خالی» یعنی «در این روزها چیزی نیست».') +
+      (res.items.some((i) => i.suppressed === true)
+        ? ' بعضی سطرها پس از لغوِ قاعده پارک شده‌اند: در فهرست «معلق»‌اند اما اجرا نمی‌شوند.'
+        : ''),
   };
 }
 
@@ -1664,9 +1930,11 @@ export async function dryRun(d: Deps, key: string): Promise<DryRunResult> {
     explain: sweep.explain,
     note: a.requiresFeature
       ? 'این سناریو هنوز اجرا نمی‌شود: داده‌ی لازم محاسبه نمی‌شود.'
-      : !a.enabled || settings.paused
-        ? `اتوماسیون ${a.enabled ? 'زیر کلید توقف کلی' : 'خاموش'} است؛ این فقط برآورد مشمولان است، نه قولِ ارسال.`
-        : null,
+      : a.archivedAt
+        ? 'این قاعده بایگانی شده است؛ تا از بایگانی بیرون نیاید اجرا نمی‌شود. این فقط برآورد مشمولان است.'
+        : !a.enabled || settings.paused
+          ? `اتوماسیون ${a.enabled ? 'زیر کلید توقف کلی' : 'خاموش'} است؛ این فقط برآورد مشمولان است، نه قولِ ارسال.`
+          : null,
   };
 }
 

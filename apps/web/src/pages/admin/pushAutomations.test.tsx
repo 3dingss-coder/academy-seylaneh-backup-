@@ -493,4 +493,139 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     expect(screen.getByText('گزارشی نرسانده است')).toBeInTheDocument();
     expect(screen.getByText(/Cron Trigger/)).toBeInTheDocument();
   });
+
+  it('a retired rule is out of the working view until it is asked for', async () => {
+    const m = mockApi({
+      ...routes(),
+      'GET /v1/admin/push-automations': () => ({
+        data: {
+          ...list([
+            row({ key: 'inactive_1d' }),
+            row({ key: 'retired', name: 'قاعده بازنشسته', archived: true }),
+          ]),
+          counts: { total: 3, enabled: 1, gates: 1, v2: 1, legacy: 1, archived: 1 },
+        },
+      }),
+    });
+    renderApp('/admin/push-campaigns/automations');
+    const panel = await screen.findByTestId('automations-panel');
+    expect(within(panel).getAllByText('یک روز بی‌فعالیتی').length).toBeGreaterThan(0);
+    // Out of service is not «something to look at while working», so it is folded away — but counted.
+    expect(screen.queryByText('قاعده بازنشسته')).toBeNull();
+    expect(within(panel).getByText(/۱ بایگانی‌شده/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /نمایش ۱ قاعده بایگانی‌شده/ }));
+    // Both views of the table (rows and mobile cards) show it, so the name appears more than once.
+    expect((await screen.findAllByText('قاعده بازنشسته')).length).toBeGreaterThan(0);
+    // …and it reads as a retirement, never as a switch someone forgot to turn off.
+    expect(screen.getAllByText('بایگانی‌شده').length).toBeGreaterThan(0);
+    expect(m.calls.some((c) => c.key.endsWith('/archive'))).toBe(false);
+  });
+
+  it('archiving is one confirmation and one POST, and it is never a delete', async () => {
+    const m = mockApi({
+      ...routes(),
+      'GET /v1/admin/push-automations': () => ({
+        data: {
+          ...list([row({ key: 'inactive_1d', isSystem: false, enabled: true })]),
+          counts: { total: 1, enabled: 1, gates: 0, v2: 0, legacy: 0, archived: 0 },
+        },
+      }),
+      'POST /v1/admin/push-automations/inactive_1d/archive': () => ({
+        data: { key: 'inactive_1d', enabled: false, archivedAt: '2026-10-03T06:30:00.000Z' },
+      }),
+    });
+    renderApp('/admin/push-campaigns/automations');
+    const btns = await screen.findAllByTestId('archive-btn');
+    fireEvent.click(btns[0] as HTMLElement);
+    const dialog = await waitFor(() => {
+      const el = document.querySelector('[role="dialog"]');
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+    expect(within(dialog).getByText(/یک روز بی‌فعالیتی/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/بایگانی یعنی خروج از سرویس/)).toBeInTheDocument();
+    // The rule is live right now, and the dialog says the archive will silence it.
+    expect(within(dialog).getByText(/الان روشن است/)).toBeInTheDocument();
+    expect(m.calls.some((c) => c.key.endsWith('/archive'))).toBe(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'بایگانی کن' }));
+    await waitFor(() =>
+      expect(m.calls.map((c) => c.key)).toContain(
+        'POST /v1/admin/push-automations/inactive_1d/archive',
+      ),
+    );
+    expect(m.calls.find((c) => c.key.endsWith('/archive'))?.body).toEqual({ archived: true });
+    expect(m.calls.some((c) => c.key.startsWith('DELETE'))).toBe(false);
+  });
+
+  it('the migration dialog reads a report first and writes only when told to', async () => {
+    const DRY = {
+      dryRun: true,
+      checked: 4,
+      migrated: 0,
+      wouldMigrate: 2,
+      skipped: 1,
+      failed: 0,
+      includeEnabled: false,
+      results: [
+        {
+          key: 'inactive_1d',
+          name: 'یک روز بی‌فعالیتی',
+          isSystem: false,
+          enabled: false,
+          action: 'would-migrate',
+          fields: ['schemaVersion', 'when', 'trigger.conditions'],
+          message: null,
+        },
+        {
+          key: 'reminder',
+          name: 'یادآوری تکلیف',
+          isSystem: true,
+          enabled: true,
+          action: 'skipped',
+          fields: [],
+          message: 'قاعده روشن است؛ با includeEnabled:true صدا بزنید.',
+        },
+      ],
+      note: 'این گزارش چیزی ننوشت؛ فقط خواند.',
+    };
+    const DONE = {
+      ...DRY,
+      dryRun: false,
+      migrated: 2,
+      wouldMigrate: 0,
+      note: 'دو قاعده تبدیل شد.',
+    };
+    let calls = 0;
+    const m = mockApi({
+      ...routes(),
+      'GET /v1/admin/push-automations': () => ({
+        data: {
+          ...list([row({ key: 'inactive_1d' })]),
+          counts: { total: 4, enabled: 1, gates: 1, v2: 2, legacy: 2, archived: 0 },
+        },
+      }),
+      'POST /v1/admin/push-automations/migrate': () => ({ data: ++calls === 1 ? DRY : DONE }),
+    });
+    renderApp('/admin/push-campaigns/automations');
+    fireEvent.click(await screen.findByRole('button', { name: /تبدیل قاعده‌های قدیمی/ }));
+    expect(await screen.findByText('قابل تبدیل')).toBeInTheDocument();
+    expect(screen.getByText(/۴ قاعده بررسی شد · ۲ تا قابل تبدیل · ۱ تا رد شد/)).toBeInTheDocument();
+    // A live catalogue rule is not touched by default, and the report says why in the server’s own words.
+    expect(screen.getByText(/با includeEnabled:true/)).toBeInTheDocument();
+    const bodies = () =>
+      m.calls
+        .filter((c) => c.key === 'POST /v1/admin/push-automations/migrate')
+        .map((c) => c.body as Record<string, unknown>);
+    await waitFor(() => expect(bodies().some((b) => b.dryRun === true)).toBe(true));
+    expect(bodies().every((b) => b.dryRun === true)).toBe(true);
+
+    fireEvent.click(screen.getByTestId('migrate-apply'));
+    await waitFor(() => expect(bodies().some((b) => b.dryRun === false)).toBe(true));
+    // The list is re-read after a write, which re-asks for a fresh dry-run report: look at the *write*.
+    expect(bodies().filter((b) => b.dryRun === false)).toEqual([
+      { dryRun: false, includeEnabled: false },
+    ]);
+    // The write is reported, not silently folded into the list: the dialog keeps the applied report.
+    expect(await screen.findByText('تبدیل انجام شد')).toBeInTheDocument();
+  });
 });

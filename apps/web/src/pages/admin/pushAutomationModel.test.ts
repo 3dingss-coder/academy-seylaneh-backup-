@@ -132,6 +132,9 @@ describe('automation model: grouping and status chips', () => {
     expect(stateOf(row({ enabled: true, push: false })).label).toBe('فقط داخل اپ');
     expect(stateOf(row({ enabled: true })).label).toBe('روشن');
     expect(stateOf(row({ requiresFeature: 'team_rank' })).label).toBe('نسخه ۲');
+    // An archived rule outranks every other reading of the row: the switch beside it is not the truth.
+    expect(stateOf(row({ enabled: true, archived: true })).label).toBe('بایگانی‌شده');
+    expect(stateOf(row({ enabled: true, archived: false })).label).toBe('روشن');
     expect(stateOf(row({ requiresFeature: 'x' })).tone).toBe('neutral');
   });
 

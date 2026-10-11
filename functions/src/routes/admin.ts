@@ -768,6 +768,22 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
   );
   // «اعتبارسنجی قبل از ذخیره»: the create form's payload, run through the very validators a save uses and
   // answered with a verdict instead of a 400. Nothing is written — no document, no audit row, no counter.
+  // The migration endpoint is a *report*: `dryRun` defaults to true, and even a real run never changes an
+  // `enabled` flag. It is registered as a static path because `migrate` is itself a legal automation key.
+  r.post(
+    '/admin/push-automations/migrate',
+    rateLimit(
+      limiter,
+      'push-automation-migrate',
+      10,
+      5 * 60_000,
+      (req) => me(req).id,
+      'مهاجرت حداکثر ۱۰ بار در پنج دقیقه ممکن است.',
+    ),
+    h(async (req) =>
+      automations.migrateRules(d, actorOf(req), parse(automations.migrateSchema, req.body ?? {})),
+    ),
+  );
   r.post(
     '/admin/push-automations/validate',
     rateLimit(
@@ -850,6 +866,31 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
   );
   // A read-only per-user answer to «why nothing for this user?». Deliberately un-prefixed by any write:
   // no notification row, no claim, no counter — see `previewForUsers`.
+  r.post(
+    '/admin/push-automations/:key/archive',
+    h(async (req) =>
+      automations.archiveAutomation(
+        d,
+        actorOf(req),
+        id(req, 'key'),
+        parse(automations.archiveSchema, req.body ?? {}).archived,
+      ),
+    ),
+  );
+  // A rollback is an ordinary versioned edit back to an older text — see `restoreRevision` for what it
+  // does and, more importantly, for what a text revision never held: the rule's logic.
+  r.post(
+    '/admin/push-automations/:key/revisions/:version/restore',
+    h(async (req) =>
+      automations.restoreRevision(
+        d,
+        actorOf(req),
+        id(req, 'key'),
+        parse(automations.revisionParamSchema, req.params).version,
+        parse(automations.restoreSchema, req.body ?? {}).expectedVersion,
+      ),
+    ),
+  );
   r.get(
     '/admin/push-automations/:key/preview',
     h(async (req) =>

@@ -807,6 +807,14 @@ export interface PushAutomation {
   createdBy: string;
   updatedBy: string;
   stats?: PushAutomationStats | null;
+  /**
+   * Set when an operator takes a rule out of service (D6). Archive is *not* a pause: a paused rule can be
+   * resumed and its parked workflow steps still fire, while an archived rule is skipped by `loadRunnable`
+   * and its pending steps are cancelled. `enabled` is forced off when archiving and is NOT restored when
+   * un-archiving — bringing a retired rule back is a deliberate act, never a side effect.
+   */
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 /** Global rules of the engine (`push_automation_settings/global`). Never cached (kill-switch). */

@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, FilterX, Trash2 } from 'lucide-react';
 import { Button, Card, EmptyState, ProgressBar } from '@/components/ui';
 import { DataTable } from '@/components/admin/DataTable';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
-import { groupByPerson, personKey, type PersonGroup } from '@/lib/people';
+import { personKey } from '@/lib/people';
 import { Select } from '@/components/common/Field';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { exportExcel } from '@/lib/excel';
@@ -20,6 +20,12 @@ type Filter =
   'brand' | 'product' | 'user' | 'status' | 'team' | 'province' | 'city' | 'from' | 'to';
 
 /** W2 / A-reports — completion report with filters (URL-synced), city filter and professional Excel export. */
+interface Account {
+  id: string;
+  first: CompletionRow;
+  rows: CompletionRow[];
+}
+
 export function CompletionReport({
   rows,
   memberLink,
@@ -98,21 +104,18 @@ export function CompletionReport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sp]);
 
-  // One row per person: same-name accounts (different numbers) are merged into a single row.
-  const people = useMemo(
-    () => groupByPerson(filtered, (r) => ({ name: r.userName, phone: r.phone })),
-    [filtered],
-  );
-  const packageLines = (g: PersonGroup<CompletionRow>) =>
-    [...g.rows].sort(
-      (a, b) =>
-        Number(b.lagging) - Number(a.lagging) ||
-        a.percent - b.percent ||
-        a.packageTitle.localeCompare(b.packageTitle, 'fa'),
-    );
-  const lastActivity = (g: PersonGroup<CompletionRow>) =>
-    Math.max(0, ...g.rows.map((r) => (r.lastActivityAt ? Date.parse(r.lastActivityAt) : 0))) ||
-    null;
+  // One row per account (name + phone): a name never repeats unless the number differs.
+  const accounts = useMemo(() => {
+    const m = new Map<string, Account>();
+    for (const r of filtered) {
+      const acc = m.get(r.userId);
+      if (acc) acc.rows.push(r);
+      else m.set(r.userId, { id: r.userId, first: r, rows: [r] });
+    }
+    return [...m.values()];
+  }, [filtered]);
+  const latest = (rows: CompletionRow[], pick: (r: CompletionRow) => string | null) =>
+    Math.max(0, ...rows.map((r) => (pick(r) ? Date.parse(pick(r) as string) : 0))) || null;
 
   const exportCsv = () => {
     const csv = toCsv(
@@ -277,7 +280,7 @@ export function CompletionReport({
       </Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-text-secondary">
-          {toPersianDigits(people.length)} نفر · {toPersianDigits(filtered.length)} ردیف آموزش
+          {toPersianDigits(accounts.length)} نفر · {toPersianDigits(filtered.length)} ردیف آموزش
         </p>
         <div className="flex gap-2">
           {any && (
@@ -313,118 +316,130 @@ export function CompletionReport({
       ) : (
         <DataTable
           caption="گزارش تکمیل"
-          rows={people}
-          rowKey={(g) => g.key}
-          onRowClick={(g) => nav(memberLink(g.first.userId))}
+          rows={accounts}
+          rowKey={(a) => a.id}
+          onRowClick={(a) => nav(memberLink(a.id))}
           columns={[
             {
               key: 'u',
-              sortValue: (g) => g.name,
+              sortValue: (a) => a.first.userName,
               header: 'نام',
-              cell: (g) => (
+              cell: (a) => (
                 <div>
-                  <span className="font-bold">{g.name}</span>
-                  {g.phones.map((p) => (
+                  <span className="font-bold">{a.first.userName}</span>
+                  {a.first.phone && (
                     <span
-                      key={p}
                       dir="ltr"
                       className="block text-start text-[11px] leading-5 text-text-secondary"
                     >
-                      {toPersianDigits(p)}
+                      {toPersianDigits(a.first.phone)}
                     </span>
-                  ))}
+                  )}
                 </div>
               ),
             },
             {
               key: 'loc',
-              sortValue: (g) =>
-                g.rows[0]?.city ? `${g.rows[0].province ?? ''} ${g.rows[0].city}` : null,
+              sortValue: (a) => (a.first.city ? `${a.first.province ?? ''} ${a.first.city}` : null),
               header: 'شهر',
-              cell: (g) => {
-                const r = g.first;
-                return r.city ? (
+              cell: (a) =>
+                a.first.city ? (
                   <span className="text-sm">
-                    {r.province} • {r.city}
+                    {a.first.province} • {a.first.city}
                   </span>
                 ) : (
                   '—'
+                ),
+              hideOnMobile: true,
+            },
+            {
+              key: 'n',
+              sortValue: (a) => a.rows.length,
+              header: 'آموزش‌ها',
+              cell: (a) => {
+                const done = a.rows.filter((r) => r.status === 'completed').length;
+                return (
+                  <span>
+                    {toPersianDigits(a.rows.length)} آموزش
+                    <span className="block text-xs text-text-secondary">
+                      {toPersianDigits(done)} تکمیل
+                    </span>
+                  </span>
                 );
               },
             },
             {
               key: 'p',
-              sortValue: (g) => g.rows.length,
-              header: 'آموزش‌ها و پیشرفت',
-              cell: (g) => (
-                <ul className="flex min-w-64 flex-col gap-3">
-                  {packageLines(g).map((r) => (
-                    <li key={`${r.userId}-${r.packageId}`} className="flex flex-col gap-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <span>
-                          {r.packageTitle}
-                          {(r.brandName || r.productName) && (
-                            <span className="block text-xs text-text-secondary">
-                              {[r.brandName, r.productName].filter(Boolean).join(' • ')}
-                            </span>
-                          )}
-                        </span>
-                        <span className="flex shrink-0 items-center gap-2 text-xs">
-                          {r.overdue ? (
-                            <b className="text-danger">دیرکرد</b>
-                          ) : r.lagging ? (
-                            <b className="text-warning-fg">عقب</b>
-                          ) : (
-                            STATUS_LABEL[r.status]
-                          )}
-                          {onArchive && (
-                            <button
-                              type="button"
-                              className="pressable rounded p-1 text-danger hover:bg-danger-light"
-                              aria-label={`حذف گزارش ${r.packageTitle} برای ${r.userName}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setToDelete({
-                                  label: `«${r.packageTitle}» برای ${g.name}`,
-                                  items: [{ userId: r.userId, packageId: r.packageId }],
-                                });
-                              }}
-                            >
-                              <Trash2 className="size-4" aria-hidden />
-                            </button>
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <ProgressBar value={r.percent} label="پیشرفت" className="flex-1" />
-                        <span className="text-xs">{faPercent(r.percent)}</span>
-                      </div>
-                      {r.deadlineAt && (
-                        <span className="text-xs text-text-secondary">
-                          مهلت: {faDate(r.deadlineAt)}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ),
+              sortValue: (a) => a.rows.reduce((n, r) => n + r.percent, 0) / a.rows.length,
+              header: 'پیشرفت',
+              cell: (a) => {
+                const avg = a.rows.reduce((n, r) => n + r.percent, 0) / a.rows.length;
+                return (
+                  <div className="flex min-w-32 items-center gap-2">
+                    <ProgressBar value={avg} label="پیشرفت" className="flex-1" />
+                    <span className="text-xs">{faPercent(avg)}</span>
+                  </div>
+                );
+              },
+            },
+            {
+              key: 's',
+              sortValue: (a) =>
+                a.rows.filter((r) => r.overdue).length * 1000 +
+                a.rows.filter((r) => r.lagging).length,
+              header: 'وضعیت',
+              cell: (a) => {
+                const overdue = a.rows.filter((r) => r.overdue).length;
+                const lagging = a.rows.filter((r) => r.lagging).length;
+                if (!overdue && !lagging) return <span className="text-text-secondary">—</span>;
+                return (
+                  <span className="flex flex-col text-xs">
+                    {overdue > 0 && (
+                      <b className="text-danger">{toPersianDigits(overdue)} دیرکرد</b>
+                    )}
+                    {lagging > 0 && (
+                      <b className="text-warning-fg">{toPersianDigits(lagging)} عقب</b>
+                    )}
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'd',
+              header: 'مهلت',
+              hideOnMobile: true,
+              sortValue: (a) => latest(a.rows, (r) => r.deadlineAt),
+              cell: (a) => {
+                const t = latest(a.rows, (r) => r.deadlineAt);
+                return t ? faDate(new Date(t).toISOString()) : '—';
+              },
+            },
+            {
+              key: 'l',
+              sortValue: (a) => latest(a.rows, (r) => r.lastActivityAt),
+              header: 'آخرین فعالیت',
+              cell: (a) => {
+                const t = latest(a.rows, (r) => r.lastActivityAt);
+                return t ? faRelative(new Date(t).toISOString()) : 'هرگز';
+              },
+              hideOnMobile: true,
             },
             ...(onArchive
               ? [
                   {
                     key: 'del',
                     header: '',
-                    cell: (g: PersonGroup<CompletionRow>) => (
+                    cell: (a: Account) => (
                       <Button
                         variant="ghost"
                         className="px-2 text-danger"
-                        aria-label={`حذف همه‌ی گزارش‌های ${g.name}`}
+                        aria-label={`حذف گزارش‌های ${a.first.userName}`}
                         icon={<Trash2 className="size-4" aria-hidden />}
                         onClick={(e) => {
                           e.stopPropagation();
                           setToDelete({
-                            label: `همه‌ی آموزش‌های ${g.name}`,
-                            items: g.rows.map((r) => ({
+                            label: `همه‌ی آموزش‌های ${a.first.userName}${a.first.phone ? ` (${a.first.phone})` : ''}`,
+                            items: a.rows.map((r) => ({
                               userId: r.userId,
                               packageId: r.packageId,
                             })),
@@ -435,32 +450,6 @@ export function CompletionReport({
                   },
                 ]
               : []),
-            {
-              key: 'd',
-              header: 'مهلت',
-              hideOnMobile: true,
-              sortValue: (g) =>
-                Math.max(0, ...g.rows.map((r) => (r.deadlineAt ? Date.parse(r.deadlineAt) : 0))) ||
-                null,
-              cell: (g) => {
-                const last = g.rows
-                  .map((r) => r.deadlineAt)
-                  .filter((x): x is string => !!x)
-                  .sort()
-                  .pop();
-                return last ? faDate(last) : '—';
-              },
-            },
-            {
-              key: 'l',
-              sortValue: (g) => lastActivity(g),
-              header: 'آخرین فعالیت',
-              cell: (g) => {
-                const t = lastActivity(g);
-                return t ? faRelative(new Date(t).toISOString()) : 'هرگز';
-              },
-              hideOnMobile: true,
-            },
           ]}
         />
       )}

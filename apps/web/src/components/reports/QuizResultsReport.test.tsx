@@ -95,7 +95,7 @@ const bodyRows = () =>
     .map((r) => r.textContent ?? '');
 
 describe('QuizResultsReport', () => {
-  it('shows attempts, correct/wrong and pass result per learner', () => {
+  it('shows one compact row per learner: quizzes, passed, failed, attempts', () => {
     render(
       <MemoryRouter>
         <QuizResultsReport data={data} memberLink={(i) => `/m/${i}`} />
@@ -104,10 +104,9 @@ describe('QuizResultsReport', () => {
     const rows = bodyRows();
     expect(rows).toHaveLength(2);
     const ali = rows.find((r) => r.includes('علی')) ?? '';
-    expect(ali).toContain('قبول');
-    expect(ali).toContain('۲'); // two attempts
+    expect(ali.startsWith('علی۱۱—۲')).toBe(true); // 1 quiz, 1 passed, none failed, 2 attempts
     const sara = rows.find((r) => r.includes('سارا')) ?? '';
-    expect(sara).toContain('مردود');
+    expect(sara.startsWith('سارا۱۰۱')).toBe(true); // 1 quiz, 0 passed, 1 failed
   });
   it('lists every attempt in the second view and filters by result', async () => {
     render(

@@ -1,28 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { Button, useToast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { enableWebPush, webPushState } from '@/lib/webPush';
-
-const SNOOZE_KEY = 'push-optin-snoozed-until';
-// Dismissing (✕) hides the banner for one day only: it comes back every day until the user allows.
-const SNOOZE_MS = 24 * 3600_000;
-
-function snoozed(): boolean {
-  try {
-    return Number(localStorage.getItem(SNOOZE_KEY) ?? 0) > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function snooze() {
-  try {
-    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
-  } catch {
-    /* private mode: the banner simply shows again next visit */
-  }
-}
 
 /** iPhone/iPad browser tab: Apple only allows Web Push for a site added to the Home Screen. */
 function needsHomeScreenInstall(): boolean {
@@ -42,27 +22,17 @@ function needsHomeScreenInstall(): boolean {
 export function PushOptInBanner() {
   const { status } = useAuth();
   const toast = useToast();
-  const [hidden, setHidden] = useState(snoozed);
+  // ✕ only hides the banner for this visit; it is never remembered, so every new entry or
+  // reload asks again until the user allows notifications.
+  const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState(webPushState);
-
-  // An installed PWA is resumed, not reopened: bring the banner back once the day has passed.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') setHidden(snoozed());
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
 
   if (status !== 'authenticated' || hidden) return null;
   const install = state === 'unavailable' && needsHomeScreenInstall();
   if (state !== 'default' && !install) return null;
 
-  const later = () => {
-    snooze();
-    setHidden(true);
-  };
+  const later = () => setHidden(true);
 
   return (
     <div

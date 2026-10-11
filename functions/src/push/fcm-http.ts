@@ -148,7 +148,7 @@ export class FcmHttpPushSender implements PushSender {
         android: { priority: 'HIGH' },
         webpush: {
           notification: {
-            icon: '/icons/icon-192.png',
+            icon: '/push-icons/push-icon-192.png',
             dir: 'rtl',
             lang: 'fa',
             ...(msg.imageUrl ? { image: msg.imageUrl } : {}),

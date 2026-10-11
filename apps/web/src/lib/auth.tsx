@@ -45,9 +45,13 @@ export function homePathFor(role: Role): string {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const [user, setUser] = useState<Me | null>(null);
+  // Returning visitor: start from the last-known profile instead of a blank spinner. The page
+  // (and its API calls, which wait for the single in-flight token refresh) can start immediately;
+  // `/me` below then replaces the cached profile. A rejected session clears this (expiry handler).
+  const [cachedMe] = useState<Me | null>(() => (session.refresh ? lastKnown.me<Me>() : null));
+  const [user, setUser] = useState<Me | null>(cachedMe);
   const [status, setStatus] = useState<AuthState['status']>(
-    session.refresh ? 'loading' : 'anonymous',
+    session.refresh ? (cachedMe ? 'authenticated' : 'loading') : 'anonymous',
   );
 
   const accept = useCallback((r: AuthResult) => {

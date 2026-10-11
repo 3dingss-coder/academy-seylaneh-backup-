@@ -9,6 +9,7 @@ import * as users from '../services/users';
 import { MemoryAuthProvider } from '../auth/memory';
 import { ApiError } from '../http/errors';
 import { randomBytesBase64Url } from '../lib/crypto';
+import { ids } from '../lib/ids';
 
 const ip = (req: { ip?: string }) => req.ip ?? 'unknown';
 
@@ -53,11 +54,27 @@ export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
         const id = users.parseIdentifier(phone);
         if (id.kind !== 'phone') throw new ApiError('VALIDATION', 'شماره موبایل وارد کنید.');
         const result = await phoneAuth.demoSignIn(id.authEmail);
-        if (!result.ok)
+        if (!result.ok) {
+          // A disabled auth account may be a blacklisted (deleted) number: say so instead of
+          // «not registered», which would send the person to a sign-up that can never succeed.
+          if (result.reason === 'disabled') {
+            const key = await d.store.get<{ uid: string | null }>(
+              `unique_keys/${ids.uniqueKey('phone', id.phone)}`,
+            );
+            const owner = key?.uid
+              ? await d.store.get<import('../domain/types').User>(`users/${key.uid}`)
+              : null;
+            if (owner?.status === 'blacklisted')
+              throw new ApiError('FORBIDDEN', users.BLACKLISTED_MESSAGE, { reason: 'BLACKLISTED' });
+            throw new ApiError('FORBIDDEN', 'حساب شما غیرفعال شده است. با مدیر خود تماس بگیرید.');
+          }
           throw new ApiError('NOT_FOUND', 'این شماره هنوز ثبت‌نام نکرده است. ابتدا ثبت‌نام کنید.', {
             reason: 'NOT_REGISTERED',
           });
+        }
         const user = await d.store.get<import('../domain/types').User>(`users/${result.uid}`);
+        if (user?.status === 'blacklisted')
+          throw new ApiError('FORBIDDEN', users.BLACKLISTED_MESSAGE, { reason: 'BLACKLISTED' });
         if (!user || user.status !== 'active') throw new ApiError('UNAUTHENTICATED');
         if (user.role !== 'marketer')
           throw new ApiError(

@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Download, FileSpreadsheet, FilterX } from 'lucide-react';
+import { Download, FileSpreadsheet, FilterX, Trash2 } from 'lucide-react';
 import { Button, Card, EmptyState, ProgressBar } from '@/components/ui';
 import { DataTable } from '@/components/admin/DataTable';
+import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { groupByPerson, personKey, type PersonGroup } from '@/lib/people';
 import { Select } from '@/components/common/Field';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { exportExcel } from '@/lib/excel';
@@ -22,11 +24,19 @@ export function CompletionReport({
   rows,
   memberLink,
   teams,
+  onArchive,
 }: {
   rows: CompletionRow[];
   memberLink: (userId: string) => string;
   teams?: Array<{ id: string; name: string }>;
+  /** Admin only: delete report rows (they move to the archive). Hidden when not given. */
+  onArchive?: (items: Array<{ userId: string; packageId: string }>) => Promise<unknown>;
 }) {
+  const [toDelete, setToDelete] = useState<{
+    label: string;
+    items: Array<{ userId: string; packageId: string }>;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [sp, setSp] = useSearchParams();
   const nav = useNavigate();
   const f = (k: Filter) => sp.get(k) ?? '';
@@ -43,14 +53,14 @@ export function CompletionReport({
   const opts = useMemo(() => {
     const brands = new Map<string, string>();
     const products = new Map<string, { name: string; brandId: string | null }>();
-    const users = new Map<string, string>();
+    const users = new Map<string, string>(); // person key → name (one entry per unique name)
     const provinces = new Set<string>();
     const citiesByProvince = new Map<string, Set<string>>();
     for (const r of rows) {
       if (r.brandId && r.brandName) brands.set(r.brandId, r.brandName);
       if (r.productId && r.productName)
         products.set(r.productId, { name: r.productName, brandId: r.brandId });
-      users.set(r.userId, r.userName);
+      users.set(personKey(r.userName) || r.userName, r.userName);
       if (r.province) {
         provinces.add(r.province);
         const citySet = citiesByProvince.get(r.province) ?? new Set<string>();
@@ -75,7 +85,7 @@ export function CompletionReport({
     return rows.filter((r) => {
       if (f('brand') && r.brandId !== f('brand')) return false;
       if (f('product') && r.productId !== f('product')) return false;
-      if (f('user') && r.userId !== f('user')) return false;
+      if (f('user') && (personKey(r.userName) || r.userName) !== f('user')) return false;
       if (f('team') && r.teamId !== f('team')) return false;
       if (f('province') && r.province !== f('province')) return false;
       if (f('city') && r.city !== f('city')) return false;
@@ -88,10 +98,27 @@ export function CompletionReport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sp]);
 
+  // One row per person: same-name accounts (different numbers) are merged into a single row.
+  const people = useMemo(
+    () => groupByPerson(filtered, (r) => ({ name: r.userName, phone: r.phone })),
+    [filtered],
+  );
+  const packageLines = (g: PersonGroup<CompletionRow>) =>
+    [...g.rows].sort(
+      (a, b) =>
+        Number(b.lagging) - Number(a.lagging) ||
+        a.percent - b.percent ||
+        a.packageTitle.localeCompare(b.packageTitle, 'fa'),
+    );
+  const lastActivity = (g: PersonGroup<CompletionRow>) =>
+    Math.max(0, ...g.rows.map((r) => (r.lastActivityAt ? Date.parse(r.lastActivityAt) : 0))) ||
+    null;
+
   const exportCsv = () => {
     const csv = toCsv(
       [
         'نام',
+        'شماره',
         'استان',
         'شهر',
         'آموزش',
@@ -108,6 +135,7 @@ export function CompletionReport({
       ],
       filtered.map((r) => [
         r.userName,
+        r.phone ?? '',
         r.province ?? '',
         r.city ?? '',
         r.packageTitle,
@@ -134,6 +162,7 @@ export function CompletionReport({
       fileName: `completion-report-${new Date().toISOString().slice(0, 10)}`,
       columns: [
         { header: 'نام بازاریاب', key: 'userName', width: 22 },
+        { header: 'شماره', key: 'phone', width: 14 },
         { header: 'استان', key: 'province', width: 16 },
         { header: 'شهر', key: 'city', width: 16 },
         { header: 'آموزش', key: 'packageTitle', width: 28 },
@@ -150,6 +179,7 @@ export function CompletionReport({
       ],
       rows: filtered.map((r) => ({
         userName: r.userName,
+        phone: r.phone ?? '—',
         province: r.province ?? '—',
         city: r.city ?? '—',
         packageTitle: r.packageTitle,
@@ -246,7 +276,9 @@ export function CompletionReport({
         />
       </Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-text-secondary">{toPersianDigits(filtered.length)} ردیف</p>
+        <p className="text-sm text-text-secondary">
+          {toPersianDigits(people.length)} نفر · {toPersianDigits(filtered.length)} ردیف آموزش
+        </p>
         <div className="flex gap-2">
           {any && (
             <Button
@@ -281,81 +313,179 @@ export function CompletionReport({
       ) : (
         <DataTable
           caption="گزارش تکمیل"
-          rows={filtered}
-          rowKey={(r) => `${r.userId}-${r.packageId}`}
-          onRowClick={(r) => nav(memberLink(r.userId))}
+          rows={people}
+          rowKey={(g) => g.key}
+          onRowClick={(g) => nav(memberLink(g.first.userId))}
           columns={[
             {
               key: 'u',
-              sortValue: (r) => r.userName,
+              sortValue: (g) => g.name,
               header: 'نام',
-              cell: (r) => <span className="font-bold">{r.userName}</span>,
+              cell: (g) => (
+                <div>
+                  <span className="font-bold">{g.name}</span>
+                  {g.phones.map((p) => (
+                    <span
+                      key={p}
+                      dir="ltr"
+                      className="block text-start text-[11px] leading-5 text-text-secondary"
+                    >
+                      {toPersianDigits(p)}
+                    </span>
+                  ))}
+                </div>
+              ),
             },
             {
               key: 'loc',
-              sortValue: (r) => (r.city ? `${r.province ?? ''} ${r.city}` : null),
+              sortValue: (g) =>
+                g.rows[0]?.city ? `${g.rows[0].province ?? ''} ${g.rows[0].city}` : null,
               header: 'شهر',
-              cell: (r) =>
-                r.city ? (
+              cell: (g) => {
+                const r = g.first;
+                return r.city ? (
                   <span className="text-sm">
                     {r.province} • {r.city}
                   </span>
                 ) : (
                   '—'
-                ),
+                );
+              },
             },
             {
               key: 'p',
-              sortValue: (r) => r.packageTitle,
-              header: 'آموزش',
-              cell: (r) => r.packageTitle,
-            },
-            {
-              key: 'b',
-              header: 'برند/محصول',
-              cell: (r) => [r.brandName, r.productName].filter(Boolean).join(' • ') || '—',
-              hideOnMobile: true,
-            },
-            {
-              key: 'pct',
-              sortValue: (r) => r.percent,
-              header: 'پیشرفت',
-              cell: (r) => (
-                <div className="flex min-w-24 items-center gap-2">
-                  <ProgressBar value={r.percent} label="پیشرفت" className="flex-1" />
-                  <span className="text-xs">{faPercent(r.percent)}</span>
-                </div>
+              sortValue: (g) => g.rows.length,
+              header: 'آموزش‌ها و پیشرفت',
+              cell: (g) => (
+                <ul className="flex min-w-64 flex-col gap-3">
+                  {packageLines(g).map((r) => (
+                    <li key={`${r.userId}-${r.packageId}`} className="flex flex-col gap-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span>
+                          {r.packageTitle}
+                          {(r.brandName || r.productName) && (
+                            <span className="block text-xs text-text-secondary">
+                              {[r.brandName, r.productName].filter(Boolean).join(' • ')}
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2 text-xs">
+                          {r.overdue ? (
+                            <b className="text-danger">دیرکرد</b>
+                          ) : r.lagging ? (
+                            <b className="text-warning-fg">عقب</b>
+                          ) : (
+                            STATUS_LABEL[r.status]
+                          )}
+                          {onArchive && (
+                            <button
+                              type="button"
+                              className="pressable rounded p-1 text-danger hover:bg-danger-light"
+                              aria-label={`حذف گزارش ${r.packageTitle} برای ${r.userName}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setToDelete({
+                                  label: `«${r.packageTitle}» برای ${g.name}`,
+                                  items: [{ userId: r.userId, packageId: r.packageId }],
+                                });
+                              }}
+                            >
+                              <Trash2 className="size-4" aria-hidden />
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ProgressBar value={r.percent} label="پیشرفت" className="flex-1" />
+                        <span className="text-xs">{faPercent(r.percent)}</span>
+                      </div>
+                      {r.deadlineAt && (
+                        <span className="text-xs text-text-secondary">
+                          مهلت: {faDate(r.deadlineAt)}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               ),
             },
-            {
-              key: 's',
-              sortValue: (r) => (r.overdue ? 3 : r.lagging ? 2 : r.status === 'completed' ? 0 : 1),
-              header: 'وضعیت',
-              cell: (r) =>
-                r.overdue ? (
-                  <span className="font-bold text-danger">دیرکرد</span>
-                ) : r.lagging ? (
-                  <span className="font-bold text-warning-fg">عقب</span>
-                ) : (
-                  STATUS_LABEL[r.status]
-                ),
-            },
+            ...(onArchive
+              ? [
+                  {
+                    key: 'del',
+                    header: '',
+                    cell: (g: PersonGroup<CompletionRow>) => (
+                      <Button
+                        variant="ghost"
+                        className="px-2 text-danger"
+                        aria-label={`حذف همه‌ی گزارش‌های ${g.name}`}
+                        icon={<Trash2 className="size-4" aria-hidden />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setToDelete({
+                            label: `همه‌ی آموزش‌های ${g.name}`,
+                            items: g.rows.map((r) => ({
+                              userId: r.userId,
+                              packageId: r.packageId,
+                            })),
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             {
               key: 'd',
-              sortValue: (r) => (r.deadlineAt ? Date.parse(r.deadlineAt) : null),
               header: 'مهلت',
-              cell: (r) => (r.deadlineAt ? faDate(r.deadlineAt) : '—'),
               hideOnMobile: true,
+              sortValue: (g) =>
+                Math.max(0, ...g.rows.map((r) => (r.deadlineAt ? Date.parse(r.deadlineAt) : 0))) ||
+                null,
+              cell: (g) => {
+                const last = g.rows
+                  .map((r) => r.deadlineAt)
+                  .filter((x): x is string => !!x)
+                  .sort()
+                  .pop();
+                return last ? faDate(last) : '—';
+              },
             },
             {
               key: 'l',
-              sortValue: (r) => (r.lastActivityAt ? Date.parse(r.lastActivityAt) : null),
+              sortValue: (g) => lastActivity(g),
               header: 'آخرین فعالیت',
-              cell: (r) => (r.lastActivityAt ? faRelative(r.lastActivityAt) : 'هرگز'),
+              cell: (g) => {
+                const t = lastActivity(g);
+                return t ? faRelative(new Date(t).toISOString()) : 'هرگز';
+              },
               hideOnMobile: true,
             },
           ]}
         />
+      )}
+      {onArchive && (
+        <ConfirmDialog
+          open={!!toDelete}
+          danger
+          title="حذف گزارش؟"
+          confirmText="حذف و انتقال به آرشیو"
+          loading={deleting}
+          onClose={() => setToDelete(null)}
+          onConfirm={async () => {
+            if (!toDelete) return;
+            setDeleting(true);
+            try {
+              await onArchive(toDelete.items);
+              setToDelete(null);
+            } finally {
+              setDeleting(false);
+            }
+          }}
+        >
+          گزارش {toDelete?.label} از این لیست حذف و به «آرشیو ← گزارش‌ها» منتقل می‌شود. از آنجا
+          می‌توانید برگردانید یا برای همیشه پاک کنید.
+        </ConfirmDialog>
       )}
     </div>
   );

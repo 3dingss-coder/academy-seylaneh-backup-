@@ -12,7 +12,7 @@ export interface Me {
   role: Role;
   teamId: string | null;
   brandIds: string[];
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'blacklisted';
   pointsBalance: number;
   onboardedAt: string | null;
   lastActiveAt: string | null;
@@ -474,6 +474,7 @@ export interface ManagerDashboard {
 export interface CompletionRow {
   userId: string;
   userName: string;
+  phone?: string | null;
   teamId: string | null;
   province: string | null;
   city: string | null;
@@ -514,6 +515,7 @@ export interface QuizAttemptRow {
   attemptId: string;
   userId: string;
   userName: string;
+  phone?: string | null;
   teamId: string | null;
   province: string | null;
   city: string | null;
@@ -539,6 +541,7 @@ export interface QuizAttemptRow {
 export interface QuizSummaryRow {
   userId: string;
   userName: string;
+  phone?: string | null;
   teamId: string | null;
   province: string | null;
   city: string | null;
@@ -848,4 +851,21 @@ export interface MentorReport {
   satisfaction: number | null;
   byOutcome: Record<string, number>;
   users: number;
+}
+
+/** Admin archive (آرشیو): blacklisted users and deleted report rows. */
+export interface ArchivedUser extends Me {
+  blacklistedAt: string | null;
+}
+export interface ArchivedReportRow {
+  userId: string;
+  packageId: string;
+  userName: string;
+  phone: string | null;
+  packageTitle: string;
+  brandName: string | null;
+  productName: string | null;
+  percent: number;
+  status: string;
+  archivedAt: string;
 }

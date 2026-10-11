@@ -224,6 +224,10 @@ export class InMemoryStore implements DocStore {
     for (const it of items) this.write(it.path, it.data, it.merge ? 'merge' : 'set');
   }
 
+  async deleteMany(paths: string[]) {
+    for (const p of paths) await this.delete(p);
+  }
+
   runTransaction<R>(fn: (tx: TxOps) => Promise<R>): Promise<R> {
     const run = async () => {
       const writes: Array<() => void> = [];

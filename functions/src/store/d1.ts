@@ -740,6 +740,21 @@ export class D1Store implements DocStore {
     return randomBytesBase64Url(15).replace(/[-_]/g, 'x').slice(0, 20);
   }
 
+  /** One D1 batch per 80 rows (a batch is a single round trip, so a big purge stays cheap). */
+  async deleteMany(paths: string[]): Promise<void> {
+    if (paths.length === 0) return;
+    await this.ensureReady();
+    const stmts = paths.map((p) => {
+      const { col, id } = splitPath(p);
+      return this.db.prepare('DELETE FROM docs WHERE col = ?1 AND id = ?2').bind(col, id);
+    });
+    const CHUNK = 80;
+    for (let i = 0; i < stmts.length; i += CHUNK) {
+      const slice = stmts.slice(i, i + CHUNK);
+      await this.enqueue(() => this.db.batch(slice));
+    }
+  }
+
   async batchSet(items: Array<{ path: string; data: Input; merge?: boolean }>): Promise<void> {
     await this.ensureReady();
     const now = new Date().toISOString();

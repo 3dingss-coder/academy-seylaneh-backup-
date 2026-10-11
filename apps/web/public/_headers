@@ -19,6 +19,9 @@
 # Push-notification template banners: versioned with the release, never rewritten in place.
 /push-templates/*
   Cache-Control: public, max-age=31536000, immutable
+# Push notification icon (mascot): fixed file name, so cache a day and revalidate.
+/push-icons/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
 # The app shell and service-worker files must always be revalidated, otherwise a browser or CDN keeps
 # serving an old copy and users never see a new version. (Hashed files under /assets/ stay immutable.)

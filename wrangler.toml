@@ -6,6 +6,14 @@ compatibility_date = "2025-04-01"
 [build]
 command = "npm run build"
 
+# Smart Placement: every API request makes several sequential D1 queries, and D1 lives in WEUR.
+# Running the Worker next to the database turns those round trips into local ones (one extra hop
+# for the user instead of one per query). Static files still come from the nearest edge because
+# only /v1/* runs the Worker first. Cloudflare keeps default placement when it measures no gain.
+# To undo: delete this block.
+[placement]
+mode = "smart"
+
 [assets]
 directory = "apps/web/dist"
 binding = "ASSETS"

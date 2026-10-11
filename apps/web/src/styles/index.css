@@ -49,6 +49,11 @@
   --color-accent: #f59e0b;
   --color-accent-light: #fef3c7;
   --color-accent-fg: #92400e;
+  /* Purple — «معرفی محصول» in the push-template categories (the push templates design has no
+     matching token). Same light/fg split as the other status colours so text stays ≥ 4.5:1. */
+  --color-violet: #7c3aed;
+  --color-violet-light: #ede9fe;
+  --color-violet-fg: #6d28d9;
   /* text/icon colour ON solid fills (flips in dark mode so contrast stays ≥ 4.5:1) */
   --color-on-primary: #ffffff;
   --color-on-danger: #ffffff;
@@ -301,6 +306,9 @@
     --color-accent: #fbbf24;
     --color-accent-light: #33250a;
     --color-accent-fg: #fcd34d;
+    --color-violet: #a78bfa;
+    --color-violet-light: #241a3d;
+    --color-violet-fg: #c4b5fd;
     --color-scrim: rgb(2 8 5 / 0.62);
     --shadow-xs: 0 1px 1px rgb(0 0 0 / 0.3);
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);

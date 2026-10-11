@@ -125,6 +125,10 @@ export function staffAuthEmail(username: string): string {
   return `${slug || 'staff'}@staff.seylane.local`;
 }
 
+/** Shown when a deleted (blacklisted) number tries to sign in or sign up again. */
+export const BLACKLISTED_MESSAGE =
+  'این شماره مسدود شده است و امکان ورود ندارد. برای رفع مسدودی با ادمین تماس بگیرید.';
+
 export type Identifier =
   | { kind: 'phone'; phone: string; authEmail: string }
   | { kind: 'email'; email: string; authEmail: string };
@@ -213,6 +217,9 @@ export async function register(
     await d.store.create(`unique_keys/${keyId}`, { kind: idf.kind, createdAt: now, uid: null });
   } catch (e) {
     if (e instanceof StoreConflictError) {
+      const reserved = await d.store.get<{ uid: string | null }>(`unique_keys/${keyId}`);
+      const owner = reserved?.uid ? await d.store.get<User>(`users/${reserved.uid}`) : null;
+      if (owner?.status === 'blacklisted') throw new ApiError('FORBIDDEN', BLACKLISTED_MESSAGE);
       throw new ApiError(
         'CONFLICT',
         idf.kind === 'phone'
@@ -308,6 +315,7 @@ export async function login(d: Deps, input: z.infer<typeof loginSchema>) {
   if (guard) await d.store.delete(`login_guards/${guardKey}`);
   const user = await d.store.get<User>(`users/${r.uid}`);
   if (!user) throw new ApiError('UNAUTHENTICATED', 'رمز یا نام کاربری اشتباه است.');
+  if (user.status === 'blacklisted') throw new ApiError('FORBIDDEN', BLACKLISTED_MESSAGE);
   if (user.status !== 'active')
     throw new ApiError('FORBIDDEN', 'حساب شما غیرفعال شده است. با مدیر خود تماس بگیرید.');
   await d.store.update(`users/${r.uid}`, { lastActiveAt: nowIso(d) });
@@ -417,6 +425,8 @@ export async function listUsers(d: Deps, f: z.infer<typeof adminUserQuery>) {
   if (f.teamId) where.push(['teamId', '==', f.teamId === 'none' ? null : f.teamId]);
   if (f.status) where.push(['status', '==', f.status]);
   let users = await d.store.query<User>({ collection: 'users', where });
+  // Deleted users live in the archive (blacklist), not in the users list.
+  users = users.filter((u) => u.status !== 'blacklisted');
   if (f.q) {
     const q = f.q.trim().toLowerCase();
     const phone = normalizePhone(q);
@@ -463,6 +473,11 @@ export async function adminUpdateUser(
 ) {
   const target = await d.store.get<User>(`users/${userId}`);
   if (!target) throw new ApiError('NOT_FOUND', 'کاربر پیدا نشد.');
+  if (target.status === 'blacklisted')
+    throw new ApiError(
+      'CONFLICT',
+      'این کاربر در آرشیو (لیست سیاه) است. از صفحه آرشیو بازگردانی کنید.',
+    );
   const selfEdit = actor.id === userId;
   if (selfEdit && (patch.role !== undefined || patch.status !== undefined)) {
     throw new ApiError('FORBIDDEN', 'نمی‌توانید نقش یا وضعیت حساب خودتان را تغییر دهید.');

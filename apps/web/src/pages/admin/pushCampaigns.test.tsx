@@ -100,7 +100,8 @@ describe('admin: کمپین‌های Push — داشبورد و تاریخچه',
     });
     renderApp('/admin/push-campaigns');
     expect(
-      await screen.findByRole('heading', { name: 'کمپین‌های اعلان (Push)' }),
+      // First test of the file: the lazy admin chunk is compiled cold, which can exceed the 1 s default.
+      await screen.findByRole('heading', { name: 'کمپین‌های اعلان (Push)' }, { timeout: 8000 }),
     ).toBeInTheDocument();
     const rows = await screen.findAllByTestId('campaign-row');
     expect(rows).toHaveLength(2);

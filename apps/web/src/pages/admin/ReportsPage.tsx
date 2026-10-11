@@ -66,7 +66,6 @@ function Completion() {
     for (const k of [
       'brand',
       'product',
-      'user',
       'team',
       'status',
       'from',
@@ -89,6 +88,18 @@ function Completion() {
       api.get<Data>(`/admin/reports/completion${qs ? `?${qs}` : ''}`, signal),
   });
   const teams = useTeams();
+  const qc = useQueryClient();
+  const toast = useToast();
+  // «حذف گزارش»: hide the rows from the reports; they wait in آرشیو → گزارش‌ها.
+  const archive = useMutation({
+    mutationFn: (items: Array<{ userId: string; packageId: string }>) =>
+      api.post('/admin/archive/reports', { items }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin'] });
+      toast.show({ type: 'success', message: 'گزارش به آرشیو منتقل شد.' });
+    },
+    onError: (e) => toast.show({ type: 'error', message: errMsg(e) }),
+  });
   return (
     <QueryState query={q} loading={<TableSkeleton rows={8} />}>
       {(d) => (
@@ -96,6 +107,7 @@ function Completion() {
           rows={d.rows}
           memberLink={(id) => `/admin/users/${id}`}
           teams={teams.data?.map((t) => ({ id: t.id, name: t.name }))}
+          onArchive={(items) => archive.mutateAsync(items)}
         />
       )}
     </QueryState>

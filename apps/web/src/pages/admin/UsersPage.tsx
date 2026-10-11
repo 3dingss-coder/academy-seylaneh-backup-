@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Pencil, Search } from 'lucide-react';
+import { Archive, KeyRound, Pencil, Search, Trash2 } from 'lucide-react';
 import {
   Button,
   EmptyState,
@@ -20,13 +20,23 @@ import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { MemberTimeline } from '@/components/reports/MemberTimeline';
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { groupByPerson, type PersonGroup } from '@/lib/people';
 import { toPersianDigits } from '@/lib/digits';
 import { errMsg } from '@/lib/errors';
 import { ROLE_LABEL, faNumber, faRelative } from '@/lib/format';
 import type { Me, Role, Timeline } from '@/lib/types';
 import { useBrands, useTeams, useUsers } from './adminQueries';
 
-/** A6 — کاربران: role, team, status, brand access, password reset. */
+/** The account an admin edits by default for a person: the one used most recently. */
+function primaryOf(g: PersonGroup<Me>): Me {
+  return (
+    [...g.rows].sort((a, b) =>
+      (b.lastActiveAt ?? b.createdAt).localeCompare(a.lastActiveAt ?? a.createdAt),
+    )[0] ?? g.first
+  );
+}
+
+/** A6 — کاربران: role, team, status, brand access, password reset, delete (→ archive). */
 export function UsersPage() {
   const users = useUsers();
   const teams = useTeams();
@@ -34,7 +44,11 @@ export function UsersPage() {
   const [role, setRole] = useState('');
   const [team, setTeam] = useState('');
   const [city, setCity] = useState('');
-  const [edit, setEdit] = useState<Me | null>(null);
+  const [edit, setEdit] = useState<{ accounts: Me[]; id: string } | null>(null);
+  const [del, setDel] = useState<PersonGroup<Me> | null>(null);
+  const editUser = edit
+    ? (edit.accounts.find((a) => a.id === edit.id) ?? edit.accounts[0])
+    : undefined;
   const teamName = useMemo(
     () => new Map((teams.data ?? []).map((t) => [t.id, t.name])),
     [teams.data],
@@ -96,64 +110,135 @@ export function UsersPage() {
               (!team || (team === 'none' ? !u.teamId : u.teamId === team)) &&
               (!city || u.city === city),
           );
-          return rows.length === 0 ? (
+          // One row per person: accounts that share a name are merged and their numbers are
+          // listed (small) under the name, so the number is what tells two people apart.
+          const people = groupByPerson(rows, (u) => ({
+            name: u.name,
+            phone: u.phone ?? u.email,
+          }));
+          const uniq = (l: Array<string | null | undefined>) => [
+            ...new Set(l.filter((x): x is string => !!x)),
+          ];
+          return people.length === 0 ? (
             <EmptyState title="کاربری پیدا نشد" />
           ) : (
             <DataTable
               caption="کاربران"
-              rows={rows}
-              rowKey={(u) => u.id}
+              rows={people}
+              rowKey={(g) => g.key}
               columns={[
                 {
                   key: 'n',
                   header: 'نام',
-                  cell: (u) => (
-                    <Link to={`/admin/users/${u.id}`} className="font-bold text-primary">
-                      {u.name}
-                    </Link>
+                  sortValue: (g) => g.name,
+                  cell: (g) => (
+                    <div>
+                      <Link
+                        to={`/admin/users/${primaryOf(g).id}`}
+                        className="font-bold text-primary"
+                      >
+                        {g.name}
+                      </Link>
+                      {g.phones.map((p) => (
+                        <span
+                          key={p}
+                          dir="ltr"
+                          className="block text-start text-[11px] leading-5 text-text-secondary"
+                        >
+                          {toPersianDigits(p)}
+                        </span>
+                      ))}
+                    </div>
                   ),
-                },
-                {
-                  key: 'p',
-                  header: 'موبایل/ایمیل',
-                  cell: (u) => <span dir="ltr">{toPersianDigits(u.phone ?? u.email ?? '')}</span>,
                 },
                 {
                   key: 'loc',
                   header: 'محل فعالیت',
-                  cell: (u) => (u.province ? `${u.province} • ${u.city ?? ''}` : '—'),
+                  cell: (g) => {
+                    const l = uniq(
+                      g.rows.map((u) => (u.province ? `${u.province} • ${u.city ?? ''}` : null)),
+                    );
+                    return l.length ? (
+                      <div className="flex flex-col">
+                        {l.map((x) => (
+                          <span key={x}>{x}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      '—'
+                    );
+                  },
                   hideOnMobile: true,
                 },
-                { key: 'r', header: 'نقش', cell: (u) => ROLE_LABEL[u.role] },
+                {
+                  key: 'r',
+                  header: 'نقش',
+                  cell: (g) => uniq(g.rows.map((u) => ROLE_LABEL[u.role])).join('، '),
+                },
                 {
                   key: 't',
                   header: 'تیم',
-                  cell: (u) => (u.teamId ? (teamName.get(u.teamId) ?? '—') : '—'),
+                  cell: (g) =>
+                    uniq(g.rows.map((u) => (u.teamId ? teamName.get(u.teamId) : null))).join(
+                      '، ',
+                    ) || '—',
                 },
-                { key: 's', header: 'وضعیت', cell: (u) => <StatusBadge status={u.status} /> },
+                {
+                  key: 's',
+                  header: 'وضعیت',
+                  cell: (g) => (
+                    <div className="flex flex-col items-start gap-1">
+                      {uniq(g.rows.map((u) => u.status)).map((st) => (
+                        <StatusBadge key={st} status={st as Me['status']} />
+                      ))}
+                    </div>
+                  ),
+                },
                 {
                   key: 'pt',
                   header: 'امتیاز',
-                  cell: (u) => faNumber(u.pointsBalance),
+                  sortValue: (g) => g.rows.reduce((n, u) => n + u.pointsBalance, 0),
+                  cell: (g) => faNumber(g.rows.reduce((n, u) => n + u.pointsBalance, 0)),
                   hideOnMobile: true,
                 },
                 {
                   key: 'a',
                   header: 'آخرین فعالیت',
-                  cell: (u) => (u.lastActiveAt ? faRelative(u.lastActiveAt) : 'هرگز'),
+                  sortValue: (g) =>
+                    Math.max(
+                      0,
+                      ...g.rows.map((u) => (u.lastActiveAt ? Date.parse(u.lastActiveAt) : 0)),
+                    ) || null,
+                  cell: (g) => {
+                    const last = g.rows
+                      .map((u) => u.lastActiveAt)
+                      .filter((x): x is string => !!x)
+                      .sort()
+                      .pop();
+                    return last ? faRelative(last) : 'هرگز';
+                  },
                   hideOnMobile: true,
                 },
                 {
                   key: 'e',
                   header: '',
-                  cell: (u) => (
-                    <Button
-                      variant="ghost"
-                      className="px-2"
-                      aria-label={`ویرایش ${u.name}`}
-                      icon={<Pencil className="size-4" />}
-                      onClick={() => setEdit(u)}
-                    />
+                  cell: (g) => (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        className="px-2"
+                        aria-label={`ویرایش ${g.name}`}
+                        icon={<Pencil className="size-4" />}
+                        onClick={() => setEdit({ accounts: g.rows, id: primaryOf(g).id })}
+                      />
+                      <Button
+                        variant="ghost"
+                        className="px-2 text-danger"
+                        aria-label={`حذف ${g.name}`}
+                        icon={<Trash2 className="size-4" />}
+                        onClick={() => setDel(g)}
+                      />
+                    </div>
                   ),
                 },
               ]}
@@ -161,12 +246,100 @@ export function UsersPage() {
           );
         }}
       </QueryState>
-      {edit && <UserDialog user={edit} onClose={() => setEdit(null)} />}
+      {editUser && edit && (
+        <UserDialog
+          key={editUser.id}
+          user={editUser}
+          accounts={edit.accounts}
+          onSwitch={(id) => setEdit({ ...edit, id })}
+          onClose={() => setEdit(null)}
+        />
+      )}
+      {del && <DeleteUsersDialog group={del} onClose={() => setDel(null)} />}
     </div>
   );
 }
 
-function UserDialog({ user, onClose }: { user: Me; onClose: () => void }) {
+/** «حذف کاربر»: the chosen numbers are blocked and moved to the archive blacklist. */
+function DeleteUsersDialog({ group, onClose }: { group: PersonGroup<Me>; onClose: () => void }) {
+  const { user: me } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const deletable = group.rows.filter((u) => u.id !== me?.id);
+  const [picked, setPicked] = useState<string[]>(deletable.map((u) => u.id));
+  const run = useMutation({
+    mutationFn: async () => {
+      for (const id of picked) await api.del(`/admin/users/${id}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin'] });
+      toast.show({
+        type: 'success',
+        message: 'به آرشیو (لیست سیاه) منتقل شد. این شماره دیگر نمی‌تواند وارد اپ شود.',
+      });
+      onClose();
+    },
+    onError: (e) => {
+      void qc.invalidateQueries({ queryKey: ['admin'] });
+      toast.show({ type: 'error', message: errMsg(e) });
+    },
+  });
+  return (
+    <ConfirmDialog
+      open
+      danger
+      title={`حذف ${group.name}؟`}
+      confirmText="حذف و انتقال به لیست سیاه"
+      loading={run.isPending}
+      onClose={onClose}
+      onConfirm={() => picked.length && run.mutate()}
+    >
+      <p>
+        شماره‌ی انتخاب‌شده مسدود می‌شود و کاربر دیگر نمی‌تواند وارد اپ شود یا دوباره ثبت‌نام کند.
+        اطلاعاتش در{' '}
+        <b className="inline-flex items-center gap-1">
+          <Archive className="size-3.5" aria-hidden /> آرشیو
+        </b>{' '}
+        می‌ماند و فقط با «حذف از آرشیو» برای همیشه پاک می‌شود.
+      </p>
+      <ul className="mt-3 flex flex-col gap-2">
+        {group.rows.map((u) => {
+          const self = u.id === me?.id;
+          return (
+            <li key={u.id}>
+              <label className="flex min-h-11 items-center gap-2">
+                <input
+                  type="checkbox"
+                  disabled={self}
+                  checked={picked.includes(u.id)}
+                  onChange={(e) =>
+                    setPicked((l) =>
+                      e.target.checked ? [...l, u.id] : l.filter((x) => x !== u.id),
+                    )
+                  }
+                />
+                <span dir="ltr">{toPersianDigits(u.phone ?? u.email ?? u.id)}</span>
+                {self && <span className="text-xs">(حساب خودتان؛ قابل حذف نیست)</span>}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </ConfirmDialog>
+  );
+}
+
+function UserDialog({
+  user,
+  accounts,
+  onSwitch,
+  onClose,
+}: {
+  user: Me;
+  accounts: Me[];
+  onSwitch: (id: string) => void;
+  onClose: () => void;
+}) {
   const { user: me } = useAuth();
   const teams = useTeams();
   const brands = useBrands();
@@ -253,6 +426,19 @@ function UserDialog({ user, onClose }: { user: Me; onClose: () => void }) {
       }
     >
       <div className="flex flex-col gap-3">
+        {accounts.length > 1 && (
+          <Select
+            label="شماره‌ی این کاربر"
+            value={user.id}
+            onChange={(e) => onSwitch(e.target.value)}
+          >
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {toPersianDigits(a.phone ?? a.email ?? a.id)}
+              </option>
+            ))}
+          </Select>
+        )}
         {tempPwd && (
           <div
             role="status"

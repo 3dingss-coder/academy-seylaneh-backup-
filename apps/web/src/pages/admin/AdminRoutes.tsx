@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import {
+  Archive,
   BarChart3,
   Bell,
   Bot,
@@ -37,6 +38,7 @@ import { QuizBuilderPage } from './QuizBuilderPage';
 import { ReportsPage } from './ReportsPage';
 import { TeamsPage } from './TeamsPage';
 import { AdminUserDetail, UsersPage } from './UsersPage';
+import { ArchivePage } from './ArchivePage';
 
 const NAV = [
   { to: '/admin', label: 'داشبورد', icon: LayoutDashboard },
@@ -52,6 +54,7 @@ const NAV = [
   { to: '/admin/users', label: 'کاربران', icon: Users },
   { to: '/admin/teams', label: 'تیم‌ها', icon: UsersRound },
   { to: '/admin/reports', label: 'گزارش‌ها', icon: BarChart3 },
+  { to: '/admin/archive', label: 'آرشیو', icon: Archive },
   { to: '/admin/notifications', label: 'اعلان‌ها', icon: Bell },
   { to: '/admin/push-campaigns', label: 'کمپین‌های Push', icon: Megaphone },
   { to: '/admin/policies', label: 'سیاست‌ها', icon: Settings2 },
@@ -75,6 +78,7 @@ export default function AdminRoutes() {
         <Route path="users/:id" element={<AdminUserDetail />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="archive" element={<ArchivePage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="push-campaigns" element={<PushCampaignsPage />} />
         {/* The automation engine lives inside the same section: one URL namespace, one mental model

@@ -22,7 +22,13 @@ export default defineConfig(({ mode }) => {
       // package.json `browserslist`): syntax down-levelled + core-js polyfills for modern chunks,
       // and a SystemJS legacy bundle for browsers without ES-module support. Many field devices
       // (older Android phones) cannot run a 2023+-only build and see a blank/unstyled page.
-      legacy({ modernPolyfills: true, renderLegacyChunks: true }),
+      legacy({
+        // Browsers older than `modernTargets` get the SystemJS legacy bundle; current browsers load
+        // the small modern build with only the few polyfills they still lack (was 130 KB for all).
+        modernTargets: ['chrome >= 90', 'edge >= 90', 'firefox >= 90', 'safari >= 15'],
+        modernPolyfills: true,
+        renderLegacyChunks: true,
+      }),
       legacyCss(),
       VitePWA({
         registerType: 'autoUpdate',

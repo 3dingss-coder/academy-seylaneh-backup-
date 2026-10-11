@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Bell, BookOpen, Bot, Home, Mail, Trophy, UserRound, WifiOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -106,7 +106,9 @@ export function MarketerLayout() {
       )}
       <main className="mx-auto max-w-[960px] px-4 py-4">
         <PageTransition>
-          <Outlet />
+          <Suspense fallback={<div className="min-h-[40vh]" aria-busy />}>
+            <Outlet />
+          </Suspense>
         </PageTransition>
       </main>
       <BottomNav

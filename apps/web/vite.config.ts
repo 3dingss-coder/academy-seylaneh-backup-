@@ -55,7 +55,23 @@ export default defineConfig(({ mode }) => {
         // Browsers older than `modernTargets` get the SystemJS legacy bundle; current browsers load
         // the small modern build with only the few polyfills they still lack (was 130 KB for all).
         modernTargets: ['chrome >= 90', 'edge >= 90', 'firefox >= 90', 'safari >= 15'],
-        modernPolyfills: true,
+        // `true` pulled in every core-js module missing from Chrome 90 / Safari 15, including 2025
+        // proposals (Iterator helpers, Set methods, JSON.parse source...) the app never calls; that
+        // chunk cost ~1 s of main-thread time on a throttled phone. Only the small, widely used
+        // gaps are listed; add a module here if code starts using a newer built-in.
+        modernPolyfills: [
+          'es.array.at',
+          'es.array.find-last',
+          'es.array.find-last-index',
+          'es.object.has-own',
+          'es.string.at-alternative',
+          'es.error.cause',
+          'es.array.to-reversed',
+          'es.array.to-sorted',
+          'es.array.to-spliced',
+          'es.array.with',
+          'web.structured-clone',
+        ],
         renderLegacyChunks: true,
       }),
       legacyCss(),

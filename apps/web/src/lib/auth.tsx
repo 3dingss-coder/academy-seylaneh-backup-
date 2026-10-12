@@ -77,7 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session.refresh) return;
     let cancelled = false;
     (async () => {
-      const ok = await refreshSession();
+      // A still-valid stored access token needs no refresh round trip first (it is renewed lazily
+      // on the first 401); otherwise refresh before asking for /me.
+      const ok = session.access ? true : await refreshSession();
       if (!ok) {
         // Offline start with a stored session: stay signed in with the last-known profile;
         // pages render their last-known data (F9). No cached profile → back to login.

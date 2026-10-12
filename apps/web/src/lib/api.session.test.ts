@@ -66,3 +66,23 @@ describe('session survives transient failures', () => {
     ).rejects.toMatchObject({ code: 'INTERNAL', status: 503, message: expect.stringContaining('شلوغ') });
   });
 });
+
+describe('stored access token', () => {
+  it('lets a returning visitor call the API without a refresh round trip', async () => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    const first = await load();
+    first.session.setAccess('stored-access-token', 3600);
+    // New page load: module state is gone, localStorage remains.
+    vi.resetModules();
+    const { request } = await import('./api');
+    const calls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      calls.push(String(url));
+      return json(200, { data: { ok: true } });
+    });
+    await request('/me');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('/v1/me');
+  });
+});

@@ -639,7 +639,6 @@ describe('engine: one send per window, with reasons', () => {
     expect(ctx.deps.push.sent).toHaveLength(1);
   });
 
-
   it('records an immediate FCM failure as failed and does not consume the rule counter', async () => {
     await buildFixture(ctx);
     await device();

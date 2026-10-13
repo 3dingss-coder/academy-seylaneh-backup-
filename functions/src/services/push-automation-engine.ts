@@ -474,7 +474,13 @@ export async function sendAutomation(
     ...(ctx.test ? { isTest: true } : {}),
     ...(deliveryTokens ? { tokenIndex: deliveryTokens } : {}),
   };
-  const delivery = await notifyUsersDetailed(d, [user.id], 'automation', { title, body }, opts);
+  const delivery = await notifyUsersDetailed(
+    d,
+    [user.id],
+    'automation',
+    { title, body },
+    opts,
+  );
   if (delivery.created === 0) return await skip('cooldown', 'notification_log');
 
   // Creating the in-app row is not evidence of FCM success. A provider failure is terminal for this
@@ -542,10 +548,7 @@ function tokenIndexForAutomation(
   return new Map([[user.id, usable]]);
 }
 
-function hasDeviceFor(
-  a: PushAutomation,
-  tokens?: Map<string, DeviceToken[]>,
-): boolean | undefined {
+function hasDeviceFor(a: PushAutomation, tokens?: Map<string, DeviceToken[]>): boolean | undefined {
   if (!a.delivery.push) return true; // in-app-only rules do not require an FCM destination
   if (!tokens) return undefined; // unknown only for preview/test paths
   for (const list of tokens.values()) if (list.length > 0) return true;

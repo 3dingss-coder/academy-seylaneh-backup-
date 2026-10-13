@@ -224,7 +224,7 @@ describe('automation model: health card', () => {
     const [scheduler, provider, volume, failures] = items;
     expect(scheduler?.tone).toBe('success');
     expect(provider?.value).toBe('fcm-http');
-    expect(volume?.detail).toContain('حداکثر ۲ پوش در روز');
+    expect(volume?.detail).toContain('در اجرا اعمال نمی‌شوند');
     expect(failures?.value).toBe('۳٪');
   });
 

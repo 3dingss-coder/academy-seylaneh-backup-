@@ -58,6 +58,20 @@ describe('push health', () => {
     expect(p.configured).toBe(false);
   });
 
+  it('records immediate provider failures in push health without exposing a secret', async () => {
+    const m = await ctx.user('marketer');
+    await ctx.api(m.token).post('/v1/me/devices', {
+      token: 'fcm-token-immediate-failure',
+      platform: 'android',
+    });
+    (ctx.deps as { push: PushSender }).push = new UnconfiguredPushSender();
+    await notifyUsers(ctx.deps, [m.id], 'new_assignment', { title: 'آموزش جدید', body: 'x' });
+    const health = await systemHealth(ctx.deps);
+    expect(health.push.today).toEqual({ sent: 0, failed: 1, invalid: 0 });
+    expect(health.push.lastError).toContain('ارسال فوری Push');
+    expect(JSON.stringify(health)).not.toContain('fcm-token-immediate-failure');
+  });
+
   it('aggregates the deferred flush into ONE day counter (sent + failed)', async () => {
     const m = await ctx.user('marketer');
     await ctx.api(m.token).post('/v1/me/devices', { token: 'fcm-token-000001', platform: 'web' });

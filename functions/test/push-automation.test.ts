@@ -639,6 +639,27 @@ describe('engine: one send per window, with reasons', () => {
     expect(ctx.deps.push.sent).toHaveLength(1);
   });
 
+
+  it('records an immediate FCM failure as failed and does not consume the rule counter', async () => {
+    await buildFixture(ctx);
+    await device();
+    await inactiveFor(2);
+    await enable('inactive_1d');
+    ctx.deps.push.send = async () => {
+      throw new Error('simulated FCM outage');
+    };
+
+    const r = await runPushAutomations(ctx.deps, { force: true });
+    expect(r.sweeps[0]?.sent).toBe(0);
+    expect(r.sweeps[0]?.failed).toBe(1);
+    expect(r.skippedTotals.error).toBe(1);
+    const notes = await notifications(marketer.id);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.pushStatus).toBe('failed');
+    expect((await readCounter(ctx.deps, marketer.id)).daySent).toBe(0);
+    expect((await traceUser(ctx.deps, marketer.id)).decisions[0]?.reason).toBe('error');
+  });
+
   it('a dry-run writes nothing at all', async () => {
     await buildFixture(ctx);
     await device();

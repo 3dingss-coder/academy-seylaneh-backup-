@@ -849,21 +849,9 @@ function CapsDialog({
           اجرای اتوماسیون نیستند. محدودیت ارسال را روی خودِ هر قانون تعریف کنید.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {field(
-            'maxPerUserPerDay',
-            'مقدار قدیمی سقف روزانه',
-            'در اجرای Rule اعمال نمی‌شود',
-          )}
-          {field(
-            'maxPerUserPerWeek',
-            'مقدار قدیمی سقف هفتگی',
-            'در اجرای Rule اعمال نمی‌شود',
-          )}
-          {field(
-            'gapMinutes',
-            'مقدار قدیمی فاصله سراسری (دقیقه)',
-            'در اجرای Rule اعمال نمی‌شود',
-          )}
+          {field('maxPerUserPerDay', 'مقدار قدیمی سقف روزانه', 'در اجرای Rule اعمال نمی‌شود')}
+          {field('maxPerUserPerWeek', 'مقدار قدیمی سقف هفتگی', 'در اجرای Rule اعمال نمی‌شود')}
+          {field('gapMinutes', 'مقدار قدیمی فاصله سراسری (دقیقه)', 'در اجرای Rule اعمال نمی‌شود')}
           {field(
             'defaultHourTehran',
             'ساعت پیش‌فرض پنجره (تهران)',

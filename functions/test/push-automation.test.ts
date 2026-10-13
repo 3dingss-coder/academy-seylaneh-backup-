@@ -558,11 +558,11 @@ describe('engine: one send per window, with reasons', () => {
     await buildFixture(ctx);
     await inactiveFor(2);
     await ctx.api(marketer.token).post('/v1/me/devices', {
-      token: 'web-token-1',
+      token: 'web-token-000001',
       platform: 'web',
     });
     await ctx.api(marketer.token).post('/v1/me/devices', {
-      token: 'android-token-1',
+      token: 'android-token-000001',
       platform: 'android',
     });
     const raw = (await store().get<PushAutomation>(
@@ -575,7 +575,7 @@ describe('engine: one send per window, with reasons', () => {
     const r = await runPushAutomations(ctx.deps, { force: true });
     expect(r.sweeps[0]?.sent).toBe(1);
     expect(ctx.deps.push.sent).toHaveLength(1);
-    expect(ctx.deps.push.sent[0]?.tokens).toEqual(['android-token-1']);
+    expect(ctx.deps.push.sent[0]?.tokens).toEqual(['android-token-000001']);
   });
 
   it('does not count an FCM failure as automation_sent or consume cadence quota', async () => {

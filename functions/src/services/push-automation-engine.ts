@@ -474,13 +474,7 @@ export async function sendAutomation(
     ...(ctx.test ? { isTest: true } : {}),
     ...(deliveryTokens ? { tokenIndex: deliveryTokens } : {}),
   };
-  const delivery = await notifyUsersDetailed(
-    d,
-    [user.id],
-    'automation',
-    { title, body },
-    opts,
-  );
+  const delivery = await notifyUsersDetailed(d, [user.id], 'automation', { title, body }, opts);
   if (delivery.created === 0) return await skip('cooldown', 'notification_log');
 
   // Creating the in-app row is not evidence of FCM success. A provider failure is terminal for this
@@ -513,8 +507,7 @@ export async function sendAutomation(
     await writeCounter(d, user.id, next);
     if (delivery.push.deferred > 0)
       await track(d, 'automation_deferred', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
-    else
-      await track(d, 'automation_sent', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
+    else await track(d, 'automation_sent', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
   }
   const pushStatus: 'sent' | 'deferred' | 'not_requested' = a.delivery.push
     ? delivery.push.deferred > 0

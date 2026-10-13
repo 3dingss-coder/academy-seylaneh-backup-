@@ -366,8 +366,7 @@ export function validateCaps(draft: CapDraft): Partial<Record<keyof CapDraft, st
   };
   const day = int(draft.maxPerUserPerDay);
   if (day === null || day < 0 || day > 20)
-    errors.maxPerUserPerDay =
-      'مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.';
+    errors.maxPerUserPerDay = 'مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.';
   const week = int(draft.maxPerUserPerWeek);
   if (week === null || week < 0 || week > 70)
     errors.maxPerUserPerWeek = 'مقدار قدیمی هفتگی باید عددی بین ۰ تا ۷۰ باشد.';

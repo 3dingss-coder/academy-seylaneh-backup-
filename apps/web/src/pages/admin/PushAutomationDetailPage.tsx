@@ -1074,7 +1074,7 @@ function Wizard({
                 value={draft.maxPerUserPerDay}
                 onChange={(e) => set('maxPerUserPerDay')(e.target.value)}
                 error={err('maxPerUserPerDay')}
-                hint="خالی = سقف سراسریِ تنظیمات کلی"
+                hint="خالی = بدون سقف روزانه برای همین قانون"
                 inputMode="numeric"
               />
               <Input

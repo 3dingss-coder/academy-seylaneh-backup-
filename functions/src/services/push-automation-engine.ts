@@ -16,7 +16,7 @@ import type { NextItem, PackageView } from './learning-state';
 import { computeNextItem, loadLearningForUsers, loadShared } from './learning-state';
 import { annotateActivity, computeSignals } from './behavior';
 import { deadlineLabel } from './assignments';
-import { notifyUsers, render, type NotifyOptions } from './notify';
+import { notifyUsersDetailed, render, type NotifyOptions } from './notify';
 import { getPolicy, track, type Deps } from './context';
 import { systemHealth } from './system-health';
 import { isSafeAutomationPath } from './push-automation-governor';
@@ -95,7 +95,8 @@ export interface SweepContext {
 }
 
 export type DeliveryOutcome =
-  { sent: true; windowKey: string } | { sent: false; reason: SkipReason };
+  | { sent: true; windowKey: string; pushStatus: 'sent' | 'deferred' | 'not_requested' }
+  | { sent: false; reason: SkipReason };
 
 const num = (v: unknown, fallback = 0): number =>
   typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : fallback;
@@ -394,7 +395,7 @@ export async function sendAutomation(
   if (!ctx.inFlow && needsFlowEngine(a)) {
     const flow = await runFlow(d, a, user, vars, { ...ctx, inFlow: true });
     if (flow.error) return await skip('error', flow.error);
-    if (flow.sent > 0) return { sent: true, windowKey: 'flow' };
+    if (flow.sent > 0) return { sent: true, windowKey: 'flow', pushStatus: 'sent' };
     const bad = flow.marks.find((m) => m.reason) ?? null;
     return await skip(bad?.reason ?? 'cancelled', bad?.detail ?? flow.stopped ?? undefined);
   }
@@ -420,7 +421,18 @@ export async function sendAutomation(
 
   const counter: UserCounter = ctx.counters?.get(user.id) ?? (await readCounter(d, user.id));
   const prefs = ctx.prefs?.get(user.id) ?? (await readPrefs(d, user.id)) ?? null;
-  const tokens = ctx.tokens;
+
+  // Event-triggered sends do not arrive with the sweep's token index. Resolve once here so the
+  // no-device gate runs BEFORE the idempotency claim and the provider does not repeat the same query.
+  let tokens = ctx.tokens;
+  if (a.delivery.push && !tokens && !ctx.dry && !ctx.test) {
+    const rows = await d.store.query<DeviceToken>({
+      collection: 'device_tokens',
+      where: [['userId', '==', user.id]],
+    });
+    tokens = new Map([[user.id, rows]]);
+  }
+  const deliveryTokens = tokenIndexForAutomation(a, user, tokens);
 
   const decision: GateResult =
     ctx.test || ctx.dry
@@ -432,12 +444,12 @@ export async function sendAutomation(
           counter,
           settings,
           missingVariables: [],
-          hasDevice: hasDeviceFor(a, user, tokens),
+          hasDevice: hasDeviceFor(a, user, deliveryTokens),
           ignoreGap: a.delivery.priority === 'urgent',
           keyTag: ctx.keyTag ?? null,
         });
   if (!decision.ok) return await skip(decision.reason, decision.detail);
-  if (ctx.dry) return { sent: true, windowKey: 'preview' };
+  if (ctx.dry) return { sent: true, windowKey: 'preview', pushStatus: 'not_requested' };
 
   const opts: NotifyOptions = {
     actionRef,
@@ -461,10 +473,29 @@ export async function sendAutomation(
     automationKey: a.key,
     category: a.category,
     ...(ctx.test ? { isTest: true } : {}),
-    ...(tokens ? { tokenIndex: tokens } : {}),
+    ...(deliveryTokens ? { tokenIndex: deliveryTokens } : {}),
   };
-  const created = await notifyUsers(d, [user.id], 'automation', { title, body }, opts);
-  if (created === 0) return await skip('cooldown', 'notification_log');
+  const delivery = await notifyUsersDetailed(d, [user.id], 'automation', { title, body }, opts);
+  if (delivery.created === 0) return await skip('cooldown', 'notification_log');
+
+  // Creating the in-app row is not evidence of FCM success. A provider failure is terminal for this
+  // idempotency window (the claim has already been taken deliberately), but it must never consume
+  // cadence quota or be recorded as automation_sent.
+  if (
+    a.delivery.push &&
+    delivery.push.sent === 0 &&
+    delivery.push.deferred === 0 &&
+    delivery.push.failed > 0
+  )
+    return await skip('error', 'push_provider_failed');
+  // A token can disappear between the pre-claim device check and delivery. Record that race honestly.
+  if (
+    a.delivery.push &&
+    delivery.push.sent === 0 &&
+    delivery.push.deferred === 0 &&
+    delivery.push.skipped > 0
+  )
+    return await skip('noDevice', 'push_provider_skipped');
 
   if (!ctx.test) {
     const now = d.clock().toISOString();
@@ -475,17 +506,41 @@ export async function sendAutomation(
     // policy — or the inherited cap — could not be enforced across the windows of a day.
     if (ctx.counters) ctx.counters.set(user.id, next);
     await writeCounter(d, user.id, next);
-    await track(d, 'automation_sent', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
+    if (delivery.push.deferred > 0)
+      await track(d, 'automation_deferred', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
+    else
+      await track(d, 'automation_sent', user.id, { key: a.key, kind: ctx.kind ?? 'sweep' });
   }
+  const pushStatus: 'sent' | 'deferred' | 'not_requested' = a.delivery.push
+    ? delivery.push.deferred > 0
+      ? 'deferred'
+      : 'sent'
+    : 'not_requested';
   await logDecision(d, user.id, {
     at: d.clock().toISOString(),
     key: a.key,
     reason: 'sent',
-    detail: [ctx.test ? 'آزمایشی' : decision.windowKey, ctx.keyTag ? `گام «${ctx.keyTag}»` : null]
+    detail: [
+      ctx.test ? 'آزمایشی' : decision.windowKey,
+      ctx.keyTag ? `گام «${ctx.keyTag}»` : null,
+      pushStatus === 'deferred' ? 'Push موکول شد' : null,
+    ]
       .filter(Boolean)
       .join(' · '),
   });
-  return { sent: true, windowKey: decision.windowKey };
+  return { sent: true, windowKey: decision.windowKey, pushStatus };
+}
+
+function tokenIndexForAutomation(
+  a: PushAutomation,
+  user: Doc<User>,
+  tokens?: Map<string, DeviceToken[]>,
+): Map<string, DeviceToken[]> | undefined {
+  if (!tokens) return undefined;
+  const list = tokens.get(user.id) ?? [];
+  const usable =
+    a.audience.channel === 'any' ? list : list.filter((t) => t.platform === a.audience.channel);
+  return new Map([[user.id, usable]]);
 }
 
 function hasDeviceFor(
@@ -493,11 +548,9 @@ function hasDeviceFor(
   user: Doc<User>,
   tokens?: Map<string, DeviceToken[]>,
 ): boolean | undefined {
-  if (!tokens) return undefined; // unknown → notifyUsers/`pushStatus` will report 'skipped'
-  const list = tokens.get(user.id) ?? [];
-  const usable =
-    a.audience.channel === 'any' ? list : list.filter((t) => t.platform === a.audience.channel);
-  return usable.length > 0;
+  if (!a.delivery.push) return true; // in-app-only rules do not require an FCM destination
+  if (!tokens) return undefined; // unknown only for preview/test paths
+  return (tokens.get(user.id) ?? []).length > 0;
 }
 
 async function noteSkip(

@@ -540,11 +540,8 @@ describe('engine: one send per window, with reasons', () => {
     await inactiveFor(2);
     await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
       delivery: {
-        ...(
-          (await store().get<PushAutomation>(
-            'push_automations/inactive_1d',
-          )) as PushAutomation
-        ).delivery,
+        ...((await store().get<PushAutomation>('push_automations/inactive_1d')) as PushAutomation)
+          .delivery,
         push: false,
       },
     });

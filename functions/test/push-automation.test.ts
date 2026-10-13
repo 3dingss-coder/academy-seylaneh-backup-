@@ -539,7 +539,12 @@ describe('engine: one send per window, with reasons', () => {
     await buildFixture(ctx);
     await inactiveFor(2);
     await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
-      delivery: { ...((await store().get<PushAutomation>('push_automations/inactive_1d')) as PushAutomation).delivery, push: false },
+      delivery: {
+        ...((await store().get<PushAutomation>(
+          'push_automations/inactive_1d',
+        )) as PushAutomation).delivery,
+        push: false,
+      },
     });
     await enable('inactive_1d');
     const r = await runPushAutomations(ctx.deps, { force: true });
@@ -560,7 +565,9 @@ describe('engine: one send per window, with reasons', () => {
       token: 'android-token-1',
       platform: 'android',
     });
-    const raw = (await store().get<PushAutomation>('push_automations/inactive_1d')) as PushAutomation;
+    const raw = (await store().get<PushAutomation>(
+      'push_automations/inactive_1d',
+    )) as PushAutomation;
     await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
       audience: { ...raw.audience, channel: 'android' },
     });

@@ -737,8 +737,6 @@ export interface GateInput {
   hasDevice?: boolean;
   /** Set when a higher-priority automation already claimed this window. */
   lostToPriority?: boolean;
-  /** Skip the global gap (urgent only, per spec). */
-  ignoreGap?: boolean;
   /** Dry-run must not claim, count or log. */
   dry?: boolean;
   /**
@@ -794,9 +792,10 @@ export function policyDecision(
 }
 
 /**
- * The whole rulebook in one function: kill-switch → enabled → audience → status → prefs → rule cadence →
- * cooldown → idempotency claim. Legacy global day/week/gap settings are intentionally not gates. Order matters: everything cheap and side-effect-free is checked
- * before the claim, because a claim can never be taken back (a retried send is worse than a skip).
+ * The whole rulebook in one function: kill-switch → enabled → audience → status → prefs → rule
+ * cadence → cooldown → idempotency claim. Legacy global day/week/gap settings are intentionally not
+ * gates. Order matters: everything cheap and side-effect-free is checked before the claim, because a
+ * claim can never be taken back (a retried send is worse than a skip).
  */
 export async function gate(d: Deps, g: GateInput): Promise<GateResult> {
   const { automation: a, user, prefs, counter, settings } = g;

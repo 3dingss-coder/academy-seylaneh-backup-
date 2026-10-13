@@ -1006,8 +1006,8 @@ export interface FlowOutcome {
 /**
  * The rule as one `notify` step sees it: the step's own message and channel, `steps` cleared so the send
  * below is a send and not a re-entry, and — only when the rule owns its cadence — the step's slice of the
- * policy merged in with the step as its counter bucket. A rule on inherited caps keeps inherited caps for
- * every step: per-step spacing is a choice a policy makes, not a way to widen a platform limit.
+ * policy merged in with the step as its counter bucket. A rule without a repeat policy has no implicit
+ * platform cadence; per-step spacing exists only when the rule explicitly owns a repeat policy.
  */
 function projectForStep(
   a: PushAutomation,

@@ -395,16 +395,16 @@ describe('migration leaves v1 rows alone', () => {
     expect(withDefaults(up)).toEqual(up);
   });
 
-  it('reports the conditions a v1 trigger kind never evaluated, and inherits the legacy caps', async () => {
+  it('reports dead v1 conditions but does not inherit platform-wide cadence caps', async () => {
     const raw = (await store().get<PushAutomation>(
       'push_automations/inactive_1d',
     )) as PushAutomation;
     expect(deadConditions(raw)).toEqual([]); // `inactivity` carries no flat conditions
-    const settings = { maxPerUserPerDay: 2, maxPerUserPerWeek: 10, minGapMs: 4 * 3_600_000 };
-    expect(repeatPolicyOf(raw, settings)).toMatchObject({
-      perDay: 2,
-      perWeek: 10,
-      minIntervalMs: 4 * 3_600_000,
+    expect(repeatPolicyOf(raw)).toMatchObject({
+      perDay: 0,
+      perWeek: 0,
+      perMonth: 0,
+      minIntervalMs: 0,
     });
     const withWhen = withDefaults({
       ...raw,
@@ -419,7 +419,7 @@ describe('migration leaves v1 rows alone', () => {
   });
 });
 
-describe('the rule’s own repeat policy replaces the imposed caps', () => {
+describe('the rule’s own repeat policy governs cadence', () => {
   const minutes = (n: number) => n * 60_000;
   const policy = (over: Partial<RepeatPolicy> = {}): RepeatPolicy => ({
     minIntervalMs: 60_000,

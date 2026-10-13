@@ -445,7 +445,6 @@ export async function sendAutomation(
           settings,
           missingVariables: [],
           hasDevice: hasDeviceFor(a, deliveryTokens),
-          ignoreGap: a.delivery.priority === 'urgent',
           keyTag: ctx.keyTag ?? null,
         });
   if (!decision.ok) return await skip(decision.reason, decision.detail);
@@ -503,7 +502,7 @@ export async function sendAutomation(
     // Both, on purpose. The in-memory map keeps *this* run consistent (a second rule in the same sweep
     // must see the send the first one just did); the write is what makes the *next* run see it. Without
     // the write a scheduled rule's day counters only ever bound a single run, so a per-rule repeat
-    // policy — or the inherited cap — could not be enforced across the windows of a day.
+    // policy or rule-owned cap could not be enforced across the windows of a day.
     if (ctx.counters) ctx.counters.set(user.id, next);
     await writeCounter(d, user.id, next);
     if (delivery.push.deferred > 0)
@@ -549,7 +548,8 @@ function hasDeviceFor(
 ): boolean | undefined {
   if (!a.delivery.push) return true; // in-app-only rules do not require an FCM destination
   if (!tokens) return undefined; // unknown only for preview/test paths
-  return (tokens.get(user.id) ?? []).length > 0;
+  for (const list of tokens.values()) if (list.length > 0) return true;
+  return false;
 }
 
 async function noteSkip(

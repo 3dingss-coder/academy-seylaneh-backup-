@@ -921,7 +921,7 @@ export function deliverySummary(d: WizardDraft, meta: CatalogMeta | null): Summa
     },
     {
       label: 'سقف روزانه این قانون',
-      value: cap === null ? 'سقف سراسری' : `${toFa(cap)} پوش`,
+      value: cap === null ? 'بدون سقف روزانه' : `${toFa(cap)} پوش`,
     },
     { label: 'یک‌بار در هر بازه', value: d.sendOnce ? 'بله' : 'نه' },
     {

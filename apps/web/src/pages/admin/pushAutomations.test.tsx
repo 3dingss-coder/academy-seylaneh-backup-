@@ -333,8 +333,8 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ادامه همه اتوماسیون‌ها' })).toBeInTheDocument();
     expect(screen.getByText('توقف کلی روشن است: هیچ اتوماسیونی اجرا نمی‌شود.')).toBeInTheDocument();
-    // the caps stay visible while paused, because they are the reason to un-pause quickly
-    expect(screen.getByText(/حداکثر ۲ پوش در روز برای هر نفر/)).toBeInTheDocument();
+    // Compatibility values stay visible while paused, but are clearly labelled as non-runtime.
+    expect(screen.getByText(/مقادیر قدیمی \(در اجرا اعمال نمی‌شوند\)/)).toBeInTheDocument();
   });
 
   it('«چند نفر مشمول؟» runs a dry-run and reports it without pretending to have sent', async () => {
@@ -427,11 +427,11 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
       expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(false);
       fireEvent.change(day, { target: { value: '1' } });
       fireEvent.change(screen.getByLabelText('مقدار قدیمی فاصله سراسری (دقیقه)'), {
-      target: { value: '90' },
+        target: { value: '90' },
       });
       fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
       await waitFor(() =>
-      expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(true),
+        expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(true),
       );
       expect(
         m.calls.find((c) => c.key === 'PUT /v1/admin/push-automations/settings')?.body,

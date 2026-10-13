@@ -552,7 +552,10 @@ describe('engine: one send per window, with reasons', () => {
   it('filters device tokens to the automation audience channel before the provider call', async () => {
     await buildFixture(ctx);
     await inactiveFor(2);
-    await device('web-token-1');
+    await ctx.api(marketer.token).post('/v1/me/devices', {
+      token: 'web-token-1',
+      platform: 'web',
+    });
     await ctx.api(marketer.token).post('/v1/me/devices', {
       token: 'android-token-1',
       platform: 'android',

@@ -624,7 +624,11 @@ describe('engine: one send per window, with reasons', () => {
       }),
     );
     await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
-      delivery: { ...(catalogSeed('inactive_1d') as PushAutomation).delivery, cooldownMs: 0, maxPerUserPerDay: null },
+      delivery: {
+        ...(catalogSeed('inactive_1d') as PushAutomation).delivery,
+        cooldownMs: 0,
+        maxPerUserPerDay: null,
+      },
     });
     await enable('inactive_1d');
     const r = await runPushAutomations(ctx.deps, { force: true });

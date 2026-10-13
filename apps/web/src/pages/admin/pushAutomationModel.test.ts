@@ -164,9 +164,9 @@ describe('automation model: numbers and sentences', () => {
     expect(gapLabel(20_000)).toBe('۲۰ ثانیه');
   });
 
-  it('summarises the global caps in one line', () => {
+  it('labels the retained cadence values as legacy, not runtime gates', () => {
     expect(capsSummary(settings())).toBe(
-      'حداکثر ۲ پوش در روز برای هر نفر · ۱۰ پوش در هفته · حداقل فاصله ۴ ساعت',
+      'مقادیر قدیمی (در اجرا اعمال نمی‌شوند): روزانه ۲ · هفتگی ۱۰ · فاصله ۴ ساعت',
     );
   });
 

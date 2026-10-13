@@ -552,7 +552,7 @@ export function validateStep(
       e.cooldownHours = 'سردکردن هر کاربر بین ۰ تا ۴۳۲۰ ساعت است.';
     const cap = intOf(d.maxPerUserPerDay);
     if (cap !== null && (cap < 0 || cap > 20))
-      e.maxPerUserPerDay = 'سقف روزانه این اتوماسیون بین ۰ تا ۲۰ است (خالی یعنی سقف سراسری).';
+      e.maxPerUserPerDay = 'سقف روزانه این اتوماسیون بین ۰ تا ۲۰ است (خالی یعنی بدون سقف روزانه).';
   }
   return e;
 }

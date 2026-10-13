@@ -444,7 +444,7 @@ export async function sendAutomation(
           counter,
           settings,
           missingVariables: [],
-          hasDevice: hasDeviceFor(a, user, deliveryTokens),
+          hasDevice: hasDeviceFor(a, deliveryTokens),
           ignoreGap: a.delivery.priority === 'urgent',
           keyTag: ctx.keyTag ?? null,
         });
@@ -545,7 +545,6 @@ function tokenIndexForAutomation(
 
 function hasDeviceFor(
   a: PushAutomation,
-  user: Doc<User>,
   tokens?: Map<string, DeviceToken[]>,
 ): boolean | undefined {
   if (!a.delivery.push) return true; // in-app-only rules do not require an FCM destination

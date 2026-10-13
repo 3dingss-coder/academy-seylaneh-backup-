@@ -262,12 +262,7 @@ export function gapLabel(ms: number): string {
 }
 
 export function capsSummary(s: AutomationSettings): string {
-  const parts = [
-    `حداکثر ${faNum(s.maxPerUserPerDay)} پوش در روز برای هر نفر`,
-    `${faNum(s.maxPerUserPerWeek)} پوش در هفته`,
-    `حداقل فاصله ${gapLabel(s.minGapMs)}`,
-  ];
-  return parts.join(' · ');
+  return `مقادیر قدیمی (در اجرا اعمال نمی‌شوند): روزانه ${faNum(s.maxPerUserPerDay)} · هفتگی ${faNum(s.maxPerUserPerWeek)} · فاصله ${gapLabel(s.minGapMs)}`;
 }
 
 /** What a «برآورد» result says in one sentence, including why people were skipped. */
@@ -363,8 +358,7 @@ export function draftFromSettings(s: AutomationSettings): CapDraft {
 export function validateCaps(draft: CapDraft): Partial<Record<keyof CapDraft, string>> {
   const errors: Partial<Record<keyof CapDraft, string>> = {};
   const int = (v: string): number | null => {
-    // An emptied field is *not* zero: clearing «سقف روزانه» must fail loudly rather than silently
-    // switch every automatic push off.
+    // Keep legacy settings well-formed for API compatibility even though cadence no longer reads them.
     const t = v.trim().replace(/[^\d-]/g, '');
     if (!t) return null;
     const n = Number(t);
@@ -373,13 +367,13 @@ export function validateCaps(draft: CapDraft): Partial<Record<keyof CapDraft, st
   const day = int(draft.maxPerUserPerDay);
   if (day === null || day < 0 || day > 20)
     errors.maxPerUserPerDay =
-      'سقف روزانه باید عددی بین ۰ تا ۲۰ باشد (۰ یعنی هیچ پوش خودکاری نرود).';
+      'مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.';
   const week = int(draft.maxPerUserPerWeek);
   if (week === null || week < 0 || week > 70)
-    errors.maxPerUserPerWeek = 'سقف هفتگی باید عددی بین ۰ تا ۷۰ باشد.';
+    errors.maxPerUserPerWeek = 'مقدار قدیمی هفتگی باید عددی بین ۰ تا ۷۰ باشد.';
   const gap = int(draft.gapMinutes);
   if (gap === null || gap < 0 || gap > 10080)
-    errors.gapMinutes = 'حداقل فاصله بر حسب دقیقه و بین ۰ تا ۷۰۸۰ است.';
+    errors.gapMinutes = 'مقدار قدیمی فاصله بر حسب دقیقه و بین ۰ تا ۱۰۰۸۰ است.';
   const hour = int(draft.defaultHourTehran);
   if (hour === null || hour < 0 || hour > 23)
     errors.defaultHourTehran = 'ساعت پیش‌فرض بین ۰ تا ۲۳ است.';

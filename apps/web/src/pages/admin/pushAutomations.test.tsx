@@ -412,40 +412,35 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     ).toBe(false);
   });
 
-  it(
-    'the legacy settings dialog validates before sending, and converts minutes to milliseconds',
-    async () => {
-      const m = mockApi(routes());
-      renderApp('/admin/push-campaigns/automations');
-      fireEvent.click(await screen.findByRole('button', { name: 'تنظیمات کلی' }));
-      const day = await inputByLabel('مقدار قدیمی سقف روزانه');
-      fireEvent.change(day, { target: { value: '99' } });
-      fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
-      expect(
-        await screen.findByText('مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.'),
-      ).toBeInTheDocument();
-      expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(false);
-      fireEvent.change(day, { target: { value: '1' } });
-      fireEvent.change(screen.getByLabelText('مقدار قدیمی فاصله سراسری (دقیقه)'), {
-        target: { value: '90' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
-      await waitFor(() =>
-        expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(true),
-      );
-      expect(
-        m.calls.find((c) => c.key === 'PUT /v1/admin/push-automations/settings')?.body,
-      ).toEqual({
-        paused: false,
-        maxPerUserPerDay: 1,
-        maxPerUserPerWeek: 10,
-        minGapMs: 5400000,
-        defaultHourTehran: 10,
-        decisionTtlDays: 30,
-        failureAlertPct: 20,
-      });
-    },
-  );
+  it('the legacy settings dialog validates before sending, and converts minutes to milliseconds', async () => {
+    const m = mockApi(routes());
+    renderApp('/admin/push-campaigns/automations');
+    fireEvent.click(await screen.findByRole('button', { name: 'تنظیمات کلی' }));
+    const day = await inputByLabel('مقدار قدیمی سقف روزانه');
+    fireEvent.change(day, { target: { value: '99' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
+    expect(
+      await screen.findByText('مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.'),
+    ).toBeInTheDocument();
+    expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(false);
+    fireEvent.change(day, { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('مقدار قدیمی فاصله سراسری (دقیقه)'), {
+      target: { value: '90' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
+    await waitFor(() =>
+      expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(true),
+    );
+    expect(m.calls.find((c) => c.key === 'PUT /v1/admin/push-automations/settings')?.body).toEqual({
+      paused: false,
+      maxPerUserPerDay: 1,
+      maxPerUserPerWeek: 10,
+      minGapMs: 5400000,
+      defaultHourTehran: 10,
+      decisionTtlDays: 30,
+      failureAlertPct: 20,
+    });
+  });
 
   it('اجرای الان reports what the sweep did and never bypasses safety gates', async () => {
     const m = mockApi(

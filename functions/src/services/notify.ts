@@ -275,14 +275,28 @@ async function mutedForUsers(
   return prefsForNotify(d, userIds, category);
 }
 
-/** Creates In-App notifications (always) and Push (per type, quiet-hours aware). Batched. */
-export async function notifyUsers(
+export interface NotifyUsersResult {
+  created: number;
+  push: {
+    sent: number;
+    failed: number;
+    skipped: number;
+    deferred: number;
+    notRequested: number;
+  };
+}
+
+/**
+ * Creates In-App notifications and returns the provider-facing result as well as the row count.
+ * Automation uses this form because creating an inbox row is not proof that FCM accepted a message.
+ */
+export async function notifyUsersDetailed(
   d: Deps,
   userIds: string[],
   type: NotificationType,
   content: { title: string; body: string },
   opts: NotifyOptions = {},
-): Promise<number> {
+): Promise<NotifyUsersResult> {
   const policy = await getPolicy(d);
   const def = DEFAULT_TEMPLATES[type];
   const wantPush = opts.push ?? def.push;
@@ -293,15 +307,22 @@ export async function notifyUsers(
   const quiet = inQuietHours(now, policy.quietHours, policy.timezone);
   const bypassQuiet = opts.priority === 'high' && !!opts.urgent;
   let created = 0;
+  const pushResult: NotifyUsersResult['push'] = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    deferred: 0,
+    notRequested: 0,
+  };
   const uniq = [...new Set(userIds)];
   for (let i = 0; i < uniq.length; i += 50) {
-    await Promise.all(
-      uniq.slice(i, i + 50).map(async (userId) => {
+    const statuses = await Promise.all(
+      uniq.slice(i, i + 50).map(async (userId): Promise<Notification['pushStatus'] | null> => {
         if (
           opts.throttleKey &&
           (await throttled(d, userId, opts.throttleKey, opts.throttleMs ?? DAY))
         )
-          return;
+          return null;
         const optedOut = muted?.has(userId) ?? false;
         const id = d.store.newId();
         const push = wantPush && !optedOut;
@@ -327,11 +348,32 @@ export async function notifyUsers(
         if (push && !deferred) {
           const status = await sendPush(d, { ...n, id }, type, opts.tokenIndex);
           await d.store.update(`notifications/${id}`, { pushStatus: status });
+          return status;
         }
+        return n.pushStatus;
       }),
     );
+    for (const status of statuses) {
+      if (status === null) continue;
+      if (status === 'sent') pushResult.sent++;
+      else if (status === 'failed') pushResult.failed++;
+      else if (status === 'skipped') pushResult.skipped++;
+      else if (status === 'deferred') pushResult.deferred++;
+      else pushResult.notRequested++;
+    }
   }
-  return created;
+  return { created, push: pushResult };
+}
+
+/** Backwards-compatible notification API for existing callers that only need the created row count. */
+export async function notifyUsers(
+  d: Deps,
+  userIds: string[],
+  type: NotificationType,
+  content: { title: string; body: string },
+  opts: NotifyOptions = {},
+): Promise<number> {
+  return (await notifyUsersDetailed(d, userIds, type, content, opts)).created;
 }
 
 export async function notifyTemplate(

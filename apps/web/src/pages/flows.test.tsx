@@ -176,6 +176,17 @@ describe('M1 login → M3 home', () => {
     expect(
       calls.filter((c) => c.key === 'GET /v1/me/sections/seed-pkg-formi-s1/media').length,
     ).toBe(1);
+
+    // Recovery fetches a fresh signed URL and remounts the media element instead of
+    // leaving the learner stuck on a permanent black/error screen.
+    fireEvent.click(screen.getByRole('button', { name: 'تلاش دوباره برای پخش' }));
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.key === 'GET /v1/me/sections/seed-pkg-formi-s1/media').length,
+      ).toBe(2),
+    );
+    expect(await screen.findByTestId('media')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-error')).not.toBeInTheDocument();
   });
 });
 

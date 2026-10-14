@@ -46,19 +46,27 @@ function Player({ d }: { d: SectionDetail }) {
   const [progress, setProgress] = useState({ percent: s.percent, completed: s.mediaCompleted });
   const [pos, setPos] = useState(s.lastPositionSec);
   const [dur, setDur] = useState(s.durationSec);
+  const [mediaRetryKey, setMediaRetryKey] = useState(0);
   const media = useQuery({
     queryKey: ['me', 'media', s.id],
     queryFn: ({ signal }) => api.get<SectionMedia>(`/me/sections/${s.id}/media`, signal),
     // Signed URLs expire after four hours; do not reuse a cached URL on a later visit.
     staleTime: 0,
     refetchOnMount: 'always',
+    // A background refetch hands out a new signed URL; swapping it under a playing element
+    // causes the black screen / restart. Fresh URLs are fetched on mount and via the retry button.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
   });
 
   const onResult = (r: ProgressResult) => {
     setProgress((prev) => {
       if (!prev.completed && r.completed) {
-        void qc.invalidateQueries({ queryKey: ['me'] });
+        void qc.invalidateQueries({
+          queryKey: ['me'],
+          predicate: (q) => q.queryKey[1] !== 'media',
+        });
       }
       return {
         percent: Math.max(prev.percent, r.percent),
@@ -67,6 +75,11 @@ function Player({ d }: { d: SectionDetail }) {
     });
   };
   const tracker = usePlaybackTracker(s.id, onResult);
+  const retryMedia = () => {
+    void media.refetch().finally(() => setMediaRetryKey((key) => key + 1));
+  };
+  const playbackPercent =
+    Number.isFinite(dur) && dur > 0 ? Math.max(0, Math.min(100, (pos / dur) * 100)) : 0;
 
   const quizSectionId = d.quizSectionId ?? s.id;
   const quizReady = !(d.packageQuizPassed ?? s.quizPassed);
@@ -110,28 +123,27 @@ function Player({ d }: { d: SectionDetail }) {
             </Card>
           ) : media.data.source === 'youtube' && media.data.youtubeId ? (
             <YouTubeView
+              key={`${media.data.youtubeId}:${mediaRetryKey}`}
               videoId={media.data.youtubeId}
-              start={s.lastPositionSec}
+              start={pos}
+              onRetry={retryMedia}
               tracker={tracker}
               onTime={setPos}
               onDuration={setDur}
             />
           ) : media.data.url ? (
             <FileView
+              key={`${s.id}:${mediaRetryKey}`}
               url={fileUrl(media.data.url)}
               audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
-              start={s.lastPositionSec}
+              start={pos}
               poster={p.product?.imageUrl ?? p.brand?.logoUrl ?? null}
               title={s.title}
               tracker={tracker}
               onTime={setPos}
               onDuration={setDur}
-              onError={() => {
-                track('playback_error', { source: 'file' });
-                if (media.data?.expiresAt && Date.parse(media.data.expiresAt) <= Date.now()) {
-                  void media.refetch();
-                }
-              }}
+              onError={() => track('playback_error', { source: 'file' })}
+              onRetry={retryMedia}
             />
           ) : (
             <ErrorState message="فایل این قسمت هنوز آماده نیست." />
@@ -146,7 +158,7 @@ function Player({ d }: { d: SectionDetail }) {
                 {clock(pos)} / {clock(dur)}
               </span>
             </div>
-            <ProgressBar value={progress.percent} label="پیشرفت قسمت" />
+            <ProgressBar value={playbackPercent} label="پیشرفت پخش" />
             <p className="text-xs text-text-secondary">
               {progress.completed ? (
                 <span className="inline-flex items-center gap-1 font-bold text-success-fg">
@@ -214,6 +226,7 @@ function FileView({
   onTime,
   onDuration,
   onError,
+  onRetry,
 }: {
   url: string;
   audio: boolean;
@@ -224,8 +237,11 @@ function FileView({
   onTime: (t: number) => void;
   onDuration: (t: number) => void;
   onError: () => void;
+  onRetry: () => void;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  // The src is frozen for this mount; a retry remounts (new key) and picks up the fresh URL.
+  const src = useRef(url).current;
   const started = useRef(false);
   const [rate, setRate] = useState(1);
   const [failed, setFailed] = useState(false);
@@ -264,8 +280,17 @@ function FileView({
   return (
     <div className="flex flex-col gap-2">
       {failed ? (
-        <Card role="alert" className="py-6 text-center text-danger-fg" data-testid="media-error">
-          فایل صوتی یا ویدیویی بارگذاری نشد. صفحه را دوباره باز کنید یا به مدیر اطلاع دهید.
+        <Card
+          role="alert"
+          className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg"
+          data-testid="media-error"
+        >
+          <p>
+            فایل صوتی یا ویدیویی بارگذاری نشد؛ ممکن است لینک پخش منقضی شده یا اتصال قطع شده باشد.
+          </p>
+          <Button type="button" variant="secondary" onClick={onRetry}>
+            تلاش دوباره برای پخش
+          </Button>
         </Card>
       ) : audio ? (
         <Card tone="brand" className="flex flex-col items-center gap-4 py-6">
@@ -277,7 +302,7 @@ function FileView({
           {/* eslint-disable-next-line jsx-a11y/media-has-caption -- caption files are V1 (spec §11); description is shown beside the player */}
           <audio
             ref={ref}
-            src={url}
+            src={src}
             controls
             preload="metadata"
             className="w-full"
@@ -290,7 +315,7 @@ function FileView({
         // eslint-disable-next-line jsx-a11y/media-has-caption -- caption files are V1 (spec §11)
         <video
           ref={ref}
-          src={url}
+          src={src}
           controls
           playsInline
           preload="metadata"
@@ -326,14 +351,18 @@ function YouTubeView({
   tracker,
   onTime,
   onDuration,
+  onRetry,
 }: {
   videoId: string;
   start: number;
   tracker: Tracker;
+  onRetry: () => void;
   onTime: (t: number) => void;
   onDuration: (t: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  // Resume position is only an initial value. Progress refetches must never recreate the player.
+  const initialStart = useRef(start);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [reportedYt, setReportedYt] = useState(false);
   const tr = useRef(tracker);
@@ -355,7 +384,7 @@ function YouTubeView({
           videoId,
           host: 'https://www.youtube-nocookie.com',
           playerVars: {
-            start: Math.floor(start),
+            start: Math.floor(initialStart.current),
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
@@ -364,7 +393,8 @@ function YouTubeView({
           events: {
             onReady: (e) => {
               setState('ready');
-              cbs.current.onDuration(e.target.getDuration());
+              const d0 = e.target.getDuration();
+              if (d0 > 0) cbs.current.onDuration(d0);
               tr.current.seeked(e.target.getCurrentTime());
               timer = window.setInterval(() => {
                 if (!player) return;
@@ -372,6 +402,9 @@ function YouTubeView({
                 const t = player.getCurrentTime();
                 tr.current.sample(t, playing, player.getPlaybackRate());
                 cbs.current.onTime(t);
+                // getDuration() can be 0 until metadata loads; keep syncing until it is known.
+                const d = player.getDuration();
+                if (d > 0) cbs.current.onDuration(d);
               }, 1000);
             },
             onStateChange: (e) => {
@@ -396,7 +429,7 @@ function YouTubeView({
       player?.destroy();
       el.remove();
     };
-  }, [videoId, start]);
+  }, [videoId]);
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-card bg-black [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:size-full">
@@ -410,6 +443,9 @@ function YouTubeView({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface p-4 text-center text-sm text-text">
           <WifiOff className="size-8 text-muted" aria-hidden />
           ویدیو بارگذاری نشد. اگر یوتیوب در دسترس نیست، اتصال خود را بررسی کنید.
+          <Button type="button" variant="secondary" onClick={onRetry}>
+            تلاش دوباره برای پخش
+          </Button>
           <button
             type="button"
             className="min-h-12 px-3 font-bold text-primary disabled:text-muted-fg"

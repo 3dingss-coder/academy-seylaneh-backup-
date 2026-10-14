@@ -176,6 +176,47 @@ describe('M1 login → M3 home', () => {
     expect(
       calls.filter((c) => c.key === 'GET /v1/me/sections/seed-pkg-formi-s1/media').length,
     ).toBe(1);
+
+    // Recovery fetches a fresh signed URL and remounts the media element instead of
+    // leaving the learner stuck on a permanent black/error screen.
+    fireEvent.click(screen.getByRole('button', { name: 'تلاش دوباره برای پخش' }));
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.key === 'GET /v1/me/sections/seed-pkg-formi-s1/media').length,
+      ).toBe(2),
+    );
+    expect(await screen.findByTestId('media')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-error')).not.toBeInTheDocument();
+  });
+
+  it('keeps the same media element when the window regains focus (no new signed URL mid-playback)', async () => {
+    let n = 0;
+    const { calls } = mockApi({
+      ...loggedIn(),
+      'GET /v1/me/sections/seed-pkg-formi-s1': () => ({ data: sectionDetail }),
+      'GET /v1/me/sections/seed-pkg-formi-s1/media': () => ({
+        data: {
+          source: 'file',
+          youtubeId: null,
+          url: `/v1/files/signed/tok${++n}`,
+          mime: 'video/mp4',
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        },
+      }),
+    });
+    renderApp('/sections/seed-pkg-formi-s1');
+    const el = await screen.findByTestId('media');
+    const src = el.getAttribute('src');
+
+    window.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    await new Promise((r) => setTimeout(r, 50));
+
+    const mediaCalls = () =>
+      calls.filter((c) => c.key === 'GET /v1/me/sections/seed-pkg-formi-s1/media').length;
+    expect(mediaCalls()).toBe(1);
+    expect(screen.getByTestId('media')).toBe(el);
+    expect(el.getAttribute('src')).toBe(src);
   });
 });
 

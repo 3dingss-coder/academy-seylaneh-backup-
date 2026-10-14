@@ -46,6 +46,7 @@ function Player({ d }: { d: SectionDetail }) {
   const [progress, setProgress] = useState({ percent: s.percent, completed: s.mediaCompleted });
   const [pos, setPos] = useState(s.lastPositionSec);
   const [dur, setDur] = useState(s.durationSec);
+  const [mediaRetryKey, setMediaRetryKey] = useState(0);
   const media = useQuery({
     queryKey: ['me', 'media', s.id],
     queryFn: ({ signal }) => api.get<SectionMedia>(`/me/sections/${s.id}/media`, signal),
@@ -67,6 +68,11 @@ function Player({ d }: { d: SectionDetail }) {
     });
   };
   const tracker = usePlaybackTracker(s.id, onResult);
+  const retryMedia = () => {
+    void media.refetch().finally(() => setMediaRetryKey((key) => key + 1));
+  };
+  const playbackPercent =
+    Number.isFinite(dur) && dur > 0 ? Math.max(0, Math.min(100, (pos / dur) * 100)) : 0;
 
   const quizSectionId = d.quizSectionId ?? s.id;
   const quizReady = !(d.packageQuizPassed ?? s.quizPassed);
@@ -118,6 +124,7 @@ function Player({ d }: { d: SectionDetail }) {
             />
           ) : media.data.url ? (
             <FileView
+              key={`${media.data.url}:${mediaRetryKey}`}
               url={fileUrl(media.data.url)}
               audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
               start={s.lastPositionSec}
@@ -126,12 +133,8 @@ function Player({ d }: { d: SectionDetail }) {
               tracker={tracker}
               onTime={setPos}
               onDuration={setDur}
-              onError={() => {
-                track('playback_error', { source: 'file' });
-                if (media.data?.expiresAt && Date.parse(media.data.expiresAt) <= Date.now()) {
-                  void media.refetch();
-                }
-              }}
+              onError={() => track('playback_error', { source: 'file' })}
+              onRetry={retryMedia}
             />
           ) : (
             <ErrorState message="فایل این قسمت هنوز آماده نیست." />
@@ -146,7 +149,7 @@ function Player({ d }: { d: SectionDetail }) {
                 {clock(pos)} / {clock(dur)}
               </span>
             </div>
-            <ProgressBar value={progress.percent} label="پیشرفت قسمت" />
+            <ProgressBar value={playbackPercent} label="پیشرفت پخش" />
             <p className="text-xs text-text-secondary">
               {progress.completed ? (
                 <span className="inline-flex items-center gap-1 font-bold text-success-fg">
@@ -214,6 +217,7 @@ function FileView({
   onTime,
   onDuration,
   onError,
+  onRetry,
 }: {
   url: string;
   audio: boolean;
@@ -224,6 +228,7 @@ function FileView({
   onTime: (t: number) => void;
   onDuration: (t: number) => void;
   onError: () => void;
+  onRetry: () => void;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const started = useRef(false);
@@ -264,8 +269,11 @@ function FileView({
   return (
     <div className="flex flex-col gap-2">
       {failed ? (
-        <Card role="alert" className="py-6 text-center text-danger-fg" data-testid="media-error">
-          فایل صوتی یا ویدیویی بارگذاری نشد. صفحه را دوباره باز کنید یا به مدیر اطلاع دهید.
+        <Card role="alert" className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg" data-testid="media-error">
+          <p>فایل صوتی یا ویدیویی بارگذاری نشد؛ ممکن است لینک پخش منقضی شده یا اتصال قطع شده باشد.</p>
+          <Button type="button" variant="secondary" onClick={onRetry}>
+            تلاش دوباره برای پخش
+          </Button>
         </Card>
       ) : audio ? (
         <Card tone="brand" className="flex flex-col items-center gap-4 py-6">
@@ -334,6 +342,8 @@ function YouTubeView({
   onDuration: (t: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  // Resume position is only an initial value. Progress refetches must never recreate the player.
+  const initialStart = useRef(start);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [reportedYt, setReportedYt] = useState(false);
   const tr = useRef(tracker);
@@ -355,7 +365,7 @@ function YouTubeView({
           videoId,
           host: 'https://www.youtube-nocookie.com',
           playerVars: {
-            start: Math.floor(start),
+            start: Math.floor(initialStart.current),
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
@@ -396,7 +406,7 @@ function YouTubeView({
       player?.destroy();
       el.remove();
     };
-  }, [videoId, start]);
+  }, [videoId]);
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-card bg-black [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:size-full">

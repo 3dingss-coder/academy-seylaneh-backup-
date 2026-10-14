@@ -164,9 +164,9 @@ describe('automation model: numbers and sentences', () => {
     expect(gapLabel(20_000)).toBe('۲۰ ثانیه');
   });
 
-  it('summarises the global caps in one line', () => {
+  it('labels the retained cadence values as legacy, not runtime gates', () => {
     expect(capsSummary(settings())).toBe(
-      'حداکثر ۲ پوش در روز برای هر نفر · ۱۰ پوش در هفته · حداقل فاصله ۴ ساعت',
+      'مقادیر قدیمی (در اجرا اعمال نمی‌شوند): روزانه ۲ · هفتگی ۱۰ · فاصله ۴ ساعت',
     );
   });
 
@@ -224,7 +224,7 @@ describe('automation model: health card', () => {
     const [scheduler, provider, volume, failures] = items;
     expect(scheduler?.tone).toBe('success');
     expect(provider?.value).toBe('fcm-http');
-    expect(volume?.detail).toContain('حداکثر ۲ پوش در روز');
+    expect(volume?.detail).toContain('در اجرا اعمال نمی‌شوند');
     expect(failures?.value).toBe('۳٪');
   });
 

@@ -228,7 +228,7 @@ export function PushAutomationsPanel() {
                 icon={<SlidersHorizontal className="size-4" aria-hidden />}
                 onClick={() => setCapsOpen(true)}
               >
-                سقف‌ها و تنظیمات کلی
+                تنظیمات کلی
               </Button>
               {(data.counts.archived ?? 0) > 0 && (
                 <Button
@@ -821,7 +821,7 @@ function CapsDialog({
     <Modal
       open
       onClose={onClose}
-      title="سقف‌ها و تنظیمات کلی اتوماسیون"
+      title="تنظیمات کلی اتوماسیون"
       size="md"
       footer={
         <>
@@ -845,17 +845,13 @@ function CapsDialog({
     >
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-6 text-text-secondary">
-          این عدد‌ها برای همه قانون‌ها یکجا اعمال می‌شوند و حتی اگر یک اتوماسیون سقف بالاتری بخواهد،
-          همین‌ها سقف نهایی‌اند. عدد ۰ یعنی «هیچ پوشی از این راه نرود».
+          سه مقدار روزانه/هفتگی/فاصله برای سازگاری با نسخه‌های قبلی نگه داشته شده‌اند و دیگر گیت
+          اجرای اتوماسیون نیستند. محدودیت ارسال را روی خودِ هر قانون تعریف کنید.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {field('maxPerUserPerDay', 'حداکثر پوش روزانه هر کاربر', 'پیش‌فرض ۲')}
-          {field('maxPerUserPerWeek', 'حداکثر پوش هفتگی هر کاربر', 'پیش‌فرض ۱۰')}
-          {field(
-            'gapMinutes',
-            'حداقل فاصله بین دو پوش (دقیقه)',
-            'پیش‌فرض ۲۴۰؛ اولویت فوری معاف است',
-          )}
+          {field('maxPerUserPerDay', 'مقدار قدیمی سقف روزانه', 'در اجرای Rule اعمال نمی‌شود')}
+          {field('maxPerUserPerWeek', 'مقدار قدیمی سقف هفتگی', 'در اجرای Rule اعمال نمی‌شود')}
+          {field('gapMinutes', 'مقدار قدیمی فاصله سراسری (دقیقه)', 'در اجرای Rule اعمال نمی‌شود')}
           {field(
             'defaultHourTehran',
             'ساعت پیش‌فرض پنجره (تهران)',

@@ -333,8 +333,8 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ادامه همه اتوماسیون‌ها' })).toBeInTheDocument();
     expect(screen.getByText('توقف کلی روشن است: هیچ اتوماسیونی اجرا نمی‌شود.')).toBeInTheDocument();
-    // the caps stay visible while paused, because they are the reason to un-pause quickly
-    expect(screen.getByText(/حداکثر ۲ پوش در روز برای هر نفر/)).toBeInTheDocument();
+    // Compatibility values stay visible while paused, but are clearly labelled as non-runtime.
+    expect(screen.getByText(/مقادیر قدیمی \(در اجرا اعمال نمی‌شوند\)/)).toBeInTheDocument();
   });
 
   it('«چند نفر مشمول؟» runs a dry-run and reports it without pretending to have sent', async () => {
@@ -412,21 +412,19 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     ).toBe(false);
   });
 
-  it('the caps dialog validates before sending, and converts minutes to milliseconds', async () => {
+  it('the legacy settings dialog validates before sending, and converts minutes to milliseconds', async () => {
     const m = mockApi(routes());
     renderApp('/admin/push-campaigns/automations');
-    fireEvent.click(await screen.findByRole('button', { name: 'سقف‌ها و تنظیمات کلی' }));
-    const day = await inputByLabel('حداکثر پوش روزانه هر کاربر');
+    fireEvent.click(await screen.findByRole('button', { name: 'تنظیمات کلی' }));
+    const day = await inputByLabel('مقدار قدیمی سقف روزانه');
     fireEvent.change(day, { target: { value: '99' } });
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
     expect(
-      await screen.findByText(
-        'سقف روزانه باید عددی بین ۰ تا ۲۰ باشد (۰ یعنی هیچ پوش خودکاری نرود).',
-      ),
+      await screen.findByText('مقدار قدیمی روزانه باید عددی بین ۰ تا ۲۰ باشد.'),
     ).toBeInTheDocument();
     expect(m.calls.some((c) => c.key === 'PUT /v1/admin/push-automations/settings')).toBe(false);
     fireEvent.change(day, { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('حداقل فاصله بین دو پوش (دقیقه)'), {
+    fireEvent.change(screen.getByLabelText('مقدار قدیمی فاصله سراسری (دقیقه)'), {
       target: { value: '90' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'ذخیره' }));
@@ -444,7 +442,7 @@ describe('admin: کمپین‌های Push ← اتوماسیون', () => {
     });
   });
 
-  it('اجرای الان reports what the sweep did and never bypasses the caps', async () => {
+  it('اجرای الان reports what the sweep did and never bypasses safety gates', async () => {
     const m = mockApi(
       routes({
         'POST /v1/admin/push-automations/run': () => ({

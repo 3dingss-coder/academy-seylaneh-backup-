@@ -46,6 +46,7 @@ import {
 import { createCtx, buildFixture, type TestCtx } from './support/ctx';
 import type { Doc } from '../src/store/types';
 import type { PushAutomation, PushAutomationSettings, User } from '../src/domain/types';
+import { UnconfiguredPushSender, type PushSender } from '../src/push/types';
 
 const freshCounter = (over: Partial<UserCounter> = {}): UserCounter => ({
   day: '2026-10-03',
@@ -305,7 +306,7 @@ describe('governor: windows, claims, caps', () => {
     expect(await isClaimed(ctx.deps, 'inactive_1d', 'other-user', w)).toBe(false);
   });
 
-  it('refuses in this order: paused → disabled → inactive user → caps', async () => {
+  it('refuses hard stops and only a rule-owned cap, never the legacy global caps', async () => {
     expect(
       await gateReason({
         settings: { ...DEFAULT_SETTINGS, paused: true, updatedAt: '', updatedBy: null },
@@ -321,12 +322,35 @@ describe('governor: windows, claims, caps', () => {
     expect(
       await gateReason({
         automation: a({ category: 'quizzes' }),
-        counter: freshCounter({ daySent: 2 }),
+        counter: freshCounter({
+          daySent: DEFAULT_SETTINGS.maxPerUserPerDay,
+          weekSent: DEFAULT_SETTINGS.maxPerUserPerWeek,
+        }),
+      }),
+    ).toBe('ok');
+    const day = '2026-10-03';
+    const week = '2026-W40';
+    expect(
+      await gateReason({
+        automation: a({
+          delivery: { ...a().delivery, cooldownMs: 0, maxPerUserPerDay: 1 },
+        }),
+        counter: freshCounter({
+          perRule: {
+            inactive_1d: {
+              day,
+              daySent: 1,
+              week,
+              weekSent: 1,
+              month: '2026-10',
+              monthSent: 1,
+              total: 1,
+              lastAt: null,
+            },
+          },
+        }),
       }),
     ).toBe('capDay');
-    expect(
-      await gateReason({ counter: freshCounter({ weekSent: DEFAULT_SETTINGS.maxPerUserPerWeek }) }),
-    ).toBe('capWeek');
     expect(
       await gateReason({
         automation: a({ audience: { type: 'role', targetId: 'admin', channel: 'any' } }),
@@ -336,7 +360,7 @@ describe('governor: windows, claims, caps', () => {
     expect(await gateReason({ missingVariables: ['section'] })).toBe('missingVariable');
   });
 
-  it('gap and per-automation cooldown both apply; only urgent skips the gap', async () => {
+  it('rule cooldown still applies, but the legacy platform-wide gap does not', async () => {
     const recent = freshCounter({
       lastAt: new Date(ctx.deps.clock().getTime() - 60_000).toISOString(),
       keys: { inactive_1d: ctx.deps.clock().toISOString() },
@@ -347,7 +371,7 @@ describe('governor: windows, claims, caps', () => {
         automation: a({ delivery: { ...a().delivery, cooldownMs: 0 } }),
         counter: recent,
       }),
-    ).toBe('gap');
+    ).toBe('ok');
     expect(
       await gateReason({
         automation: a({ delivery: { ...a().delivery, cooldownMs: 0, priority: 'urgent' } }),
@@ -511,6 +535,65 @@ describe('engine: one send per window, with reasons', () => {
     expect((await readCounter(ctx.deps, marketer.id)).daySent).toBe(0);
   });
 
+  it('an in-app-only automation does not require a device token', async () => {
+    await buildFixture(ctx);
+    await inactiveFor(2);
+    await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
+      delivery: {
+        ...((await store().get<PushAutomation>('push_automations/inactive_1d')) as PushAutomation)
+          .delivery,
+        push: false,
+      },
+    });
+    await enable('inactive_1d');
+    const r = await runPushAutomations(ctx.deps, { force: true });
+    expect(r.sweeps[0]?.sent).toBe(1);
+    expect(ctx.deps.push.sent).toHaveLength(0);
+    const notes = await notifications(marketer.id);
+    expect(notes.find((n) => n.automationKey === 'inactive_1d')?.pushStatus).toBe('none');
+  });
+
+  it('filters device tokens to the automation audience channel before the provider call', async () => {
+    await buildFixture(ctx);
+    await inactiveFor(2);
+    await ctx.api(marketer.token).post('/v1/me/devices', {
+      token: 'web-token-000001',
+      platform: 'web',
+    });
+    await ctx.api(marketer.token).post('/v1/me/devices', {
+      token: 'android-token-000001',
+      platform: 'android',
+    });
+    const raw = (await store().get<PushAutomation>(
+      'push_automations/inactive_1d',
+    )) as PushAutomation;
+    await updateAutomation(ctx.deps, { id: 'test', role: 'admin' }, 'inactive_1d', {
+      audience: { ...raw.audience, channel: 'android' },
+    });
+    await enable('inactive_1d');
+    const r = await runPushAutomations(ctx.deps, { force: true });
+    expect(r.sweeps[0]?.sent).toBe(1);
+    expect(ctx.deps.push.sent).toHaveLength(1);
+    expect(ctx.deps.push.sent[0]?.tokens).toEqual(['android-token-000001']);
+  });
+
+  it('does not count an FCM failure as automation_sent or consume cadence quota', async () => {
+    await buildFixture(ctx);
+    await device('fcm-token-failure-test');
+    await inactiveFor(2);
+    await enable('inactive_1d');
+    (ctx.deps as { push: PushSender }).push = new UnconfiguredPushSender();
+
+    const r = await runPushAutomations(ctx.deps, { force: true });
+    expect(r.sweeps[0]?.sent).toBe(0);
+    expect(r.sweeps[0]?.skipped).toBeGreaterThanOrEqual(1);
+    expect(r.skippedTotals.error).toBeGreaterThanOrEqual(1);
+    const notes = await notifications(marketer.id);
+    expect(notes.find((n) => n.automationKey === 'inactive_1d')?.pushStatus).toBe('failed');
+    expect((await readCounter(ctx.deps, marketer.id)).daySent).toBe(0);
+    expect((await traceUser(ctx.deps, marketer.id)).decisions[0]?.reason).toBe('error');
+  });
+
   it('quiet hours: the in-app card is created, the push waits for the window to end', async () => {
     await buildFixture(ctx);
     await device();
@@ -566,7 +649,7 @@ describe('engine: one send per window, with reasons', () => {
     expect((await traceUser(ctx.deps, marketer.id)).decisions[0]?.reason).toBe('missingVariable');
   });
 
-  it('the daily cap of the global settings stops the second automation of the same day', async () => {
+  it('legacy global day/week/gap settings do not suppress two eligible automations', async () => {
     const fx = await buildFixture(ctx);
     // Overdue → the condition rule matches the same user in the same run.
     await store().update(`packages/${fx.packageId}`, {
@@ -584,9 +667,11 @@ describe('engine: one send per window, with reasons', () => {
     await enable('overdue_daily');
     const r = await runPushAutomations(ctx.deps, { force: true });
     const total = r.sweeps.reduce((n, x) => n + x.sent, 0);
-    expect(total).toBe(1);
-    expect(r.skippedTotals.capDay).toBeGreaterThanOrEqual(1);
-    expect(ctx.deps.push.sent).toHaveLength(1);
+    expect(total).toBe(2);
+    expect(r.skippedTotals.capDay ?? 0).toBe(0);
+    expect(r.skippedTotals.capWeek ?? 0).toBe(0);
+    expect(r.skippedTotals.gap ?? 0).toBe(0);
+    expect(ctx.deps.push.sent).toHaveLength(2);
   });
 
   it('a dry-run writes nothing at all', async () => {

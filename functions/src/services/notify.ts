@@ -220,19 +220,24 @@ async function throttled(d: Deps, userId: string, key: string, windowMs: number)
   });
 }
 
+interface PushAttemptResult {
+  status: Notification['pushStatus'];
+  invalid: number;
+}
+
 async function sendPush(
   d: Deps,
   n: Doc<Notification>,
   type: NotificationType,
   tokenIndex?: Map<string, DeviceToken[]>,
-): Promise<Notification['pushStatus']> {
+): Promise<PushAttemptResult> {
   const tokens =
     tokenIndex?.get(n.userId) ??
     (await d.store.query<DeviceToken>({
       collection: 'device_tokens',
       where: [['userId', '==', n.userId]],
     }));
-  if (!tokens.length) return 'skipped';
+  if (!tokens.length) return { status: 'skipped', invalid: 0 };
   const g = GENERIC_PUSH[type];
   try {
     const res = await d.push.send(
@@ -251,10 +256,13 @@ async function sendPush(
       },
     );
     for (const bad of res.invalidTokens) await d.store.delete(`device_tokens/${ids.hash(bad)}`);
-    return res.sent > 0 ? 'sent' : 'failed';
+    return {
+      status: res.sent > 0 ? 'sent' : 'failed',
+      invalid: res.invalidTokens.length,
+    };
   } catch (e) {
     console.warn('push failed', (e as Error).message);
-    return 'failed'; // In-App remains (fallback) and deferred retry picks up 'failed' once.
+    return { status: 'failed', invalid: 0 }; // In-App remains; the provider failure is reported below.
   }
 }
 
@@ -275,14 +283,29 @@ async function mutedForUsers(
   return prefsForNotify(d, userIds, category);
 }
 
-/** Creates In-App notifications (always) and Push (per type, quiet-hours aware). Batched. */
-export async function notifyUsers(
+export interface NotifyUsersResult {
+  created: number;
+  push: {
+    sent: number;
+    failed: number;
+    skipped: number;
+    deferred: number;
+    notRequested: number;
+    invalid: number;
+  };
+}
+
+/**
+ * Creates In-App notifications and returns the provider-facing result as well as the row count.
+ * Automation uses this form because creating an inbox row is not proof that FCM accepted a message.
+ */
+export async function notifyUsersDetailed(
   d: Deps,
   userIds: string[],
   type: NotificationType,
   content: { title: string; body: string },
   opts: NotifyOptions = {},
-): Promise<number> {
+): Promise<NotifyUsersResult> {
   const policy = await getPolicy(d);
   const def = DEFAULT_TEMPLATES[type];
   const wantPush = opts.push ?? def.push;
@@ -293,15 +316,23 @@ export async function notifyUsers(
   const quiet = inQuietHours(now, policy.quietHours, policy.timezone);
   const bypassQuiet = opts.priority === 'high' && !!opts.urgent;
   let created = 0;
+  const pushResult: NotifyUsersResult['push'] = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    deferred: 0,
+    notRequested: 0,
+    invalid: 0,
+  };
   const uniq = [...new Set(userIds)];
   for (let i = 0; i < uniq.length; i += 50) {
-    await Promise.all(
-      uniq.slice(i, i + 50).map(async (userId) => {
+    const statuses = await Promise.all(
+      uniq.slice(i, i + 50).map(async (userId): Promise<Notification['pushStatus'] | null> => {
         if (
           opts.throttleKey &&
           (await throttled(d, userId, opts.throttleKey, opts.throttleMs ?? DAY))
         )
-          return;
+          return null;
         const optedOut = muted?.has(userId) ?? false;
         const id = d.store.newId();
         const push = wantPush && !optedOut;
@@ -325,13 +356,43 @@ export async function notifyUsers(
         await d.store.set(`notifications/${id}`, n as unknown as Record<string, unknown>);
         created++;
         if (push && !deferred) {
-          const status = await sendPush(d, { ...n, id }, type, opts.tokenIndex);
-          await d.store.update(`notifications/${id}`, { pushStatus: status });
+          const attempt = await sendPush(d, { ...n, id }, type, opts.tokenIndex);
+          pushResult.invalid += attempt.invalid;
+          await d.store.update(`notifications/${id}`, { pushStatus: attempt.status });
+          return attempt.status;
         }
+        return n.pushStatus;
       }),
     );
+    for (const status of statuses) {
+      if (status === null) continue;
+      if (status === 'sent') pushResult.sent++;
+      else if (status === 'failed') pushResult.failed++;
+      else if (status === 'skipped') pushResult.skipped++;
+      else if (status === 'deferred') pushResult.deferred++;
+      else pushResult.notRequested++;
+    }
   }
-  return created;
+  if (pushResult.sent + pushResult.failed > 0) {
+    await recordPushOutcome(d, {
+      sent: pushResult.sent,
+      failed: pushResult.failed,
+      invalid: pushResult.invalid,
+      ...(pushResult.failed ? { error: 'یک یا چند ارسال فوری Push ناموفق بود.' } : {}),
+    });
+  }
+  return { created, push: pushResult };
+}
+
+/** Backwards-compatible notification API for existing callers that only need the created row count. */
+export async function notifyUsers(
+  d: Deps,
+  userIds: string[],
+  type: NotificationType,
+  content: { title: string; body: string },
+  opts: NotifyOptions = {},
+): Promise<number> {
+  return (await notifyUsersDetailed(d, userIds, type, content, opts)).created;
 }
 
 export async function notifyTemplate(
@@ -379,12 +440,14 @@ export async function flushDeferredPush(d: Deps): Promise<number> {
   let done = 0;
   let sent = 0;
   let failed = 0;
+  let invalid = 0;
   for (const n of due) {
     if (Date.now() > deadline) break;
-    const status = await sendPush(d, n, n.type);
-    await d.store.update(`notifications/${n.id}`, { pushStatus: status });
-    if (status === 'sent') sent++;
-    else if (status === 'failed') failed++;
+    const attempt = await sendPush(d, n, n.type);
+    await d.store.update(`notifications/${n.id}`, { pushStatus: attempt.status });
+    if (attempt.status === 'sent') sent++;
+    else if (attempt.status === 'failed') failed++;
+    invalid += attempt.invalid;
     done++;
   }
   if (done) {
@@ -393,7 +456,7 @@ export async function flushDeferredPush(d: Deps): Promise<number> {
     await recordPushOutcome(d, {
       sent,
       failed,
-      invalid: 0,
+      invalid,
       ...(failed ? { error: 'بخشی از ارسال‌های موکول‌شده ناموفق بود.' } : {}),
     });
   }

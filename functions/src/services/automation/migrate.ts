@@ -13,8 +13,8 @@
  *    `event`/`schedule` rule the flat list was always ignored by the engine, so migrating it into
  *    `when` would *change* behaviour — possibly starting sends that never happened. `deadConditions()`
  *    reports those rules instead, so the panel can say it out loud and an admin can decide, per rule.
- *  • The legacy caps are copied into `repeatPolicy` (`policyFromLegacySettings`), never dropped. A
- *    migrated rule sends as often as it did before; loosening it is a separate, visible edit.
+ *  • Global day/week/gap values are retained in the settings document for API compatibility, but they
+ *    are not copied into a runnable rule. Cadence belongs to the rule; absent policy means uncapped.
  */
 
 import type {
@@ -25,7 +25,7 @@ import type {
   RuleLeaf,
   RuleNode,
 } from '../../domain/types';
-import { policyFromLegacySettings } from './repeat';
+import { DEFAULT_REPEAT_POLICY } from './repeat';
 
 /** The v1 ops are a subset of the operator registry, with the same ids — so the map is a rename. */
 const V1_OPS = new Set(['gte', 'lte', 'eq', 'neq']);
@@ -78,12 +78,12 @@ export function deadConditions(a: PushAutomation): AutomationCondition[] {
   return (a.trigger.conditions ?? []).slice();
 }
 
-/** The policy that governs one rule: its own, or the legacy global numbers copied for it. */
+/** The policy that governs one rule: its own, or the uncapped technical default. */
 export function repeatPolicyOf(
   a: PushAutomation,
-  settings: Pick<PushAutomationSettings, 'maxPerUserPerDay' | 'maxPerUserPerWeek' | 'minGapMs'>,
+  _settings: Pick<PushAutomationSettings, 'maxPerUserPerDay' | 'maxPerUserPerWeek' | 'minGapMs'>,
 ): RepeatPolicy {
-  return a.repeatPolicy ?? policyFromLegacySettings(settings);
+  return a.repeatPolicy ?? DEFAULT_REPEAT_POLICY;
 }
 
 /** Whether this rule's cadence is still the inherited one (what the list row's «بی‌سقف» badge needs). */

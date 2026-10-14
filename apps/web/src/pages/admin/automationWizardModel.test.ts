@@ -366,7 +366,7 @@ describe('wizard model: sentences and previews', () => {
   it('summarises the delivery rules for the read-only half', () => {
     const rows = deliverySummary(draftFromDetail(DETAIL), META);
     expect(rows.find((r) => r.label === 'سردکردن هر کاربر')?.value).toBe('۲۴ ساعت');
-    expect(rows.find((r) => r.label === 'سقف روزانه این قانون')?.value).toBe('سقف سراسری');
+    expect(rows.find((r) => r.label === 'سقف روزانه این قانون')?.value).toBe('بدون سقف روزانه');
     expect(rows.find((r) => r.label === 'مقصد')?.value).toBe('آموزش‌ها');
     expect(rows.find((r) => r.label === 'تصویر')?.value).toBe('بدون تصویر');
     expect(toFa(1234)).toBe('۱٬۲۳۴');

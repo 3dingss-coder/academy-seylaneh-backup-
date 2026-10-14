@@ -53,13 +53,20 @@ function Player({ d }: { d: SectionDetail }) {
     // Signed URLs expire after four hours; do not reuse a cached URL on a later visit.
     staleTime: 0,
     refetchOnMount: 'always',
+    // A background refetch hands out a new signed URL; swapping it under a playing element
+    // causes the black screen / restart. Fresh URLs are fetched on mount and via the retry button.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
   });
 
   const onResult = (r: ProgressResult) => {
     setProgress((prev) => {
       if (!prev.completed && r.completed) {
-        void qc.invalidateQueries({ queryKey: ['me'] });
+        void qc.invalidateQueries({
+          queryKey: ['me'],
+          predicate: (q) => q.queryKey[1] !== 'media',
+        });
       }
       return {
         percent: Math.max(prev.percent, r.percent),
@@ -126,7 +133,7 @@ function Player({ d }: { d: SectionDetail }) {
             />
           ) : media.data.url ? (
             <FileView
-              key={`${media.data.url}:${mediaRetryKey}`}
+              key={`${s.id}:${mediaRetryKey}`}
               url={fileUrl(media.data.url)}
               audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
               start={pos}
@@ -233,6 +240,8 @@ function FileView({
   onRetry: () => void;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  // The src is frozen for this mount; a retry remounts (new key) and picks up the fresh URL.
+  const src = useRef(url).current;
   const started = useRef(false);
   const [rate, setRate] = useState(1);
   const [failed, setFailed] = useState(false);
@@ -276,7 +285,9 @@ function FileView({
           className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg"
           data-testid="media-error"
         >
-          <p>فایل صوتی یا ویدیویی بارگذاری نشد؛ ممکن است لینک پخش منقضی شده یا اتصال قطع شده باشد.</p>
+          <p>
+            فایل صوتی یا ویدیویی بارگذاری نشد؛ ممکن است لینک پخش منقضی شده یا اتصال قطع شده باشد.
+          </p>
           <Button type="button" variant="secondary" onClick={onRetry}>
             تلاش دوباره برای پخش
           </Button>
@@ -291,7 +302,7 @@ function FileView({
           {/* eslint-disable-next-line jsx-a11y/media-has-caption -- caption files are V1 (spec §11); description is shown beside the player */}
           <audio
             ref={ref}
-            src={url}
+            src={src}
             controls
             preload="metadata"
             className="w-full"
@@ -304,7 +315,7 @@ function FileView({
         // eslint-disable-next-line jsx-a11y/media-has-caption -- caption files are V1 (spec §11)
         <video
           ref={ref}
-          src={url}
+          src={src}
           controls
           playsInline
           preload="metadata"
@@ -382,7 +393,8 @@ function YouTubeView({
           events: {
             onReady: (e) => {
               setState('ready');
-              cbs.current.onDuration(e.target.getDuration());
+              const d0 = e.target.getDuration();
+              if (d0 > 0) cbs.current.onDuration(d0);
               tr.current.seeked(e.target.getCurrentTime());
               timer = window.setInterval(() => {
                 if (!player) return;
@@ -390,6 +402,9 @@ function YouTubeView({
                 const t = player.getCurrentTime();
                 tr.current.sample(t, playing, player.getPlaybackRate());
                 cbs.current.onTime(t);
+                // getDuration() can be 0 until metadata loads; keep syncing until it is known.
+                const d = player.getDuration();
+                if (d > 0) cbs.current.onDuration(d);
               }, 1000);
             },
             onStateChange: (e) => {

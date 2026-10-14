@@ -271,7 +271,11 @@ function FileView({
   return (
     <div className="flex flex-col gap-2">
       {failed ? (
-        <Card role="alert" className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg" data-testid="media-error">
+        <Card
+          role="alert"
+          className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg"
+          data-testid="media-error"
+        >
           <p>فایل صوتی یا ویدیویی بارگذاری نشد؛ ممکن است لینک پخش منقضی شده یا اتصال قطع شده باشد.</p>
           <Button type="button" variant="secondary" onClick={onRetry}>
             تلاش دوباره برای پخش

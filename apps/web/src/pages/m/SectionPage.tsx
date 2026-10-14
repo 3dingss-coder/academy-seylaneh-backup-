@@ -116,8 +116,10 @@ function Player({ d }: { d: SectionDetail }) {
             </Card>
           ) : media.data.source === 'youtube' && media.data.youtubeId ? (
             <YouTubeView
+              key={`${media.data.youtubeId}:${mediaRetryKey}`}
               videoId={media.data.youtubeId}
-              start={s.lastPositionSec}
+              start={pos}
+              onRetry={retryMedia}
               tracker={tracker}
               onTime={setPos}
               onDuration={setDur}
@@ -127,7 +129,7 @@ function Player({ d }: { d: SectionDetail }) {
               key={`${media.data.url}:${mediaRetryKey}`}
               url={fileUrl(media.data.url)}
               audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
-              start={s.lastPositionSec}
+              start={pos}
               poster={p.product?.imageUrl ?? p.brand?.logoUrl ?? null}
               title={s.title}
               tracker={tracker}
@@ -334,10 +336,12 @@ function YouTubeView({
   tracker,
   onTime,
   onDuration,
+  onRetry,
 }: {
   videoId: string;
   start: number;
   tracker: Tracker;
+  onRetry: () => void;
   onTime: (t: number) => void;
   onDuration: (t: number) => void;
 }) {
@@ -420,6 +424,9 @@ function YouTubeView({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface p-4 text-center text-sm text-text">
           <WifiOff className="size-8 text-muted" aria-hidden />
           ویدیو بارگذاری نشد. اگر یوتیوب در دسترس نیست، اتصال خود را بررسی کنید.
+          <Button type="button" variant="secondary" onClick={onRetry}>
+            تلاش دوباره برای پخش
+          </Button>
           <button
             type="button"
             className="min-h-12 px-3 font-bold text-primary disabled:text-muted-fg"

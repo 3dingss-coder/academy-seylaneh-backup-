@@ -14,27 +14,18 @@ import { AuthPage } from '@/pages/auth/AuthPage';
 import { OnboardingPage } from '@/pages/auth/OnboardingPage';
 import { HomePage } from '@/pages/m/HomePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { marketerPages } from '@/lib/marketerPages';
 
 // Panels are code-split: marketers (mobile, weak networks) never download admin code.
 // Marketer sub-pages load on demand; only Home and the sign-in screens ship in the first bundle.
-const CardsPage = lazy(() => import('@/pages/m/CardsPage').then((m) => ({ default: m.CardsPage })));
-const LearnPage = lazy(() => import('@/pages/m/LearnPage').then((m) => ({ default: m.LearnPage })));
-const MentorPage = lazy(() =>
-  import('@/pages/m/MentorPage').then((m) => ({ default: m.MentorPage })),
-);
-const MessagesPage = lazy(() =>
-  import('@/pages/m/MessagesPage').then((m) => ({ default: m.MessagesPage })),
-);
-const PackagePage = lazy(() =>
-  import('@/pages/m/PackagePage').then((m) => ({ default: m.PackagePage })),
-);
-const ProfilePage = lazy(() =>
-  import('@/pages/m/ProfilePage').then((m) => ({ default: m.ProfilePage })),
-);
-const QuizPage = lazy(() => import('@/pages/m/QuizPage').then((m) => ({ default: m.QuizPage })));
-const SectionPage = lazy(() =>
-  import('@/pages/m/SectionPage').then((m) => ({ default: m.SectionPage })),
-);
+const CardsPage = lazy(marketerPages.CardsPage);
+const LearnPage = lazy(marketerPages.LearnPage);
+const MentorPage = lazy(marketerPages.MentorPage);
+const MessagesPage = lazy(marketerPages.MessagesPage);
+const PackagePage = lazy(marketerPages.PackagePage);
+const ProfilePage = lazy(marketerPages.ProfilePage);
+const QuizPage = lazy(marketerPages.QuizPage);
+const SectionPage = lazy(marketerPages.SectionPage);
 const ManagerRoutes = lazy(() => import('@/pages/manager/ManagerRoutes'));
 const AdminRoutes = lazy(() => import('@/pages/admin/AdminRoutes'));
 const GalleryPage = lazy(() =>

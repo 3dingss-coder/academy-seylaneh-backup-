@@ -184,6 +184,18 @@ describe('M1 login → M3 home', () => {
     expect(calls.some((call) => call.key === 'POST /v1/auth/phone-register')).toBe(false);
   });
 
+  it('never caps the login field, so an 11-digit phone typed digit by digit is not cut at 10', async () => {
+    mockApi({});
+    renderApp('/login');
+    const field = await screen.findByLabelText('شماره موبایل یا کد ملی');
+    // The first ten digits of a phone look like a national code; that must not set a length limit.
+    fireEvent.change(field, { target: { value: '0912000000' } });
+    expect(field).not.toHaveAttribute('maxlength');
+    expect(field).toHaveAttribute('inputmode', 'tel');
+    fireEvent.change(field, { target: { value: '09120000005' } });
+    expect(field).toHaveValue('09120000005');
+  });
+
   it('logs in using a national code and not the phone sign-in endpoint', async () => {
     const { calls } = mockApi({
       'POST /v1/auth/national-code-login': () => ({

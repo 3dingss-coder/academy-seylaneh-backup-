@@ -229,10 +229,12 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
             <Input
               label={identifierLabel}
               ltr
-              inputMode={fieldUsesNationalCode ? 'numeric' : 'tel'}
+              inputMode={mode === 'register' && fieldUsesNationalCode ? 'numeric' : 'tel'}
               autoComplete={mode === 'login' ? 'username' : fieldUsesNationalCode ? 'off' : 'tel'}
               placeholder={identifierPlaceholder}
-              maxLength={fieldUsesNationalCode ? 10 : undefined}
+              // Login accepts a phone (11 digits) or a national code (10): while typing, the first ten
+              // digits already look like a national code, so a limit here would cut the phone's last digit.
+              maxLength={mode === 'register' && fieldUsesNationalCode ? 10 : undefined}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               error={errors.identifier}

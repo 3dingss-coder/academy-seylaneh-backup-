@@ -93,7 +93,13 @@ jobs:
         run: |
           export CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable)"
           echo "Chrome: $CHROME_PATH ($("$CHROME_PATH" --version))"
-          npx -y -p @lhci/cli@0.15 -p puppeteer-core@24 lhci autorun --config=./lighthouserc.cjs
+          set +e
+          npx -y -p @lhci/cli@0.15 -p puppeteer-core@24 lhci autorun --config=./lighthouserc.cjs 2>&1 | tee /tmp/lhci.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=LHCI diagnostics::$(grep -iE 'assert|expected|found|error|fail|timeout|protocol|NO_FCP|puppeteer|score|lcp' /tmp/lhci.log | head -20 | tr '\n' ' ' | cut -c1-1800)"
+          fi
+          exit $rc
       - uses: actions/upload-artifact@v6
         if: always()
         with:

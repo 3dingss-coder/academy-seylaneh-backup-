@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractYoutubeId, normalizePhone } from '../src/lib/ids';
+import { extractYoutubeId, normalizeNationalCode, normalizePhone } from '../src/lib/ids';
 import { mp4DurationFromBuffer, sniff } from '../src/lib/media';
 import { dayKey, inQuietHours, parseHhmm, quietHoursEnd, weekKey } from '../src/lib/time';
 import { applyHeartbeat, grade } from '../src/services/learning';
@@ -17,6 +17,13 @@ describe('normalisation', () => {
     expect(normalizePhone('+98 912 123 4567')).toBe('09121234567');
     expect(normalizePhone('9121234567')).toBe('09121234567');
     expect(normalizePhone('0212345678')).toBeNull();
+  });
+  it('normalizes Persian/Arabic digits and validates the national-code check digit', () => {
+    expect(normalizeNationalCode('۱۲۳۴۵۶۷۸۹۱')).toBe('1234567891');
+    expect(normalizeNationalCode('١٢٣٤٥٦٧٨٩١')).toBe('1234567891');
+    expect(normalizeNationalCode('1234567890')).toBeNull();
+    expect(normalizeNationalCode('1111111111')).toBeNull();
+    expect(normalizeNationalCode('123456789')).toBeNull();
   });
   it('extracts YouTube ids from common URL shapes', () => {
     expect(extractYoutubeId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');

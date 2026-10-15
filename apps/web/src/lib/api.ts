@@ -179,12 +179,14 @@ export async function request<T>(
       onSessionExpired?.();
     }
   }
-  // Quiet retries (600 ms, then 1.5 s) for idempotent calls and phone-login when the Worker is
-  // cold or briefly over its CPU limit (Cloudflare 1101/1102/503).
+  // Quiet retries (600 ms, then 1.5 s) for idempotent calls and passwordless sign-in when the
+  // Worker is cold or briefly over its CPU limit (Cloudflare 1101/1102/503).
   if (
     attempt < 2 &&
     isTransientStatus(res.status) &&
-    ((opts.method ?? 'GET') === 'GET' || path === '/auth/phone-login')
+    ((opts.method ?? 'GET') === 'GET' ||
+      path === '/auth/phone-login' ||
+      path === '/auth/national-code-login')
   ) {
     await sleep(attempt === 0 ? 600 : 1500);
     return request<T>(path, opts, retried, attempt + 1);

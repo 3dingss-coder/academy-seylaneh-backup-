@@ -15,7 +15,7 @@ export type SignInResult =
  * implementation is used for tests and the no-emulator local server.
  */
 export interface AuthProvider {
-  /** `passwordless`: phone-only account — no password is ever checked, so skip the costly hash. */
+  /** `passwordless`: account signed in through an identifier route; no password is checked, so skip hashing. */
   createUser(p: {
     email: string;
     password: string;

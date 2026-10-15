@@ -17,13 +17,20 @@ import { lastKnown } from './lastKnown';
 
 import type { AuthResult, Me, Role } from './types';
 
+type LoginIdentifier = { kind: 'phone' | 'nationalCode'; value: string };
+type MarketerRegistration = {
+  name: string;
+  province: string;
+  city: string;
+} & ({ phone: string; nationalCode?: never } | { nationalCode: string; phone?: never });
+
 interface AuthState {
   user: Me | null;
   status: 'loading' | 'authenticated' | 'anonymous';
-  /** Marketers: phone number only. Rejects with code NOT_FOUND when the number isn't registered. */
-  login(phone: string): Promise<Me>;
-  /** Marketers: sign up with name + phone + residence and be signed in straight away. */
-  register(input: { name: string; phone: string; province: string; city: string }): Promise<Me>;
+  /** Marketers sign in with the phone or national code used at registration. */
+  login(identifier: LoginIdentifier): Promise<Me>;
+  /** Marketers register with the identity type required by their selected province. */
+  register(input: MarketerRegistration): Promise<Me>;
   /** Admin / manager panels: username + password. */
   staffLogin(input: {
     panel: 'admin' | 'manager';
@@ -111,8 +118,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       status,
-      login: async (phone) => accept(await api.post<AuthResult>('/auth/phone-login', { phone })),
-      register: async (input) => accept(await api.post<AuthResult>('/auth/phone-register', input)),
+      login: async (identifier) => {
+        const result =
+          identifier.kind === 'nationalCode'
+            ? await api.post<AuthResult>('/auth/national-code-login', {
+                nationalCode: identifier.value,
+              })
+            : await api.post<AuthResult>('/auth/phone-login', { phone: identifier.value });
+        return accept(result);
+      },
+      register: async (input) => {
+        const result =
+          'nationalCode' in input
+            ? await api.post<AuthResult>('/auth/national-code-register', input)
+            : await api.post<AuthResult>('/auth/phone-register', input);
+        return accept(result);
+      },
       staffLogin: async (input) => accept(await api.post<AuthResult>('/auth/staff-login', input)),
       logout: async () => {
         try {

@@ -341,6 +341,38 @@ describe('Cloudflare D1 + Web Fetch Handler', () => {
       }),
     );
     expect(phoneLoginRes.status).toBe(200);
+
+    // 5. National-code sign-up and login work across Cloudflare D1 Worker isolates too.
+    const nationalCodeRegisterRes = await handler1(
+      new Request('https://learn.pages.dev/v1/auth/national-code-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'بازاریاب یزد',
+          nationalCode: '1234567891',
+          province: 'یزد',
+          city: 'یزد',
+        }),
+      }),
+    );
+    expect(nationalCodeRegisterRes.status).toBe(201);
+    const nationalCodeRegisterData = (await nationalCodeRegisterRes.json()) as {
+      data: { user: { id: string; nationalCodeHash?: string } };
+    };
+    expect(nationalCodeRegisterData.data.user).not.toHaveProperty('nationalCodeHash');
+
+    const nationalCodeLoginRes = await handler2(
+      new Request('https://learn.pages.dev/v1/auth/national-code-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nationalCode: '۱۲۳۴۵۶۷۸۹۱' }),
+      }),
+    );
+    expect(nationalCodeLoginRes.status).toBe(200);
+    const nationalCodeLoginData = (await nationalCodeLoginRes.json()) as {
+      data: { user: { id: string }; idToken: string };
+    };
+    expect(nationalCodeLoginData.data.user.id).toBe(nationalCodeRegisterData.data.user.id);
   });
 
   it('stores and serves uploaded media blobs in D1 with Range support', async () => {

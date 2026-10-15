@@ -34,7 +34,7 @@ describe('M1 login → M3 home', () => {
       'GET /v1/me/mentor/nudges': () => ({ data: [] }),
     });
     renderApp('/login');
-    fireEvent.change(await screen.findByLabelText('شماره موبایل'), {
+    fireEvent.change(await screen.findByLabelText('شماره موبایل یا کد ملی'), {
       target: { value: '۰۹۱۲۰۰۰۰۰۰۴' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'ورود' }));
@@ -63,14 +63,29 @@ describe('M1 login → M3 home', () => {
       }),
     });
     renderApp('/login');
-    fireEvent.change(await screen.findByLabelText('شماره موبایل'), {
+    fireEvent.change(await screen.findByLabelText('شماره موبایل یا کد ملی'), {
       target: { value: '09120000004' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'ورود' }));
     expect(await screen.findByRole('button', { name: 'ثبت‌نام و ورود' })).toBeInTheDocument();
-    expect(screen.getByLabelText('شماره موبایل')).toHaveValue('09120000004');
+    expect(screen.queryByLabelText('شماره موبایل')).toBeNull();
     expect(screen.getByLabelText('نام و نام خانوادگی')).toBeInTheDocument();
     expect(screen.getByLabelText('انتخاب محل فعالیت شما')).toBeInTheDocument();
+
+    // The identifier appears after city selection and is kept when it matches the selected province.
+    fireEvent.click(screen.getByLabelText('انتخاب محل فعالیت شما'));
+    const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی استان' }), {
+      target: { value: 'خراسان رضوی' },
+    });
+    fireEvent.click(within(provinces).getByRole('option', { name: 'خراسان رضوی' }));
+    fireEvent.click(screen.getByLabelText('شهر'));
+    const cities = await screen.findByRole('listbox', { name: 'شهرهای استان خراسان رضوی' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی شهر' }), {
+      target: { value: 'مشهد' },
+    });
+    fireEvent.click(within(cities).getByRole('option', { name: 'مشهد' }));
+    expect(screen.getByLabelText('شماره موبایل')).toHaveValue('09120000004');
   });
 
   it('signs up with name, phone and محل فعالیت (province → city) in one step', async () => {
@@ -86,11 +101,9 @@ describe('M1 login → M3 home', () => {
     fireEvent.change(await screen.findByLabelText('نام و نام خانوادگی'), {
       target: { value: 'نگار محمدی' },
     });
-    fireEvent.change(screen.getByLabelText('شماره موبایل'), {
-      target: { value: '۰۹۱۲۰۰۰۰۱۱۱' },
-    });
 
-    // Province: search inside the long list, then pick — this reveals the city field.
+    // Residence comes before the identity field: province first, then its city.
+    expect(screen.queryByLabelText('شماره موبایل')).toBeNull();
     expect(screen.queryByLabelText('شهر')).toBeNull();
     fireEvent.click(screen.getByLabelText('انتخاب محل فعالیت شما'));
     const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
@@ -108,6 +121,9 @@ describe('M1 login → M3 home', () => {
       target: { value: 'سبزوار' },
     });
     fireEvent.click(within(cities).getByRole('option', { name: 'سبزوار' }));
+    fireEvent.change(screen.getByLabelText('شماره موبایل'), {
+      target: { value: '۰۹۱۲۰۰۰۰۱۱۱' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'ثبت‌نام و ورود' }));
     expect(await screen.findByTestId('next-item')).toBeInTheDocument();
@@ -119,13 +135,127 @@ describe('M1 login → M3 home', () => {
     });
   });
 
+  it('signs up in a listed province with a national code after selecting province and city', async () => {
+    const { calls } = mockApi({
+      'POST /v1/auth/national-code-register': () => ({
+        data: {
+          user: { ...marketer, phone: null, province: 'یزد', city: 'یزد' },
+          idToken: 't1',
+          refreshToken: 'r1',
+          expiresIn: 3600,
+        },
+      }),
+      'GET /v1/me/home': () => ({ data: home }),
+      'GET /v1/me/notifications': () => ({ data: { unread: 0, items: [] } }),
+      'GET /v1/me/mentor/nudges': () => ({ data: [] }),
+    });
+    renderApp('/register');
+    fireEvent.change(await screen.findByLabelText('نام و نام خانوادگی'), {
+      target: { value: 'نگار محمدی' },
+    });
+    expect(screen.queryByLabelText('کد ملی')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('انتخاب محل فعالیت شما'));
+    const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی استان' }), {
+      target: { value: 'یزد' },
+    });
+    fireEvent.click(within(provinces).getByRole('option', { name: 'یزد' }));
+    expect(screen.queryByLabelText('کد ملی')).toBeNull();
+    fireEvent.click(screen.getByLabelText('شهر'));
+    const cities = await screen.findByRole('listbox', { name: 'شهرهای استان یزد' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی شهر' }), {
+      target: { value: 'یزد' },
+    });
+    fireEvent.click(within(cities).getByRole('option', { name: 'یزد' }));
+
+    const codeField = screen.getByLabelText('کد ملی');
+    fireEvent.change(codeField, { target: { value: '۱۲۳۴۵۶۷۸۹۱' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت‌نام و ورود' }));
+    expect(await screen.findByTestId('next-item')).toBeInTheDocument();
+    expect(calls.find((call) => call.key === 'POST /v1/auth/national-code-register')?.body).toEqual(
+      {
+        name: 'نگار محمدی',
+        nationalCode: '1234567891',
+        province: 'یزد',
+        city: 'یزد',
+      },
+    );
+    expect(calls.some((call) => call.key === 'POST /v1/auth/phone-register')).toBe(false);
+  });
+
+  it('never caps the login field, so an 11-digit phone typed digit by digit is not cut at 10', async () => {
+    mockApi({});
+    renderApp('/login');
+    const field = await screen.findByLabelText('شماره موبایل یا کد ملی');
+    // The first ten digits of a phone look like a national code; that must not set a length limit.
+    fireEvent.change(field, { target: { value: '0912000000' } });
+    expect(field).not.toHaveAttribute('maxlength');
+    expect(field).toHaveAttribute('inputmode', 'tel');
+    fireEvent.change(field, { target: { value: '09120000005' } });
+    expect(field).toHaveValue('09120000005');
+  });
+
+  it('logs in using a national code and not the phone sign-in endpoint', async () => {
+    const { calls } = mockApi({
+      'POST /v1/auth/national-code-login': () => ({
+        data: { user: marketer, idToken: 't1', refreshToken: 'r1', expiresIn: 3600 },
+      }),
+      'GET /v1/me/home': () => ({ data: home }),
+      'GET /v1/me/notifications': () => ({ data: { unread: 0, items: [] } }),
+      'GET /v1/me/mentor/nudges': () => ({ data: [] }),
+    });
+    renderApp('/login');
+    fireEvent.change(await screen.findByLabelText('شماره موبایل یا کد ملی'), {
+      target: { value: '۱۲۳۴۵۶۷۸۹۱' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'ورود' }));
+    expect(await screen.findByTestId('next-item')).toBeInTheDocument();
+    expect(calls.find((call) => call.key === 'POST /v1/auth/national-code-login')?.body).toEqual({
+      nationalCode: '1234567891',
+    });
+    expect(calls.some((call) => call.key === 'POST /v1/auth/phone-login')).toBe(false);
+  });
+
+  it('keeps an unknown national code when login continues into sign-up for a listed province', async () => {
+    mockApi({
+      'POST /v1/auth/national-code-login': () => ({
+        status: 404,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'این کد ملی هنوز ثبت‌نام نکرده است. ابتدا ثبت‌نام کنید.',
+        },
+      }),
+    });
+    renderApp('/login');
+    fireEvent.change(await screen.findByLabelText('شماره موبایل یا کد ملی'), {
+      target: { value: '۱۲۳۴۵۶۷۸۹۱' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'ورود' }));
+    expect(await screen.findByRole('button', { name: 'ثبت‌نام و ورود' })).toBeInTheDocument();
+    expect(await screen.findByText(/این کد ملی هنوز ثبت‌نام نشده است/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('انتخاب محل فعالیت شما'));
+    const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی استان' }), {
+      target: { value: 'یزد' },
+    });
+    fireEvent.click(within(provinces).getByRole('option', { name: 'یزد' }));
+    fireEvent.click(screen.getByLabelText('شهر'));
+    const cities = await screen.findByRole('listbox', { name: 'شهرهای استان یزد' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی شهر' }), {
+      target: { value: 'یزد' },
+    });
+    fireEvent.click(within(cities).getByRole('option', { name: 'یزد' }));
+    expect(screen.getByLabelText('کد ملی')).toHaveValue('۱۲۳۴۵۶۷۸۹۱');
+  });
+
   it('will not sign up without a residence', async () => {
     const { calls } = mockApi({});
     renderApp('/register');
     fireEvent.change(await screen.findByLabelText('نام و نام خانوادگی'), {
       target: { value: 'نگار محمدی' },
     });
-    fireEvent.change(screen.getByLabelText('شماره موبایل'), { target: { value: '09120000111' } });
     fireEvent.click(screen.getByRole('button', { name: 'ثبت‌نام و ورود' }));
     expect(await screen.findByText('استان محل فعالیت خود را انتخاب کنید.')).toBeInTheDocument();
     expect(calls.some((c) => c.key === 'POST /v1/auth/phone-register')).toBe(false);

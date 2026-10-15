@@ -2,7 +2,15 @@ import { randomInt } from '../lib/crypto';
 import { z } from 'zod';
 import { ApiError } from '../http/errors';
 import { text } from '../http/validate';
-import { ids, normalizePhone, phoneToAuthEmail } from '../lib/ids';
+import {
+  ids,
+  nationalCodeDigest,
+  nationalCodeToAuthEmailFromDigest,
+  normalizeNationalCode,
+  normalizePhone,
+  phoneToAuthEmail,
+} from '../lib/ids';
+import { provinceUsesNationalCode } from '../domain/nationalCode';
 import { StoreConflictError, type Doc } from '../store/types';
 import {
   canonicalCity,
@@ -93,13 +101,32 @@ export const registerSchema = z
     password: passwordSchema,
     ...residenceShape,
   })
-  .superRefine(checkResidence);
+  .superRefine((value, ctx) => {
+    checkResidence(value, ctx);
+    if (
+      value.province &&
+      normalizePhone(value.identifier) &&
+      provinceUsesNationalCode(value.province)
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['identifier'],
+        message: 'برای این استان، به‌جای شماره موبایل کد ملی را وارد کنید.',
+      });
+  });
 export const loginSchema = z.object({
   identifier: identifierSchema,
   password: z.string().min(1, 'رمز عبور را وارد کنید.').max(128),
 });
 
-/** Self sign-up by phone only (no password: marketers sign in with their number). */
+const nationalCodeSchema = z
+  .string({ required_error: 'کد ملی را وارد کنید.', invalid_type_error: 'کد ملی معتبر نیست.' })
+  .trim()
+  .min(1, 'کد ملی را وارد کنید.')
+  .max(20, 'کد ملی معتبر ۱۰ رقمی وارد کنید.')
+  .refine((value) => normalizeNationalCode(value) !== null, 'کد ملی معتبر ۱۰ رقمی وارد کنید.');
+
+/** Self sign-up outside the listed provinces: phone-only sign-in, with no password. */
 export const phoneRegisterSchema = z
   .object({
     name: text(2, 60, 'نام'),
@@ -108,7 +135,35 @@ export const phoneRegisterSchema = z
     province: provinceSchema,
     city: citySchema,
   })
-  .superRefine(checkResidence);
+  .superRefine((value, ctx) => {
+    checkResidence(value, ctx);
+    if (provinceUsesNationalCode(value.province))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['phone'],
+        message: 'برای این استان، به‌جای شماره موبایل کد ملی را وارد کنید.',
+      });
+  });
+
+/** Self sign-up in the listed provinces: national-code-only sign-in, with no password. */
+export const nationalCodeRegisterSchema = z
+  .object({
+    name: text(2, 60, 'نام'),
+    nationalCode: nationalCodeSchema,
+    province: provinceSchema,
+    city: citySchema,
+  })
+  .superRefine((value, ctx) => {
+    checkResidence(value, ctx);
+    if (canonicalProvince(value.province) && !provinceUsesNationalCode(value.province))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['nationalCode'],
+        message: 'برای این استان، شماره موبایل را وارد کنید.',
+      });
+  });
+
+export const nationalCodeLoginSchema = z.object({ nationalCode: nationalCodeSchema });
 export const staffLoginSchema = z.object({
   username: z.string().trim().min(2).max(60),
   password: z.string().min(1).max(128),
@@ -125,26 +180,44 @@ export function staffAuthEmail(username: string): string {
   return `${slug || 'staff'}@staff.seylane.local`;
 }
 
-/** Shown when a deleted (blacklisted) number tries to sign in or sign up again. */
+/** Shown when a deleted (blacklisted) phone number tries to sign in or sign up again. */
 export const BLACKLISTED_MESSAGE =
   'این شماره مسدود شده است و امکان ورود ندارد. برای رفع مسدودی با ادمین تماس بگیرید.';
+export const BLACKLISTED_NATIONAL_CODE_MESSAGE =
+  'این کد ملی مسدود شده است و امکان ورود ندارد. برای رفع مسدودی با ادمین تماس بگیرید.';
 
 export type Identifier =
-  | { kind: 'phone'; phone: string; authEmail: string }
-  | { kind: 'email'; email: string; authEmail: string };
+  | { kind: 'phone'; value: string; phone: string; authEmail: string }
+  | { kind: 'email'; value: string; email: string; authEmail: string }
+  | { kind: 'nationalCode'; value: string; nationalCodeHash: string; authEmail: string };
+export type PasswordIdentifier = Exclude<Identifier, { kind: 'nationalCode' }>;
+export type NationalCodeIdentifier = Extract<Identifier, { kind: 'nationalCode' }>;
 
 /** Accepts mobile (Persian/Latin digits, +98) or email. */
-export function parseIdentifier(raw: string): Identifier {
+export function parseIdentifier(raw: string): PasswordIdentifier {
   const s = raw.trim();
   if (s.includes('@')) {
     const email = s.toLowerCase();
     if (!z.string().email().safeParse(email).success)
       throw new ApiError('VALIDATION', 'ایمیل واردشده درست نیست.');
-    return { kind: 'email', email, authEmail: email };
+    return { kind: 'email', value: email, email, authEmail: email };
   }
   const phone = normalizePhone(s);
   if (!phone) throw new ApiError('VALIDATION', 'شماره موبایل درست نیست. مثال: ۰۹۱۲۱۲۳۴۵۶۷');
-  return { kind: 'phone', phone, authEmail: phoneToAuthEmail(phone) };
+  return { kind: 'phone', value: phone, phone, authEmail: phoneToAuthEmail(phone) };
+}
+
+/** Build the opaque identity used by account creation and national-code sign-in. */
+export function nationalCodeIdentifier(raw: string, secret: string): NationalCodeIdentifier {
+  const nationalCode = normalizeNationalCode(raw);
+  if (!nationalCode) throw new ApiError('VALIDATION', 'کد ملی معتبر ۱۰ رقمی وارد کنید.');
+  const nationalCodeHash = nationalCodeDigest(nationalCode, secret);
+  return {
+    kind: 'nationalCode',
+    value: nationalCodeHash,
+    nationalCodeHash,
+    authEmail: nationalCodeToAuthEmailFromDigest(nationalCodeHash),
+  };
 }
 
 export function publicUser(u: Doc<User>) {
@@ -208,9 +281,10 @@ export async function register(
   role: Role = 'marketer',
   extra: Partial<User> = {},
   opts: { passwordless?: boolean } = {},
+  identity?: Identifier,
 ) {
-  const idf = parseIdentifier(input.identifier);
-  const keyId = ids.uniqueKey(idf.kind, idf.kind === 'phone' ? idf.phone : idf.email);
+  const idf = identity ?? parseIdentifier(input.identifier);
+  const keyId = ids.uniqueKey(idf.kind, idf.value);
   const now = nowIso(d);
   // Reserve the unique key first (handles concurrent sign-ups deterministically).
   try {
@@ -219,12 +293,18 @@ export async function register(
     if (e instanceof StoreConflictError) {
       const reserved = await d.store.get<{ uid: string | null }>(`unique_keys/${keyId}`);
       const owner = reserved?.uid ? await d.store.get<User>(`users/${reserved.uid}`) : null;
-      if (owner?.status === 'blacklisted') throw new ApiError('FORBIDDEN', BLACKLISTED_MESSAGE);
+      if (owner?.status === 'blacklisted')
+        throw new ApiError(
+          'FORBIDDEN',
+          idf.kind === 'nationalCode' ? BLACKLISTED_NATIONAL_CODE_MESSAGE : BLACKLISTED_MESSAGE,
+        );
       throw new ApiError(
         'CONFLICT',
         idf.kind === 'phone'
           ? 'این شماره قبلاً ثبت شده است. وارد شوید.'
-          : 'این ایمیل قبلاً ثبت شده است. وارد شوید.',
+          : idf.kind === 'nationalCode'
+            ? 'این کد ملی قبلاً ثبت شده است. وارد شوید.'
+            : 'این ایمیل قبلاً ثبت شده است. وارد شوید.',
       );
     }
     throw e;
@@ -248,6 +328,7 @@ export async function register(
     name: input.name,
     phone: idf.kind === 'phone' ? idf.phone : null,
     email: idf.kind === 'email' ? idf.email : null,
+    nationalCodeHash: idf.kind === 'nationalCode' ? idf.nationalCodeHash : null,
     ...residence(input),
     firebaseUid: uid,
     role,
@@ -449,7 +530,13 @@ export async function changePassword(
   user: Doc<User>,
   input: z.infer<typeof changePasswordSchema>,
 ) {
-  const authEmail = user.email ?? (user.phone ? phoneToAuthEmail(user.phone) : '');
+  const authEmail =
+    user.email ??
+    (user.phone
+      ? phoneToAuthEmail(user.phone)
+      : user.nationalCodeHash
+        ? nationalCodeToAuthEmailFromDigest(user.nationalCodeHash)
+        : '');
   const r = await d.auth.signIn(authEmail, input.currentPassword);
   if (!r.ok) throw new ApiError('VALIDATION', 'رمز فعلی اشتباه است.');
   await d.auth.setPassword(user.id, input.newPassword);

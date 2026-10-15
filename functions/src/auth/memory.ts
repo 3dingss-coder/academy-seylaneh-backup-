@@ -67,10 +67,9 @@ export class MemoryAuthProvider implements AuthProvider {
     passwordless?: boolean;
   }) {
     const email = p.email.toLowerCase();
-    const deterministicId = `u_${sha(email).slice(0, 18)}`;
-    const uid = (await this.store.get(`_auth/${deterministicId}`))
-      ? this.store.newId()
-      : deterministicId;
+    // Never derive a UID from the sign-in identifier: after a purged account reuses the same
+    // phone/email/national code, deterministic UIDs could make an unexpired old token valid again.
+    const uid = this.store.newId();
     await this.store.create(`_auth_email/${sha(email)}`, { uid });
     await this.store.create(`_auth/${uid}`, {
       email,
@@ -100,7 +99,7 @@ export class MemoryAuthProvider implements AuthProvider {
     return { ok: true, uid: link.uid, tokens: await this.issue(link.uid) };
   }
 
-  /** Phone-only login for the MemoryAuthProvider (local + Cloudflare D1), never Firebase Auth. */
+  /** Passwordless identifier login for MemoryAuthProvider (local + Cloudflare D1), never Firebase Auth. */
   async demoSignIn(email: string): Promise<SignInResult> {
     const link = await this.store.get<{ uid: string }>(`_auth_email/${sha(email.toLowerCase())}`);
     const acc = link ? await this.store.get<Account>(`_auth/${link.uid}`) : null;

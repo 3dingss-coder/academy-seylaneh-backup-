@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Phone, UserRound } from 'lucide-react';
+import { Fingerprint, Phone, UserRound } from 'lucide-react';
 import { BrandBackdrop } from '@/components/brand/BrandBackdrop';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
 import { Button, Card, Input } from '@/components/ui';
@@ -8,11 +8,16 @@ import { ApiError } from '@/lib/api';
 import { homePathFor, useAuth } from '@/lib/auth';
 import { canAccess } from '@/lib/roles';
 import { toLatinDigits } from '@/lib/digits';
+import {
+  isNationalCodeShape,
+  normalizeNationalCode,
+  provinceUsesNationalCode,
+} from '@/lib/nationalCode';
 import { track } from '@/lib/telemetry';
 
 type Mode = 'login' | 'register';
 
-/** Phone-only sign-in for marketers; unknown numbers are sent to sign-up, which signs them in directly. */
+/** Phone or national-code sign-in for marketers; unknown identifiers move to sign-up. */
 export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   const { status, user, login, register } = useAuth();
   const nav = useNavigate();
@@ -36,24 +41,70 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
     );
   }
 
-  const switchMode = (m: Mode) => {
-    setMode(m);
-    if (m === 'register') track('signup_started');
+  const requiresNationalCode = provinceUsesNationalCode(residence.province);
+  const registrationIdentityVisible = Boolean(residence.province && residence.city);
+  const loginIdentifierIsNationalCode = mode === 'login' && isNationalCodeShape(identifier);
+  const fieldUsesNationalCode =
+    mode === 'register' ? requiresNationalCode : loginIdentifierIsNationalCode;
+
+  const switchMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    if (nextMode === 'register') track('signup_started');
     setErrors({});
     setFormError('');
     setInfo('');
   };
 
+  const handleResidenceChange = (next: Residence) => {
+    if (next.province && next.province !== residence.province && identifier) {
+      const nextUsesNationalCode = provinceUsesNationalCode(next.province);
+      const existingLooksLikeNationalCode = isNationalCodeShape(identifier);
+      const existingLooksLikePhone = /^09\d{9}$/.test(toLatinDigits(identifier.trim()));
+      if (
+        (nextUsesNationalCode && existingLooksLikePhone) ||
+        (!nextUsesNationalCode && existingLooksLikeNationalCode)
+      ) {
+        // When an unknown login is converted to registration, don't leave a phone number in the
+        // national-code field (or vice versa) after the user changes their selected province.
+        setIdentifier('');
+        setErrors((current) => {
+          const nextErrors = { ...current };
+          delete nextErrors.identifier;
+          return nextErrors;
+        });
+        setInfo(
+          nextUsesNationalCode
+            ? 'استان انتخاب‌شده کد ملی می‌خواهد؛ شماره موبایل قبلی پاک شد. پس از انتخاب شهر، کد ملی را وارد کنید.'
+            : 'استان انتخاب‌شده شماره موبایل می‌خواهد؛ کد ملی قبلی پاک شد. پس از انتخاب شهر، شماره موبایل را وارد کنید.',
+        );
+      }
+    }
+    setResidence(next);
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
+    const value = toLatinDigits(identifier.trim());
     if (mode === 'register' && name.trim().length < 2) e.name = 'نام و نام خانوادگی را بنویسید.';
-    if (!/^09\d{9}$/.test(toLatinDigits(identifier.trim())))
-      e.identifier = 'شماره موبایل معتبر وارد کنید.';
+
+    if (mode === 'login') {
+      if (isNationalCodeShape(value)) {
+        if (!normalizeNationalCode(value)) e.identifier = 'کد ملی معتبر ۱۰ رقمی وارد کنید.';
+      } else if (!/^09\d{9}$/.test(value)) {
+        e.identifier = 'شماره موبایل ۱۱ رقمی یا کد ملی معتبر وارد کنید.';
+      }
+    }
+
     if (mode === 'register') {
-      // Activity location is part of sign-up: the admin/manager panels get the region of every marketer.
+      // Activity location is deliberately completed before asking for the sign-in identifier.
       if (!residence.province) e.province = 'استان محل فعالیت خود را انتخاب کنید.';
       else if (!residence.city) e.city = 'شهر محل فعالیت خود را انتخاب کنید.';
+      else if (requiresNationalCode && !normalizeNationalCode(value))
+        e.identifier = 'کد ملی معتبر ۱۰ رقمی وارد کنید.';
+      else if (!requiresNationalCode && !/^09\d{9}$/.test(value))
+        e.identifier = 'شماره موبایل معتبر وارد کنید.';
     }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -64,16 +115,31 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
     if (!validate()) return;
     setBusy(true);
     const id = toLatinDigits(identifier.trim());
+    const identityKind =
+      mode === 'register'
+        ? requiresNationalCode
+          ? 'nationalCode'
+          : 'phone'
+        : isNationalCodeShape(id)
+          ? 'nationalCode'
+          : 'phone';
     try {
       const u =
         mode === 'login'
-          ? await login(id)
-          : await register({
-              name: name.trim(),
-              phone: id,
-              province: residence.province,
-              city: residence.city,
-            });
+          ? await login({ kind: identityKind, value: id })
+          : requiresNationalCode
+            ? await register({
+                name: name.trim(),
+                nationalCode: id,
+                province: residence.province,
+                city: residence.city,
+              })
+            : await register({
+                name: name.trim(),
+                phone: id,
+                province: residence.province,
+                city: residence.city,
+              });
       // Return to the page that sent the user here (e.g. /admin/users) when their role allows it.
       const from = (loc.state as { from?: string } | null)?.from;
       const target =
@@ -85,17 +151,22 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
       nav(target, { replace: true });
     } catch (e) {
       if (mode === 'login' && e instanceof ApiError && e.code === 'NOT_FOUND') {
-        // Not registered yet: move to sign-up with the number kept; sign-up logs them in directly.
+        // Not registered yet: keep the entered identifier and let the user supply name + location.
         setMode('register');
         track('signup_started');
         setErrors({});
         setInfo(
-          'این شماره هنوز ثبت‌نام نکرده است. نام خود را وارد کنید و ثبت‌نام را بزنید تا مستقیم وارد شوید.',
+          `این ${identityKind === 'nationalCode' ? 'کد ملی' : 'شماره موبایل'} هنوز ثبت‌نام نشده است. نام و محل فعالیت خود را وارد کنید تا حساب‌تان ساخته شود.`,
         );
       } else if (e instanceof ApiError) {
-        const f = e.fields;
-        if (Object.keys(f).length) setErrors(f);
-        else if (e.code === 'CONFLICT') setErrors({ identifier: e.message });
+        const fieldErrors = e.fields;
+        const identityField = identityKind === 'nationalCode' ? 'nationalCode' : 'phone';
+        if (Object.keys(fieldErrors).length) {
+          setErrors({
+            ...fieldErrors,
+            ...(fieldErrors[identityField] ? { identifier: fieldErrors[identityField] } : {}),
+          });
+        } else if (e.code === 'CONFLICT') setErrors({ identifier: e.message });
         else setFormError(e.message);
       } else setFormError('خطایی رخ داد. دوباره تلاش کنید.');
     } finally {
@@ -104,6 +175,14 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   };
 
   const title = mode === 'login' ? 'ورود' : 'ثبت‌نام';
+  const identifierLabel =
+    mode === 'login' ? 'شماره موبایل یا کد ملی' : fieldUsesNationalCode ? 'کد ملی' : 'شماره موبایل';
+  const identifierPlaceholder =
+    mode === 'login'
+      ? 'شماره موبایل یا کد ملی ۱۰ رقمی'
+      : fieldUsesNationalCode
+        ? 'کد ملی ۱۰ رقمی'
+        : '09xxxxxxxxx';
   return (
     <div className="relative flex min-h-dvh flex-col items-center bg-background px-4 pb-8">
       {/* brand hero behind the top of the form */}
@@ -136,25 +215,43 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
               disabled={busy}
             />
           )}
-          <Input
-            label="شماره موبایل"
-            ltr
-            inputMode="tel"
-            autoComplete="username"
-            placeholder="09xxxxxxxxx"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            error={errors.identifier}
-            icon={<Phone className="size-5" />}
-            disabled={busy}
-          />
           {mode === 'register' && (
             <ResidencePicker
               value={residence}
-              onChange={setResidence}
+              onChange={handleResidenceChange}
               label="انتخاب محل فعالیت شما"
               provinceError={errors.province}
               cityError={errors.city}
+              disabled={busy}
+            />
+          )}
+          {(mode === 'login' || registrationIdentityVisible) && (
+            <Input
+              label={identifierLabel}
+              ltr
+              inputMode={mode === 'register' && fieldUsesNationalCode ? 'numeric' : 'tel'}
+              autoComplete={mode === 'login' ? 'username' : fieldUsesNationalCode ? 'off' : 'tel'}
+              placeholder={identifierPlaceholder}
+              // Login accepts a phone (11 digits) or a national code (10): while typing, the first ten
+              // digits already look like a national code, so a limit here would cut the phone's last digit.
+              maxLength={mode === 'register' && fieldUsesNationalCode ? 10 : undefined}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              error={errors.identifier}
+              hint={
+                mode === 'login'
+                  ? 'برای کاربران استان‌های مشمول، کد ملی ثبت‌شده را وارد کنید.'
+                  : fieldUsesNationalCode
+                    ? 'برای ورودهای بعدی از همین کد ملی استفاده می‌شود.'
+                    : undefined
+              }
+              icon={
+                fieldUsesNationalCode ? (
+                  <Fingerprint className="size-5" />
+                ) : (
+                  <Phone className="size-5" />
+                )
+              }
               disabled={busy}
             />
           )}

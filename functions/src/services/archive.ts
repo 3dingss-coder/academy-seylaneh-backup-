@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ApiError } from '../http/errors';
-import { ids, phoneToAuthEmail } from '../lib/ids';
+import { ids, nationalCodeToAuthEmailFromDigest, phoneToAuthEmail } from '../lib/ids';
 import type { Doc, Where } from '../store/types';
 import type { ArchivedReport, Team, User } from '../domain/types';
 import { audit, nowIso, track, type Actor, type Deps } from './context';
@@ -159,13 +159,18 @@ export async function purgeUser(d: Deps, actor: Actor, userId: string) {
   removed.audit_logs = await deleteWhere(d, 'audit_logs', [['entityId', '==', userId]]);
   removed._auth_refresh = await deleteWhere(d, '_auth_refresh', [['uid', '==', userId]]);
   await d.store.deleteMany([`mentor_memory/${userId}`]);
-  // Sign-in bookkeeping + the unique number/email reservation.
+  // Sign-in bookkeeping + the unique identity reservation. Only the keyed digest of a national
+  // code is kept on the user, so it can be removed here without storing the code itself.
   const authEmail = target.phone
     ? phoneToAuthEmail(target.phone)
-    : (target.email ?? staffAuthEmail(target.name));
+    : target.nationalCodeHash
+      ? nationalCodeToAuthEmailFromDigest(target.nationalCodeHash)
+      : (target.email ?? staffAuthEmail(target.name));
   const keys = [`login_guards/${ids.hash(authEmail)}`];
   if (target.phone) keys.push(`unique_keys/${ids.uniqueKey('phone', target.phone)}`);
   if (target.email) keys.push(`unique_keys/${ids.uniqueKey('email', target.email)}`);
+  if (target.nationalCodeHash)
+    keys.push(`unique_keys/${ids.uniqueKey('nationalCode', target.nationalCodeHash)}`);
   await d.store.deleteMany(keys);
   await d.auth.deleteUser(userId);
   // The account document goes last: if anything above failed, the user is still in the archive.

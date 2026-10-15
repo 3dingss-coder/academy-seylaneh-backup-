@@ -1,4 +1,4 @@
-import { sha256Hex } from './crypto';
+import { bytesToHex, hmacSha256Bytes, sha256Hex } from './crypto';
 
 /** Deterministic document ids (idempotency + uniqueness without queries). */
 export const ids = {
@@ -7,7 +7,7 @@ export const ids = {
   points: (userId: string, reason: string, refId: string) => `${userId}_${reason}_${refId}`,
   userBadge: (userId: string, badgeId: string) => `${userId}_${badgeId}`,
   escalation: (userId: string, packageId: string, type: string) => `${userId}_${packageId}_${type}`,
-  uniqueKey: (kind: 'phone' | 'email', value: string) =>
+  uniqueKey: (kind: 'phone' | 'email' | 'nationalCode', value: string) =>
     `${kind}_${sha256Hex(value.toLowerCase()).slice(0, 40)}`,
   hash: (s: string) => sha256Hex(s).slice(0, 40),
 };
@@ -26,10 +26,42 @@ export function normalizePhone(input: string): string | null {
   return /^09\d{9}$/.test(p) ? p : null;
 }
 
+/** Normalize Persian/Arabic digits and validate Iran's 10-digit national-code checksum. */
+export function normalizeNationalCode(input: string): string | null {
+  const code = input
+    .trim()
+    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  if (!/^\d{10}$/.test(code) || /^(\d)\1{9}$/.test(code)) return null;
+
+  const sum = [...code.slice(0, 9)].reduce(
+    (total, digit, index) => total + Number(digit) * (10 - index),
+    0,
+  );
+  const remainder = sum % 11;
+  const expectedCheckDigit = remainder < 2 ? remainder : 11 - remainder;
+  return Number(code[9]) === expectedCheckDigit ? code : null;
+}
+
 /** D35: phone users authenticate with a synthetic email. */
 export const PHONE_EMAIL_DOMAIN = 'phone.seylane-sabz.app';
 export function phoneToAuthEmail(phone: string): string {
   return `${phone}@${PHONE_EMAIL_DOMAIN}`;
+}
+
+/**
+ * A keyed, non-reversible lookup value for national codes. Codes are low-entropy personal data, so
+ * a plain SHA-256 digest would be vulnerable to an offline dictionary attack if the store leaked.
+ */
+export function nationalCodeDigest(nationalCode: string, secret: string): string {
+  const normalized = normalizeNationalCode(nationalCode);
+  if (!normalized) throw new Error('Invalid national code');
+  return bytesToHex(hmacSha256Bytes(secret, `seylane:national-code:${normalized}`));
+}
+
+/** The opaque internal auth email derived from a stored national-code digest. */
+export function nationalCodeToAuthEmailFromDigest(digest: string): string {
+  return `nc-${digest}@national-code.seylane-sabz.app`;
 }
 
 export function extractYoutubeId(url: string): string | null {

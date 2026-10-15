@@ -56,6 +56,23 @@ describe('session survives transient failures', () => {
     expect(n).toBe(2);
   });
 
+  it('retries national-code login on a transient Worker error', async () => {
+    const { request } = await load();
+    let n = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      ++n === 1
+        ? json(503, { error: { code: 'INTERNAL', message: 'x' } })
+        : json(200, { data: { ok: 1 } }),
+    );
+    await expect(
+      request(
+        '/auth/national-code-login',
+        { method: 'POST', body: { nationalCode: '1234567891' }, anonymous: true },
+      ),
+    ).resolves.toEqual({ ok: 1 });
+    expect(n).toBe(2);
+  });
+
   it('shows a clear message for Cloudflare edge JSON errors (no `error` field)', async () => {
     const { request } = await load();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>

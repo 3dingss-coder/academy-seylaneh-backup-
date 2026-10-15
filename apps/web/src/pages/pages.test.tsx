@@ -68,7 +68,7 @@ describe('routing', () => {
     localStorage.clear();
     renderAt('/');
     expect(await screen.findByRole('button', { name: 'ورود' })).toBeInTheDocument();
-    expect(screen.getByLabelText('شماره موبایل')).toBeInTheDocument();
+    expect(screen.getByLabelText('شماره موبایل یا کد ملی')).toBeInTheDocument();
   });
 
   it('protects the admin panel', async () => {

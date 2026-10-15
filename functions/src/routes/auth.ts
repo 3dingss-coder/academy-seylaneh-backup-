@@ -10,8 +10,59 @@ import { MemoryAuthProvider } from '../auth/memory';
 import { ApiError } from '../http/errors';
 import { randomBytesBase64Url } from '../lib/crypto';
 import { ids } from '../lib/ids';
+import type { User } from '../domain/types';
+
+type PasswordlessIdentifier = Extract<users.Identifier, { kind: 'phone' | 'nationalCode' }>;
 
 const ip = (req: { ip?: string }) => req.ip ?? 'unknown';
+
+/** Complete a passwordless marketer login for either phone or national-code identity. */
+async function passwordlessLogin(
+  d: Deps,
+  auth: MemoryAuthProvider,
+  identity: PasswordlessIdentifier,
+) {
+  const isNationalCode = identity.kind === 'nationalCode';
+  const blacklistedMessage = isNationalCode
+    ? users.BLACKLISTED_NATIONAL_CODE_MESSAGE
+    : users.BLACKLISTED_MESSAGE;
+  const idKind = isNationalCode ? 'کد ملی' : 'شماره';
+  const result = await auth.demoSignIn(identity.authEmail);
+  if (!result.ok) {
+    if (result.reason === 'disabled') {
+      const key = await d.store.get<{ uid: string | null }>(
+        `unique_keys/${ids.uniqueKey(identity.kind, identity.value)}`,
+      );
+      const owner = key?.uid ? await d.store.get<User>(`users/${key.uid}`) : null;
+      if (owner?.status === 'blacklisted')
+        throw new ApiError('FORBIDDEN', blacklistedMessage, { reason: 'BLACKLISTED' });
+      throw new ApiError('FORBIDDEN', 'حساب شما غیرفعال شده است. با مدیر خود تماس بگیرید.');
+    }
+    throw new ApiError('NOT_FOUND', `این ${idKind} هنوز ثبت‌نام نکرده است. ابتدا ثبت‌نام کنید.`, {
+      reason: 'NOT_REGISTERED',
+    });
+  }
+
+  const user = await d.store.get<User>(`users/${result.uid}`);
+  if (user?.status === 'blacklisted')
+    throw new ApiError('FORBIDDEN', blacklistedMessage, { reason: 'BLACKLISTED' });
+  if (!user || user.status !== 'active') throw new ApiError('UNAUTHENTICATED');
+  if (user.role !== 'marketer')
+    throw new ApiError(
+      'FORBIDDEN',
+      isNationalCode
+        ? 'این کد ملی از طریق ورود با کد ملی قابل استفاده نیست.'
+        : 'این شماره از طریق ورود با شماره موبایل قابل استفاده نیست.',
+    );
+  const identityMatches =
+    identity.kind === 'phone'
+      ? user.phone === identity.phone
+      : user.nationalCodeHash === identity.nationalCodeHash;
+  if (!identityMatches) throw new ApiError('UNAUTHENTICATED');
+
+  await d.store.update(`users/${result.uid}`, { lastActiveAt: d.clock().toISOString() });
+  return { user: users.publicUser(user), ...result.tokens };
+}
 
 /** Spec §21.1 — public auth endpoints (API is the only gateway, D35). */
 export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
@@ -42,8 +93,8 @@ export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
     perIp('login', 10),
     h(async (req) => users.login(d, parse(users.loginSchema, req.body))),
   );
-  // Marketers sign in with their phone number only (MemoryAuthProvider: local + Cloudflare D1).
-  // Staff accounts can never use this route; they sign in with username + password below.
+  // Passwordless marketer sign-in (MemoryAuthProvider: local + Cloudflare D1): phone for most
+  // provinces, national code for the configured provinces. Staff use username + password below.
   if (d.auth instanceof MemoryAuthProvider) {
     const phoneAuth = d.auth;
     r.post(
@@ -53,36 +104,16 @@ export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
         const { phone } = parse(z.object({ phone: z.string().max(20) }), req.body);
         const id = users.parseIdentifier(phone);
         if (id.kind !== 'phone') throw new ApiError('VALIDATION', 'شماره موبایل وارد کنید.');
-        const result = await phoneAuth.demoSignIn(id.authEmail);
-        if (!result.ok) {
-          // A disabled auth account may be a blacklisted (deleted) number: say so instead of
-          // «not registered», which would send the person to a sign-up that can never succeed.
-          if (result.reason === 'disabled') {
-            const key = await d.store.get<{ uid: string | null }>(
-              `unique_keys/${ids.uniqueKey('phone', id.phone)}`,
-            );
-            const owner = key?.uid
-              ? await d.store.get<import('../domain/types').User>(`users/${key.uid}`)
-              : null;
-            if (owner?.status === 'blacklisted')
-              throw new ApiError('FORBIDDEN', users.BLACKLISTED_MESSAGE, { reason: 'BLACKLISTED' });
-            throw new ApiError('FORBIDDEN', 'حساب شما غیرفعال شده است. با مدیر خود تماس بگیرید.');
-          }
-          throw new ApiError('NOT_FOUND', 'این شماره هنوز ثبت‌نام نکرده است. ابتدا ثبت‌نام کنید.', {
-            reason: 'NOT_REGISTERED',
-          });
-        }
-        const user = await d.store.get<import('../domain/types').User>(`users/${result.uid}`);
-        if (user?.status === 'blacklisted')
-          throw new ApiError('FORBIDDEN', users.BLACKLISTED_MESSAGE, { reason: 'BLACKLISTED' });
-        if (!user || user.status !== 'active') throw new ApiError('UNAUTHENTICATED');
-        if (user.role !== 'marketer')
-          throw new ApiError(
-            'FORBIDDEN',
-            'این شماره از طریق ورود با شماره موبایل قابل استفاده نیست.',
-          );
-        await d.store.update(`users/${result.uid}`, { lastActiveAt: new Date().toISOString() });
-        return { user: users.publicUser(user), ...result.tokens };
+        return passwordlessLogin(d, phoneAuth, id);
+      }),
+    );
+    r.post(
+      '/auth/national-code-login',
+      perIp('national-code-login', 10),
+      h(async (req) => {
+        const input = parse(users.nationalCodeLoginSchema, req.body);
+        const id = users.nationalCodeIdentifier(input.nationalCode, d.config.localSecret);
+        return passwordlessLogin(d, phoneAuth, id);
       }),
     );
     r.post(
@@ -112,6 +143,36 @@ export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
         );
         await notifyTemplate(d, [user.id], 'welcome', { name: user.name }, { actionRef: '/' });
         const session = await phoneAuth.demoSignIn(id.authEmail);
+        if (!session.ok) throw new ApiError('INTERNAL');
+        return { user: users.publicUser(user), ...session.tokens };
+      }, 201),
+    );
+    r.post(
+      '/auth/national-code-register',
+      perIp('national-code-register', 5),
+      h(async (req) => {
+        const input = parse(users.nationalCodeRegisterSchema, req.body);
+        const identity = users.nationalCodeIdentifier(input.nationalCode, d.config.localSecret);
+        // No password is shown or used: a random credential satisfies the auth provider. The
+        // national code itself is never stored; only its keyed HMAC lookup value is persisted.
+        const password = randomBytesBase64Url(24);
+        const team = await d.store.get('teams/team-seylane');
+        const user = await users.register(
+          d,
+          {
+            name: input.name,
+            identifier: identity.authEmail,
+            password,
+            province: input.province,
+            city: input.city,
+          },
+          'marketer',
+          team ? { teamId: 'team-seylane' } : {},
+          { passwordless: true },
+          identity,
+        );
+        await notifyTemplate(d, [user.id], 'welcome', { name: user.name }, { actionRef: '/' });
+        const session = await phoneAuth.demoSignIn(identity.authEmail);
         if (!session.ok) throw new ApiError('INTERNAL');
         return { user: users.publicUser(user), ...session.tokens };
       }, 201),

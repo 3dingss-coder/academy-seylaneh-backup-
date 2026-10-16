@@ -2,7 +2,14 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Spinner } from './Spinner';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'light';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'danger'
+  | 'light'
+  | 'energy'
+  | 'accent';
 export type ButtonSize = 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -26,6 +33,12 @@ const VARIANTS: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent text-text-secondary hover:bg-border/60 active:bg-border',
   danger:
     'bg-danger text-on-danger shadow-sm hover:brightness-[0.92] active:brightness-90 hover:shadow-md',
+  /** Marketer reward/progress energy (Stage 2, additive): #58CC02 with dark text only (8.49:1). */
+  energy:
+    'bg-brand-energy text-on-energy shadow-sm hover:brightness-[0.95] active:brightness-90 hover:shadow-md',
+  /** Amber rewards accent (Stage 2, additive): #F59E0B with dark text only (8.26:1). */
+  accent:
+    'bg-accent text-on-accent shadow-sm hover:brightness-[0.95] active:brightness-90 hover:shadow-md',
 };
 
 const SIZES: Record<ButtonSize, string> = {

@@ -60,7 +60,7 @@ const MAP: Record<BadgeStatus, { label: string; icon: LucideIcon; cls: string }>
   blacklisted: {
     label: 'لیست سیاه',
     icon: Ban,
-    cls: 'bg-danger-light text-danger border-danger/30',
+    cls: 'bg-danger-light text-danger-fg border-danger/30',
   },
 };
 

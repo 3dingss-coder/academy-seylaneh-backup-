@@ -18,9 +18,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // Design refresh: soft brand gradient + top highlight, lift on hover, scale(0.98) on press.
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary bg-brand-gradient text-on-primary [box-shadow:var(--shadow-sm),var(--shadow-inset-top)] hover:bg-primary-hover hover:[box-shadow:var(--shadow-brand),var(--shadow-inset-top)] active:bg-primary-hover',
+    'bg-cta bg-brand-gradient text-on-cta [box-shadow:var(--shadow-sm),var(--shadow-inset-top)] hover:bg-cta-hover hover:[box-shadow:var(--shadow-brand),var(--shadow-inset-top)] active:bg-cta-hover',
   secondary:
-    'bg-surface text-primary border border-primary/70 hover:bg-primary-light active:bg-primary-light',
+    'bg-surface text-primary-fg border border-primary/70 hover:bg-primary-light active:bg-primary-light',
   /** white button for dark brand surfaces (hero cards) — same look in light and dark mode */
   light: 'bg-white text-primary-800 shadow-md hover:bg-primary-50 active:bg-primary-100',
   ghost: 'bg-transparent text-text-secondary hover:bg-border/60 active:bg-border',

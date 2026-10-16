@@ -84,7 +84,7 @@ export function CategoryFilter({
           className={cn(
             'pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-bold whitespace-nowrap',
             value === c.value
-              ? 'border-primary bg-primary bg-brand-gradient text-on-primary shadow-sm'
+              ? 'border-primary bg-cta bg-brand-gradient text-on-cta shadow-sm'
               : 'border-border bg-surface text-text-secondary hover:bg-surface-2',
           )}
         >

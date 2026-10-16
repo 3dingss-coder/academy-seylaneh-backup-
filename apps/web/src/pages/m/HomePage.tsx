@@ -193,7 +193,7 @@ export function HomePage() {
                 </h2>
                 <Link
                   to="/learn"
-                  className="flex min-h-12 items-center gap-0.5 px-2 text-sm font-bold text-primary"
+                  className="flex min-h-12 items-center gap-0.5 px-2 text-sm font-bold text-primary-fg"
                 >
                   همه
                   <ChevronLeft className="size-4" aria-hidden />

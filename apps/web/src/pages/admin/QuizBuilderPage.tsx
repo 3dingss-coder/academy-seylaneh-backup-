@@ -139,7 +139,7 @@ function Builder({ d }: { d: AdminQuiz }) {
                           className={cn(
                             'flex items-center gap-2 rounded-input px-2 py-1 text-sm',
                             o.key === x.answerKey
-                              ? 'bg-primary-light font-bold text-primary'
+                              ? 'bg-primary-light font-bold text-primary-fg'
                               : 'text-text-secondary',
                           )}
                         >

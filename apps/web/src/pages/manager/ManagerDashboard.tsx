@@ -82,7 +82,7 @@ export function ManagerDashboard() {
                     className="flex min-h-12 items-center justify-between rounded-card border border-warning/30 bg-warning-light px-3 text-sm font-bold text-text"
                   >
                     {toPersianDigits(d.pendingRetakes)} درخواست آزمون مجدد منتظر بررسی شماست
-                    <span className="text-primary">بررسی</span>
+                    <span className="text-primary-fg">بررسی</span>
                   </Link>
                 )}
                 <section aria-labelledby="laggards" className="flex flex-col gap-2">
@@ -92,7 +92,7 @@ export function ManagerDashboard() {
                     </h2>
                     <Link
                       to="/manager/reports?status=overdue"
-                      className="flex min-h-12 items-center px-2 text-sm font-bold text-primary"
+                      className="flex min-h-12 items-center px-2 text-sm font-bold text-primary-fg"
                     >
                       گزارش کامل
                     </Link>

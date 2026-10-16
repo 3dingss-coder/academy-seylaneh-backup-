@@ -87,7 +87,7 @@ export function MessagesPage() {
                     <Bell
                       className={cn(
                         'mt-0.5 size-5 shrink-0',
-                        it.readAt ? 'text-muted-fg' : 'text-primary',
+                        it.readAt ? 'text-muted-fg' : 'text-primary-fg',
                       )}
                       aria-hidden
                     />

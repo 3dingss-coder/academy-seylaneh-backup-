@@ -48,7 +48,7 @@ const MAP: Record<BadgeStatus, { label: string; icon: LucideIcon; cls: string }>
   published: {
     label: 'منتشرشده',
     icon: Send,
-    cls: 'bg-primary-light text-primary border-primary/30',
+    cls: 'bg-primary-light text-primary-fg border-primary/30',
   },
   archived: { label: 'بایگانی', icon: Archive, cls: 'bg-background text-muted-fg border-border' },
   active: {

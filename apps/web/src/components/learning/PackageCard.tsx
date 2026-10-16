@@ -21,7 +21,7 @@ export function PackageCard({ p }: { p: PackageSummary }) {
         className="size-20 transition-transform duration-300 ease-soft group-hover:scale-[1.03]"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <p className="text-xs font-bold text-primary">
+        <p className="text-xs font-bold text-primary-fg">
           {p.brand?.name}
           {p.product ? '' : p.brand ? ' — آموزش برند' : ''}
         </p>

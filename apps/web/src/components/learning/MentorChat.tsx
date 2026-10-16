@@ -325,7 +325,7 @@ export function MentorChat({
               className={cn(
                 'max-w-[85%] whitespace-pre-line rounded-[18px] px-3.5 py-2 text-sm leading-7 shadow-xs',
                 m.role === 'user'
-                  ? 'rounded-se-md bg-primary bg-brand-gradient text-on-primary'
+                  ? 'rounded-se-md bg-cta bg-brand-gradient text-on-cta'
                   : 'rounded-ee-md border border-border bg-surface text-text',
               )}
             >
@@ -348,7 +348,7 @@ export function MentorChat({
                   onClick={() => fb.mutate({ messageId: m.id, feedback: 'up' })}
                   className={cn(
                     'flex size-12 items-center justify-center',
-                    m.feedback === 'up' ? 'text-primary' : 'text-muted-fg',
+                    m.feedback === 'up' ? 'text-primary-fg' : 'text-muted-fg',
                   )}
                 >
                   <ThumbsUp className="size-4" />
@@ -372,7 +372,7 @@ export function MentorChat({
         {pending && (
           <>
             <div className="animate-fade-up flex justify-start">
-              <div className="max-w-[85%] rounded-[18px] rounded-se-md bg-primary px-3.5 py-2 text-sm text-on-primary">
+              <div className="max-w-[85%] rounded-[18px] rounded-se-md bg-cta px-3.5 py-2 text-sm text-on-cta">
                 {pending}
               </div>
             </div>

@@ -14,7 +14,7 @@ export function MentorPage() {
     <div className="flex h-[calc(100dvh-12rem)] flex-col md:h-[calc(100dvh-8rem)]">
       <div className="mb-2 flex items-center gap-2">
         <span className="flex size-9 items-center justify-center rounded-full bg-primary-light">
-          <Bot className="size-5 text-primary" aria-hidden />
+          <Bot className="size-5 text-primary-fg" aria-hidden />
         </span>
         <div className="min-w-0">
           <h1 className="text-lg font-bold leading-6">منتور</h1>

@@ -101,7 +101,9 @@ export function CardsPage() {
                       </span>
                       <p className="text-sm font-bold text-text">{b.title}</p>
                       <p className="text-xs leading-5 text-text-secondary">{b.description}</p>
-                      {b.earnedAt && <p className="text-xs text-primary">{faDate(b.earnedAt)}</p>}
+                      {b.earnedAt && (
+                        <p className="text-xs text-primary-fg">{faDate(b.earnedAt)}</p>
+                      )}
                     </Card>
                   </li>
                 );

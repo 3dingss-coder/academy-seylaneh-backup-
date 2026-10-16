@@ -16,7 +16,7 @@ export interface ProgressRingProps {
 }
 
 const TONES = {
-  primary: 'text-primary',
+  primary: 'text-primary-fg',
   success: 'text-success',
   warning: 'text-warning',
   danger: 'text-danger',
@@ -103,7 +103,7 @@ export function ProgressBar({
       <div
         className={cn(
           'h-full w-full rounded-full transition-transform duration-700 ease-soft',
-          pct >= 100 ? 'bg-success' : 'bg-primary bg-brand-gradient',
+          pct >= 100 ? 'bg-success' : 'bg-cta bg-brand-gradient',
         )}
         // RTL: the fill is anchored to the right edge, so the unfilled part slides out to the right
         style={{ transform: `translateX(${document.dir === 'ltr' ? -rest : rest}%)` }}

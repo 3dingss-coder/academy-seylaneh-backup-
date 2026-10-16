@@ -22,7 +22,7 @@ export function EmptyState({ title, description, actionText, onAction, icon }: E
       />
       <div className="relative mb-3">
         {icon ? (
-          <div className="flex size-16 items-center justify-center rounded-card bg-primary-light text-primary">
+          <div className="flex size-16 items-center justify-center rounded-card bg-primary-light text-primary-fg">
             {icon}
           </div>
         ) : (

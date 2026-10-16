@@ -87,7 +87,7 @@ export function LearnPage() {
               className={cn(
                 'pressable flex min-h-12 shrink-0 items-center gap-2 rounded-full border bg-surface px-2 pe-4 text-sm font-bold shadow-xs',
                 brand === b.id
-                  ? 'border-primary bg-primary-light text-primary'
+                  ? 'border-primary bg-primary-light text-primary-fg'
                   : 'border-border text-text-secondary hover:border-primary/40',
               )}
             >

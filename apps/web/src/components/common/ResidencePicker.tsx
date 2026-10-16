@@ -279,7 +279,7 @@ function LocationField({
                       className={cn(
                         'flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3.5 text-sm',
                         index === active && 'bg-primary-light',
-                        selected ? 'font-bold text-primary' : 'text-text',
+                        selected ? 'font-bold text-primary-fg' : 'text-text',
                       )}
                     >
                       <span className="truncate">{option}</span>

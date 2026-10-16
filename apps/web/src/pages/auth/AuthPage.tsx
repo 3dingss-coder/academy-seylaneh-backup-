@@ -276,7 +276,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
           {mode === 'login' ? (
             <button
               type="button"
-              className="min-h-12 font-bold text-primary"
+              className="min-h-12 font-bold text-primary-fg"
               onClick={() => switchMode('register')}
             >
               حساب ندارید؟ ثبت‌نام کنید
@@ -284,7 +284,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
           ) : (
             <button
               type="button"
-              className="min-h-12 font-bold text-primary"
+              className="min-h-12 font-bold text-primary-fg"
               onClick={() => switchMode('login')}
             >
               حساب دارید؟ وارد شوید

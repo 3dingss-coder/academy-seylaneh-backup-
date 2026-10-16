@@ -150,7 +150,7 @@ function Templates() {
               <li key={t.key}>
                 <Card className="flex h-full flex-col gap-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold text-primary">
+                    <p className="text-xs font-bold text-primary-fg">
                       {KEY_LABEL[t.key] ?? t.key}
                       {t.customized && <span className="ms-2 text-warning-fg">(سفارشی)</span>}
                     </p>

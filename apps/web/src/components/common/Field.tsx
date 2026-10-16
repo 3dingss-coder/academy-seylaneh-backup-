@@ -107,7 +107,7 @@ export function Tabs<T extends string>({
           className={cn(
             'pressable flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-input px-3 text-sm font-bold',
             value === it.value
-              ? 'bg-primary bg-brand-gradient text-on-primary shadow-sm'
+              ? 'bg-cta bg-brand-gradient text-on-cta shadow-sm'
               : 'text-text-secondary hover:bg-surface-2',
           )}
         >

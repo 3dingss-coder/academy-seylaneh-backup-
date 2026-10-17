@@ -409,7 +409,7 @@ export function MentorChat({
               <button
                 type="button"
                 aria-label="حذف پیوست"
-                className="flex size-8 items-center justify-center text-muted-fg"
+                className="flex size-12 items-center justify-center rounded-full text-muted-fg hover:bg-surface-2"
                 onClick={() => setAttachments((old) => old.filter((_, idx) => idx !== i))}
               >
                 <X className="size-3.5" />

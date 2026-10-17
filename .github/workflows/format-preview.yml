@@ -1,0 +1,39 @@
+name: Format preview files
+
+on:
+  push:
+    branches:
+      - arena/9e53c41a-seylane-sabz-learning
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          npx prettier --write \
+            apps/web/src/components/brand/Mascot.tsx \
+            apps/web/src/components/learning/PackageCard.tsx \
+            apps/web/src/pages/m/HomePage.tsx \
+            apps/web/src/pages/m/LearnPage.tsx \
+            apps/web/src/pages/manager/ManagerDashboard.tsx \
+            apps/web/src/styles/index.css
+      - uses: actions/upload-artifact@v6
+        with:
+          name: formatted-preview-files
+          path: |
+            apps/web/src/components/brand/Mascot.tsx
+            apps/web/src/components/learning/PackageCard.tsx
+            apps/web/src/pages/m/HomePage.tsx
+            apps/web/src/pages/m/LearnPage.tsx
+            apps/web/src/pages/manager/ManagerDashboard.tsx
+            apps/web/src/styles/index.css
+          retention-days: 1

@@ -39,7 +39,7 @@ export function ManagerDashboard() {
         {(d) => (
           <>
             <PageHeader
-              title={d.team ? `تیم ${d.team.name}` : 'داشبورد تیم'}
+              title={d.team ? (d.team.name.trim().startsWith('تیم') ? d.team.name : `تیم ${d.team.name}`) : 'داشبورد تیم'}
               subtitle="وضعیت آموزش اعضای تیم"
             />
             {!d.team ? (

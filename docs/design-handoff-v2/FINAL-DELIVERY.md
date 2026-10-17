@@ -119,7 +119,7 @@
 - **وضعیت‌ها و semantic status colors** (موفق/هشدار/خطر/اطلاع) — از spec حفظ و در تست‌های StatusBadge پین شد؛ وضعیت‌ها هرگز فقط-رنگی نیستند (آیکون/متن).
 - **هویت ماسکات:** `02-mascot/mascot-original.png` با SHA-256 `1bf42cc8…f49562` — بدون regeneration/لباس/کلاه/عینک؛ پرتکرار در مارکتر، نادر در مدیر، تقریباً غایب در ادمین (پین شده در adminCore).
 - **فونت وزیرمتن (self-hosted)**، RTL اول فارسی.
-- **dark-mode و `prefers-reduced-motion`** (پین‌شده در refresh.test/primitives.test/e2e foundation).
+- **`prefers-reduced-motion`** (پین‌شده در refresh.test/primitives.test/e2e foundation). **dark-mode:** توکن‌های تم تاریک زیر `:root[data-theme='dark']` کشتی می‌شوند؛ اما هیچ‌جا در برنامه `data-theme` ست نمی‌شود و سیم‌کشی `prefers-color-scheme` وجود ندارد — بنابراین برنامه امروز فقط تم روشن را رندر می‌کند و بلوک تاریک تا معرفی یک toggle غیرفعال (dormant) است (راستی‌آزمایی visual-QA در ۲۰۲۶-۱۰).
 - **تمام مسیرها، دکمه‌ها، فیلدها، اعتبارسنجی‌ها، وضعیت‌ها، دسترسی‌ها، خروجی‌ها، آپلودها و حالت‌های خطا** — طبق قاعدهٔ صفر regression؛ مواردی که در spec نبودند (مثلاً «میکروفون/تماس صوتی» منتور، تب‌های سه‌گانهٔ اعلان‌ها، آرشیو ≠ حذف) عمداً حفظ شدند.
 - **ادغام دسترسی‌های ادمین و مدیر: انجام نشد** (رابط‌ها و navها مستقل ماندند — پین شده در manager.test/adminCore.test/flows.test «marketer cannot open the admin panel»).
 

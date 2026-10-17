@@ -290,7 +290,10 @@
   --breakpoint-xl: 1280px;
 }
 
-/* ---- Dark mode: same token names, re-mapped. Opt-in by the OS (prefers-color-scheme). ----
+/* ---- Dark mode: same token names, re-mapped. Opt-in only via <html data-theme='dark'>. ----
+   Visual-QA note (2026-10): nothing in the app sets `data-theme` and there is no
+   `prefers-color-scheme` wiring, so the app renders the light theme only; this block
+   is dormant until a toggle (or the attribute) is introduced.
    Contrast checked: text/surface 14:1, text-secondary/surface 7.6:1, primary(text)/surface 7.9:1,
    on-primary/primary 8.3:1, each *-fg on its *-light ≥ 7:1. */
 :root[data-theme='dark'] {

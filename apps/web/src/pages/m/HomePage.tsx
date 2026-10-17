@@ -41,7 +41,7 @@ export function HomePage() {
   return (
     <div className="stagger flex flex-col gap-4">
       <div>
-        <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]} 👋</p>
+        <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]}</p>
         <h1 className="text-2xl font-extrabold text-text">کار بعدی تو</h1>
       </div>
       <StaleBanner

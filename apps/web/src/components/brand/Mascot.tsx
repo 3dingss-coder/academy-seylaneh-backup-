@@ -37,7 +37,7 @@ function Sparkle({ className }: { className?: string }) {
 
 export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; className?: string }) {
   return (
-    <span aria-hidden className={cn('pointer-events-none relative inline-flex', className)}>
+    <span aria-hidden className="pointer-events-none relative inline-flex shrink-0 items-end justify-center">
       {/* thinking: three amber "hmm…" dots rising on the head side (RTL start = right) */}
       {mood === 'thinking' && (
         <span className="absolute -top-2 start-1 flex flex-col items-center gap-1">
@@ -59,7 +59,7 @@ export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; cla
         width={250}
         height={324}
         decoding="async"
-        className={cn('h-auto drop-shadow-md', POSE[mood])}
+        className={cn('block h-auto w-auto max-w-full object-contain drop-shadow-md', POSE[mood], className)}
       />
     </span>
   );

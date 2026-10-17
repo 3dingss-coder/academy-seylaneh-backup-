@@ -197,7 +197,7 @@ export function JalaliDateField({
                   aria-pressed={selected}
                   aria-label={formatJalali(cur)}
                   className={cn(
-                    'flex aspect-square min-h-10 items-center justify-center rounded-input text-sm font-bold transition-colors',
+                    'flex aspect-square min-h-12 items-center justify-center rounded-input text-sm font-bold transition-colors',
                     selected
                       ? 'bg-cta text-on-cta'
                       : disabled

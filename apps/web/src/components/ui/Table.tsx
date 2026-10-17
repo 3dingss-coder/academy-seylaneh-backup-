@@ -86,7 +86,7 @@ export function DataTable<T>({
                     <button
                       type="button"
                       onClick={() => toggle(c.key)}
-                      className="inline-flex min-h-8 items-center gap-1 font-bold hover:text-text"
+                      className="inline-flex min-h-12 items-center gap-1 font-bold hover:text-text"
                     >
                       {c.header}
                       {sort?.key === c.key ? (

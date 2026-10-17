@@ -11,9 +11,18 @@ export interface EmptyStateProps {
   onAction?: () => void;
   /** Custom icon; when omitted a small animated brand illustration is shown. */
   icon?: ReactNode;
+  /** Full custom visual replacing the default illustration (e.g. a small mascot state). */
+  illustration?: ReactNode;
 }
 
-export function EmptyState({ title, description, actionText, onAction, icon }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  actionText,
+  onAction,
+  icon,
+  illustration,
+}: EmptyStateProps) {
   return (
     <div className="animate-fade-up relative flex flex-col items-center justify-center overflow-hidden rounded-card border border-border bg-surface px-6 py-10 text-center shadow-sm">
       <div
@@ -26,7 +35,7 @@ export function EmptyState({ title, description, actionText, onAction, icon }: E
             {icon}
           </div>
         ) : (
-          <EmptyIllustration />
+          (illustration ?? <EmptyIllustration />)
         )}
       </div>
       <h3 className="relative text-base font-bold text-text">{title}</h3>

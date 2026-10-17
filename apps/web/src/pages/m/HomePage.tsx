@@ -8,10 +8,10 @@ import {
   PackageCardSkeleton,
   ProgressRing,
   Skeleton,
-  TrophyIllustration,
 } from '@/components/ui';
 import { QueryState, StaleBanner } from '@/components/common/QueryState';
 import { ProductImage } from '@/components/common/ProductImage';
+import { Mascot } from '@/components/brand/Mascot';
 import { PackageCard } from '@/components/learning/PackageCard';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/cn';
@@ -62,6 +62,7 @@ export function HomePage() {
           <EmptyState
             title="هنوز آموزشی ندارید"
             description="منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید."
+            illustration={<Mascot mood="thinking" className="h-24 w-auto" />}
           />
         }
       >
@@ -135,7 +136,8 @@ export function HomePage() {
               </Card>
             ) : (
               <Card tone="brand" className="flex items-center gap-3">
-                <TrophyIllustration className="h-20 shrink-0" />
+                {/* success state (handoff: mascot may support success moments) */}
+                <Mascot mood="success" className="h-24 w-auto shrink-0" />
                 <div>
                   <p className="font-bold text-text">همه آموزش‌ها را تمام کردی! 🎉</p>
                   <p className="text-sm text-text-secondary">

@@ -5,6 +5,7 @@ import { Tabs } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState, StaleBanner } from '@/components/common/QueryState';
 import { BrandLogo } from '@/components/brand/BrandLogo';
+import { Mascot } from '@/components/brand/Mascot';
 import { PackageCard } from '@/components/learning/PackageCard';
 import { cn } from '@/lib/cn';
 import { clearSubject, rememberSubject } from '@/lib/pageContext';
@@ -111,7 +112,10 @@ export function LearnPage() {
         {(list) => {
           const items = list.filter((p) => p.status === tab && (!brand || p.brand?.id === brand));
           return items.length === 0 ? (
-            <EmptyState title={EMPTY[tab]} />
+            <EmptyState
+              title={EMPTY[tab]}
+              illustration={<Mascot mood="thinking" className="h-24 w-auto" />}
+            />
           ) : (
             <div
               key={`${tab}-${brand}`}

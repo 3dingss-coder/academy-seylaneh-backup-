@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CountUp, EmptyState, Skeleton } from '@/components/ui';
+import { Mascot } from '@/components/brand/Mascot';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
 import { api } from '@/lib/api';
@@ -124,6 +125,7 @@ export function CardsPage() {
             <EmptyState
               title="هنوز امتیازی نگرفته‌ای"
               description="با تکمیل به‌موقع آموزش‌ها و قبولی در آزمون امتیاز بگیر."
+              illustration={<Mascot mood="guide" className="h-24 w-auto" />}
             />
           }
         >

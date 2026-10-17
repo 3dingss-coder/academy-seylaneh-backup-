@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Bot,
   FileText,
   ImagePlus,
   Link2,
@@ -14,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button, Skeleton, useToast } from '@/components/ui';
+import { Mascot } from '@/components/brand/Mascot';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { errMsg } from '@/lib/errors';
@@ -293,9 +293,8 @@ export function MentorChat({
         {history.isPending && <Skeleton className="h-16 w-3/4" />}
         {!history.isPending && msgs.length === 0 && !pending && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <span className="animate-float flex size-16 items-center justify-center rounded-full bg-hero shadow-md">
-              <Bot className="size-8 text-white" aria-hidden />
-            </span>
+            {/* mentor state: the provided mascot greets, secondary to the suggestions */}
+            <Mascot mood="welcome" className="animate-float h-20 w-auto" />
             <p className="text-sm text-text-secondary">
               سؤالت درباره محصولات و آموزش‌ها را بپرس. فقط از محتوای تأییدشده جواب می‌دهم.
             </p>

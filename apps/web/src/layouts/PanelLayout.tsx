@@ -62,7 +62,7 @@ export function PanelLayout({ title, items }: { title: string; items: PanelNavIt
               end={to.split('/').length <= 2}
               className={({ isActive }) =>
                 cn(
-                  'pressable flex min-h-11 shrink-0 items-center gap-1.5 rounded-input px-3 text-sm font-bold transition-colors',
+                  'pressable flex min-h-12 shrink-0 items-center gap-1.5 rounded-input px-3 text-sm font-bold transition-colors',
                   isActive ? 'bg-cta text-on-cta' : 'text-text-secondary',
                 )
               }

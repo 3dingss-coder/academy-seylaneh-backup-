@@ -179,7 +179,9 @@ export function LearnPage() {
         }
       >
         {(list) => {
-          const items = list.filter((p) => p.status === tab && (!brand || p.brand?.id === brand));
+          const items = list.filter(
+            (p) => p.status === tab && (!brand || p.brand?.id === brand),
+          );
           return items.length === 0 ? (
             <EmptyState
               title={EMPTY[tab]}

@@ -233,7 +233,7 @@ function TemplateDialog({ t, onClose }: { t: NotificationTemplate; onClose: () =
                 key={v}
                 type="button"
                 onClick={() => setBody((b) => `${b}{${v}}`)}
-                className="ms-1 inline-flex min-h-8 items-center rounded-full bg-background px-2 font-mono"
+                className="ms-1 inline-flex min-h-12 items-center rounded-full bg-background px-3 font-mono"
                 dir="ltr"
               >
                 {`{${v}}`}

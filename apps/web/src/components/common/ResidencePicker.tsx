@@ -197,7 +197,7 @@ function LocationField({
                 onClear?.();
                 close(true);
               }}
-              className="pointer-events-auto grid size-8 place-items-center rounded-full text-muted-fg hover:bg-surface-2 focus:outline-none focus:ring-4 focus:ring-info/15"
+              className="pointer-events-auto grid size-12 place-items-center rounded-full text-muted-fg hover:bg-surface-2 focus:outline-none focus:ring-4 focus:ring-info/15"
             >
               <X aria-hidden className="size-4" />
             </button>

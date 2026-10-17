@@ -35,7 +35,13 @@ function Sparkle({ className }: { className?: string }) {
   );
 }
 
-export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; className?: string }) {
+export function Mascot({
+  mood = 'welcome',
+  className,
+}: {
+  mood?: MascotMood;
+  className?: string;
+}) {
   return (
     <span aria-hidden className="pointer-events-none relative inline-flex shrink-0 items-end justify-center">
       {/* thinking: three amber "hmm…" dots rising on the head side (RTL start = right) */}
@@ -59,7 +65,11 @@ export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; cla
         width={250}
         height={324}
         decoding="async"
-        className={cn('block h-auto w-auto max-w-full object-contain drop-shadow-md', POSE[mood], className)}
+        className={cn(
+          'block h-auto w-auto max-w-full object-contain drop-shadow-md',
+          POSE[mood],
+          className,
+        )}
       />
     </span>
   );

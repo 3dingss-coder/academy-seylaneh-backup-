@@ -155,7 +155,9 @@ export function HomePage() {
                 <div className="flex items-center gap-5">
                   <Mascot mood="success" className="h-36" />
                   <div>
-                    <p className="text-lg font-extrabold text-text">عالیه! همه آموزش‌ها را تمام کردی</p>
+                    <p className="text-lg font-extrabold text-text">
+                      عالیه! همه آموزش‌ها را تمام کردی
+                    </p>
                     <p className="mt-1 text-sm leading-7 text-text-secondary">
                       به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.
                     </p>

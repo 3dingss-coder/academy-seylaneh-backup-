@@ -1258,7 +1258,7 @@ function Bool({
   hint?: string;
 }) {
   return (
-    <label className="flex min-h-11 items-start gap-2 text-sm" title={hint}>
+    <label className="flex min-h-12 items-start gap-2 text-sm" title={hint}>
       <input
         type="checkbox"
         className="mt-1 size-5 accent-primary"

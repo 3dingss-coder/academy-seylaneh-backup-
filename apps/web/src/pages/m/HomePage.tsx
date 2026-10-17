@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from '@/components/ui';
 import { QueryState, StaleBanner } from '@/components/common/QueryState';
+import { ProductImage } from '@/components/common/ProductImage';
 import { Mascot } from '@/components/brand/Mascot';
 import { PackageCard } from '@/components/learning/PackageCard';
 import { useAuth } from '@/lib/auth';
@@ -111,7 +112,7 @@ export function HomePage() {
                 <div className="relative z-10 max-w-[58%] sm:max-w-[56%]">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-light px-3 py-1 text-xs font-extrabold text-accent-fg">
                     <Sparkles className="size-3.5" aria-hidden />
-                    درس امروز
+                    کار بعدی
                   </span>
                   <h2 className="mt-4 text-xl font-extrabold leading-8 text-text sm:text-2xl">
                     {d.nextItem.packageTitle}
@@ -147,7 +148,13 @@ export function HomePage() {
                 </div>
 
                 <div className="pointer-events-none absolute -bottom-4 -start-5 z-0 flex h-[290px] w-[48%] items-end justify-center sm:-start-2 sm:h-[320px]">
-                  <Mascot mood="guide" className="max-h-full w-auto" />
+                  {/* Real product image (contract: accessible name = package title, real catalog src) —
+                      the mascot stays reserved for empty/success/encouragement/mentor states. */}
+                  <ProductImage
+                    src={d.nextItem.imageUrl}
+                    alt={d.nextItem.packageTitle}
+                    className="size-44 rounded-[24px] border-white/60 shadow-lg sm:size-52"
+                  />
                 </div>
               </section>
             ) : (
@@ -156,7 +163,7 @@ export function HomePage() {
                   <Mascot mood="success" className="h-36" />
                   <div>
                     <p className="text-lg font-extrabold text-text">
-                      عالیه! همه آموزش‌ها را تمام کردی
+                      همه آموزش‌ها را تمام کردی! 🎉
                     </p>
                     <p className="mt-1 text-sm leading-7 text-text-secondary">
                       به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.
@@ -224,7 +231,7 @@ export function HomePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 id="my-trainings" className="text-lg font-extrabold text-text">
-                    دوره‌های آموزشی
+                    آموزش‌های من
                   </h2>
                   <p className="mt-0.5 text-xs text-text-secondary">مسیرهای فعال شما</p>
                 </div>

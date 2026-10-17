@@ -41,9 +41,7 @@ export function PackageCard({ p }: { p: PackageSummary }) {
             p.deadlineAt && <CountdownChip deadline={p.deadlineAt} />
           )}
         </div>
-        <h3 className="line-clamp-2 text-base font-extrabold leading-7 text-text">
-          {p.title}
-        </h3>
+        <h3 className="line-clamp-2 text-base font-extrabold leading-7 text-text">{p.title}</h3>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3.5" aria-hidden />
@@ -56,9 +54,7 @@ export function PackageCard({ p }: { p: PackageSummary }) {
         <div className="mt-auto pt-4">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[11px] font-medium text-text-secondary">پیشرفت آموزش</span>
-            <span className="text-xs font-extrabold text-primary-fg">
-              {faPercent(p.percent)}
-            </span>
+            <span className="text-xs font-extrabold text-primary-fg">{faPercent(p.percent)}</span>
           </div>
           <ProgressBar value={p.percent} label={`پیشرفت ${p.title}`} />
         </div>

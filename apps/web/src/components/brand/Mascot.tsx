@@ -43,7 +43,10 @@ export function Mascot({
   className?: string;
 }) {
   return (
-    <span aria-hidden className="pointer-events-none relative inline-flex shrink-0 items-end justify-center">
+    <span
+      aria-hidden
+      className="pointer-events-none relative inline-flex shrink-0 items-end justify-center"
+    >
       {/* thinking: three amber "hmm…" dots rising on the head side (RTL start = right) */}
       {mood === 'thinking' && (
         <span className="absolute -top-2 start-1 flex flex-col items-center gap-1">

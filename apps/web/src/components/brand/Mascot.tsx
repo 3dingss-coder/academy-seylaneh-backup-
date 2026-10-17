@@ -35,13 +35,7 @@ function Sparkle({ className }: { className?: string }) {
   );
 }
 
-export function Mascot({
-  mood = 'welcome',
-  className,
-}: {
-  mood?: MascotMood;
-  className?: string;
-}) {
+export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; className?: string }) {
   return (
     <span
       aria-hidden

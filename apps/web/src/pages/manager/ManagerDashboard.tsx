@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  AlarmClock,
-  CheckCircle2,
-  ClipboardList,
-  Send,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import { AlarmClock, CheckCircle2, ClipboardList, Send, TrendingUp, Users } from 'lucide-react';
 import { Button, EmptyState, KpiCard, ProgressBar, Skeleton, TableSkeleton } from '@/components/ui';
 import { DataTable } from '@/components/admin/DataTable';
 import { Mascot } from '@/components/brand/Mascot';

@@ -15,7 +15,10 @@ export function PackageCard({ p }: { p: PackageSummary }) {
       className="pressable group relative grid min-h-40 grid-cols-[96px_1fr] gap-4 overflow-hidden rounded-hero border border-border bg-surface p-4 shadow-sm hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:border-primary sm:grid-cols-[112px_1fr]"
       data-testid="package-card"
     >
-      <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-primary via-primary-400 to-accent" />
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-primary via-primary-400 to-accent"
+      />
       <div className="relative self-start">
         <div className="absolute -inset-2 rounded-[22px] bg-primary-light opacity-70 blur-xl transition-opacity group-hover:opacity-100" />
         <ProductImage
@@ -38,7 +41,9 @@ export function PackageCard({ p }: { p: PackageSummary }) {
             p.deadlineAt && <CountdownChip deadline={p.deadlineAt} />
           )}
         </div>
-        <h3 className="line-clamp-2 text-base font-extrabold leading-7 text-text">{p.title}</h3>
+        <h3 className="line-clamp-2 text-base font-extrabold leading-7 text-text">
+          {p.title}
+        </h3>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3.5" aria-hidden />
@@ -51,7 +56,9 @@ export function PackageCard({ p }: { p: PackageSummary }) {
         <div className="mt-auto pt-4">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[11px] font-medium text-text-secondary">پیشرفت آموزش</span>
-            <span className="text-xs font-extrabold text-primary-fg">{faPercent(p.percent)}</span>
+            <span className="text-xs font-extrabold text-primary-fg">
+              {faPercent(p.percent)}
+            </span>
           </div>
           <ProgressBar value={p.percent} label={`پیشرفت ${p.title}`} />
         </div>

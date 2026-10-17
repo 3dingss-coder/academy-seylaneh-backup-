@@ -52,7 +52,7 @@ export function Sidebar({ items, title }: { items: SidebarItem[]; title: string 
                     className={cn(
                       'flex min-h-12 items-center justify-between rounded-card px-3 text-sm transition-colors duration-200',
                       active
-                        ? 'font-bold text-on-primary'
+                        ? 'font-bold text-on-cta'
                         : 'font-medium text-text-secondary hover:bg-background hover:text-primary-fg',
                     )}
                   >

@@ -147,7 +147,7 @@ export function HomePage() {
                   </Button>
                 </div>
 
-                <div className="pointer-events-none absolute -bottom-4 -start-5 z-0 flex h-[290px] w-[48%] items-end justify-center sm:-start-2 sm:h-[320px]">
+                <div className="pointer-events-none absolute -bottom-4 -end-5 z-0 flex h-[290px] w-[48%] items-end justify-center sm:-end-2 sm:h-[320px]">
                   {/* Real product image (contract: accessible name = package title, real catalog src) —
                       the mascot stays reserved for empty/success/encouragement/mentor states. */}
                   <ProductImage

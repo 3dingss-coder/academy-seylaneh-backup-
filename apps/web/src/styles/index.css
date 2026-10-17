@@ -293,8 +293,7 @@
 /* ---- Dark mode: same token names, re-mapped. Opt-in by the OS (prefers-color-scheme). ----
    Contrast checked: text/surface 14:1, text-secondary/surface 7.6:1, primary(text)/surface 7.9:1,
    on-primary/primary 8.3:1, each *-fg on its *-light ≥ 7:1. */
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-theme='dark'] {
     color-scheme: dark;
     --color-primary: #34d399;
     --color-primary-hover: #6ee7b7;
@@ -343,7 +342,6 @@
     --shadow-brand: 0 8px 20px -6px rgb(52 211 153 / 0.35);
     --shadow-inset-top: inset 0 1px 0 rgb(255 255 255 / 0.08);
   }
-}
 
 @layer base {
   html {
@@ -351,7 +349,7 @@
     line-height: 1.8;
     color: var(--color-text);
     background-color: var(--color-background);
-    color-scheme: light dark;
+    color-scheme: light;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;

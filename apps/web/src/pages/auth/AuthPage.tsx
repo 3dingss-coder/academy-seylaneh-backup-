@@ -193,7 +193,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
       <div className="relative mt-10 flex flex-col items-center gap-3 text-center sm:mt-14">
         <div className="animate-pop flex items-end justify-center gap-1">
           {/* Friendly mascot presence (handoff auth spec) — supportive, beside the brand mark. */}
-          <Mascot mood={mode === 'login' ? 'welcome' : 'guide'} className="w-14 sm:w-16" />
+          <Mascot mood={mode === 'login' ? 'welcome' : 'guide'} className="h-auto w-14 sm:w-16" />
           <span className="rounded-hero bg-white p-3 shadow-lg">
             <img
               src="/icons/logo-full.png"

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import { faPercent } from '@/lib/format';
 import { useMountedFlag } from '@/lib/motion';
 
 export interface ProgressRingProps {
@@ -11,7 +12,7 @@ export interface ProgressRingProps {
   className?: string;
   /** Color by meaning (§16.1): primary for progress, success when complete. */
   tone?: 'primary' | 'success' | 'warning' | 'danger';
-  /** Replaces the default «NN%» centre label. */
+  /** Replaces the default «۵۰٪» centre label (Persian digits, `faPercent`). */
   center?: ReactNode;
 }
 
@@ -73,7 +74,7 @@ export function ProgressRing({
           )}
         />
       </svg>
-      {center ?? <span className="num-latin absolute text-sm font-bold text-text">{pct}%</span>}
+      {center ?? <span className="absolute text-sm font-bold text-text">{faPercent(pct)}</span>}
     </div>
   );
 }

@@ -82,7 +82,7 @@ export function HomePage() {
           <EmptyState
             title="هنوز آموزشی ندارید"
             description="منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید."
-            illustration={<Mascot mood="thinking" className="h-32" />}
+            illustration={<Mascot mood="thinking" className="h-32 w-auto" />}
           />
         }
       >
@@ -160,7 +160,7 @@ export function HomePage() {
             ) : (
               <section className="relative overflow-hidden rounded-[30px] border border-[#eadfce] bg-[#fffaf2] p-6 shadow-sm">
                 <div className="flex items-center gap-5">
-                  <Mascot mood="success" className="h-36" />
+                  <Mascot mood="success" className="h-36 w-auto" />
                   <div>
                     <p className="text-lg font-extrabold text-text">
                       همه آموزش‌ها را تمام کردی! 🎉

@@ -184,7 +184,7 @@ export function LearnPage() {
             <EmptyState
               title={EMPTY[tab]}
               description="وقتی آموزش مرتبطی برایت فعال شود، همین‌جا نمایش داده می‌شود."
-              illustration={<Mascot mood="thinking" className="h-28" />}
+              illustration={<Mascot mood="thinking" className="h-28 w-auto" />}
             />
           ) : (
             <section>

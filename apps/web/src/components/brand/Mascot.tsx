@@ -63,7 +63,11 @@ export function Mascot({ mood = 'welcome', className }: { mood?: MascotMood; cla
         height={324}
         decoding="async"
         className={cn(
-          'block h-auto w-auto max-w-full object-contain drop-shadow-md',
+          // Size comes from the caller (h-*/w-*). No `h-auto w-auto` here: those
+          // utilities are emitted after numeric sizes in Tailwind's CSS order and
+          // would silently defeat every consumer size class (mascots rendered at
+          // natural size and overflowed narrow viewports).
+          'block max-w-full object-contain drop-shadow-md',
           POSE[mood],
           className,
         )}

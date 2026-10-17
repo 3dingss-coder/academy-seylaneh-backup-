@@ -1,5 +1,15 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BellRing, ChevronLeft, Headphones, PlayCircle, Sparkles, Trophy } from 'lucide-react';
+import {
+  BellRing,
+  BookOpenCheck,
+  CheckCircle2,
+  ChevronLeft,
+  Headphones,
+  PlayCircle,
+  Sparkles,
+  Target,
+  Trophy,
+} from 'lucide-react';
 import {
   Button,
   Card,
@@ -39,11 +49,31 @@ export function HomePage() {
   const topNudge = nudges.data?.[0];
 
   return (
-    <div className="stagger flex flex-col gap-4">
-      <div>
-        <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]}</p>
-        <h1 className="text-2xl font-extrabold text-text">کار بعدی تو</h1>
-      </div>
+    <div className="stagger flex flex-col gap-5">
+      <section className="relative overflow-hidden rounded-hero bg-hero px-5 py-6 shadow-lg sm:px-7 sm:py-7">
+        <div aria-hidden className="bg-dots absolute inset-0 text-white/[0.05]" />
+        <div
+          aria-hidden
+          className="absolute -end-20 -top-24 size-56 rounded-full bg-primary-300/15 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute -bottom-24 -start-16 size-48 rounded-full bg-accent/10 blur-3xl"
+        />
+        <div className="relative flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white/70">سلام {user?.name.split(' ')[0]}</p>
+            <h1 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">کار بعدی تو</h1>
+            <p className="mt-2 max-w-lg text-sm leading-7 text-white/70">
+              قدم بعدی مسیر یادگیریت را از همین‌جا ادامه بده.
+            </p>
+          </div>
+          <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white/85 sm:flex">
+            <Target className="size-4 text-accent" aria-hidden />
+            مسیر امروز
+          </div>
+        </div>
+      </section>
       <StaleBanner
         show={home.isError && home.data !== undefined}
         onRetry={() => void home.refetch()}
@@ -72,7 +102,7 @@ export function HomePage() {
               <Card
                 tone="hero"
                 className={cn(
-                  'relative overflow-hidden p-5',
+                  'relative overflow-hidden p-5 sm:p-6',
                   highlight && 'ring-4 ring-primary/40',
                 )}
                 data-testid="next-item"
@@ -90,14 +120,17 @@ export function HomePage() {
                   <Sparkles className="size-3.5" aria-hidden />
                   کار بعدی
                 </p>
-                <div className="relative flex gap-3">
-                  <ProductImage
-                    src={d.nextItem.imageUrl}
-                    alt={d.nextItem.packageTitle}
-                    className="size-20 border-white/20 shadow-md"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-base font-bold leading-7 text-white">
+                <div className="relative grid grid-cols-[96px_1fr] gap-4 sm:grid-cols-[112px_1fr]">
+                  <div className="relative self-start">
+                    <div className="absolute -inset-3 rounded-[24px] bg-white/10 blur-xl" />
+                    <ProductImage
+                      src={d.nextItem.imageUrl}
+                      alt={d.nextItem.packageTitle}
+                      className="relative size-24 rounded-[20px] border border-white/20 bg-white/95 object-contain p-2 shadow-md sm:size-28"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-lg font-extrabold leading-8 text-white">
                       {d.nextItem.packageTitle}
                     </p>
                     <p className="mt-1 flex items-center gap-1 text-sm text-white/85">
@@ -120,7 +153,7 @@ export function HomePage() {
                   size="lg"
                   block
                   variant="light"
-                  className="relative mt-4"
+                  className="relative mt-5 min-h-14 rounded-[16px] text-base font-extrabold"
                   icon={<PlayCircle className="size-5" aria-hidden />}
                   onClick={() => {
                     track('next_item_cta_clicked', { action: d.nextItem?.action ?? '' });
@@ -157,24 +190,32 @@ export function HomePage() {
               </Link>
             )}
 
-            <Card className="flex flex-col gap-3">
-              <div className="flex items-center gap-4">
-                <ProgressRing value={d.totalProgress} size={76} stroke={8} label="پیشرفت کلی" />
-                <div className="grid flex-1 grid-cols-3 gap-2 text-center">
-                  <Stat label="در حال انجام" value={d.counts.inProgress} />
-                  <Stat label="جدید" value={d.counts.new} />
-                  <Stat label="تکمیل" value={d.counts.completed} />
+            <Card className="overflow-hidden p-0">
+              <div className="grid gap-4 p-4 sm:grid-cols-[auto_1fr] sm:items-center sm:p-5">
+                <div className="flex items-center gap-4">
+                  <ProgressRing value={d.totalProgress} size={84} stroke={8} label="پیشرفت کلی" />
+                  <div>
+                    <p className="text-xs font-bold text-primary-fg">پیشرفت کلی</p>
+                    <p className="mt-1 text-sm text-text-secondary">روند یادگیری این دوره</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Stat label="در حال انجام" value={d.counts.inProgress} icon={PlayCircle} />
+                  <Stat label="جدید" value={d.counts.new} icon={BookOpenCheck} />
+                  <Stat label="تکمیل" value={d.counts.completed} icon={CheckCircle2} />
                 </div>
               </div>
               <Link
                 to="/cards"
-                className="pressable flex min-h-12 items-center justify-between rounded-card bg-accent-light px-3 text-accent-fg"
+                className="pressable flex min-h-14 items-center justify-between border-t border-accent/20 bg-accent-light px-4 text-accent-fg"
               >
-                <span className="flex items-center gap-2 text-sm font-bold">
-                  <Trophy className="size-5" aria-hidden />
+                <span className="flex items-center gap-2 text-sm font-extrabold">
+                  <span className="grid size-9 place-items-center rounded-full bg-accent/15">
+                    <Trophy className="size-5" aria-hidden />
+                  </span>
                   امتیاز شما
                 </span>
-                <span className="text-base font-extrabold">{faNumber(d.pointsBalance)}</span>
+                <span className="text-lg font-extrabold">{faNumber(d.pointsBalance)}</span>
               </Link>
             </Card>
 
@@ -217,11 +258,20 @@ export function HomePage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: typeof PlayCircle;
+}) {
   return (
-    <div>
+    <div className="rounded-card border border-border bg-background p-3 text-center">
+      <Icon className="mx-auto mb-2 size-5 text-primary-fg" aria-hidden />
       <p className="text-xl font-extrabold text-text">{toPersianDigits(value)}</p>
-      <p className="text-[11px] text-text-secondary">{label}</p>
+      <p className="mt-0.5 text-[11px] text-text-secondary">{label}</p>
     </div>
   );
 }

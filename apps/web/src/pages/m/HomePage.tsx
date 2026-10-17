@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import {
   Button,
-  Card,
   CountdownChip,
   EmptyState,
   PackageCardSkeleton,
@@ -21,7 +20,6 @@ import {
   Skeleton,
 } from '@/components/ui';
 import { QueryState, StaleBanner } from '@/components/common/QueryState';
-import { ProductImage } from '@/components/common/ProductImage';
 import { Mascot } from '@/components/brand/Mascot';
 import { PackageCard } from '@/components/learning/PackageCard';
 import { useAuth } from '@/lib/auth';

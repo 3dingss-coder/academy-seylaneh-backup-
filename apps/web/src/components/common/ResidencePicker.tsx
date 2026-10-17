@@ -238,7 +238,7 @@ function LocationField({
                   setActive(0);
                 }}
                 onKeyDown={onKeyDown}
-                className="min-h-11 w-full bg-transparent text-base text-text outline-none placeholder:text-muted-fg"
+                className="min-h-12 w-full bg-transparent text-base text-text outline-none placeholder:text-muted-fg"
               />
               {status === 'loading' && <Spinner className="size-4 text-muted-fg" />}
             </div>
@@ -277,7 +277,7 @@ function LocationField({
                       data-value={option}
                       aria-selected={selected}
                       className={cn(
-                        'flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3.5 text-sm',
+                        'flex min-h-12 cursor-pointer items-center justify-between gap-2 px-3.5 text-sm',
                         index === active && 'bg-primary-light',
                         selected ? 'font-bold text-primary-fg' : 'text-text',
                       )}

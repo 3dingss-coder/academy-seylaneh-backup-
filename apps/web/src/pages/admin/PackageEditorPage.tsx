@@ -388,7 +388,7 @@ function Editor({ d }: { d: AdminPackageDetail }) {
           )}
           {archived.length > 0 && (
             <details className="rounded-card border border-border bg-surface p-3 text-sm">
-              <summary className="min-h-8 cursor-pointer font-bold text-text-secondary">
+              <summary className="min-h-12 cursor-pointer py-3 font-bold text-text-secondary">
                 قسمت‌های بایگانی‌شده ({toPersianDigits(archived.length)})
               </summary>
               <ul className="mt-2 flex flex-col gap-1">

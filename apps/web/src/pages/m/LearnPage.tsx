@@ -67,8 +67,14 @@ export function LearnPage() {
     <div className="flex flex-col gap-5 pb-2">
       <section className="relative overflow-hidden rounded-hero bg-hero px-5 py-6 shadow-lg sm:px-7 sm:py-7">
         <div aria-hidden className="bg-dots absolute inset-0 text-white/[0.05]" />
-        <div aria-hidden className="absolute -end-14 -top-20 size-52 rounded-full bg-primary-300/15 blur-3xl" />
-        <div aria-hidden className="absolute -bottom-20 -start-16 size-48 rounded-full bg-accent/10 blur-3xl" />
+        <div
+          aria-hidden
+          className="absolute -end-14 -top-20 size-52 rounded-full bg-primary-300/15 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute -bottom-20 -start-16 size-48 rounded-full bg-accent/10 blur-3xl"
+        />
         <div className="relative grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white/90">
@@ -83,17 +89,23 @@ export function LearnPage() {
           <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
             <div className="rounded-card border border-white/10 bg-white/10 p-3">
               <PlayCircle className="mb-2 size-5 text-primary-200" aria-hidden />
-              <strong className="block text-xl text-white">{counts.in_progress.toLocaleString('fa-IR')}</strong>
+              <strong className="block text-xl text-white">
+                {counts.in_progress.toLocaleString('fa-IR')}
+              </strong>
               <span className="text-xs text-white/65">در حال انجام</span>
             </div>
             <div className="rounded-card border border-white/10 bg-white/10 p-3">
               <BookOpenCheck className="mb-2 size-5 text-accent" aria-hidden />
-              <strong className="block text-xl text-white">{counts.new.toLocaleString('fa-IR')}</strong>
+              <strong className="block text-xl text-white">
+                {counts.new.toLocaleString('fa-IR')}
+              </strong>
               <span className="text-xs text-white/65">جدید</span>
             </div>
             <div className="rounded-card border border-white/10 bg-white/10 p-3">
               <CheckCircle2 className="mb-2 size-5 text-primary-200" aria-hidden />
-              <strong className="block text-xl text-white">{completion.toLocaleString('fa-IR')}٪</strong>
+              <strong className="block text-xl text-white">
+                {completion.toLocaleString('fa-IR')}٪
+              </strong>
               <span className="text-xs text-white/65">تکمیل کل</span>
             </div>
           </div>
@@ -179,7 +191,11 @@ export function LearnPage() {
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-extrabold text-text">
-                    {tab === 'in_progress' ? 'ادامه مسیر' : tab === 'new' ? 'آموزش‌های جدید' : 'تکمیل‌شده‌ها'}
+                    {tab === 'in_progress'
+                      ? 'ادامه مسیر'
+                      : tab === 'new'
+                        ? 'آموزش‌های جدید'
+                        : 'تکمیل‌شده‌ها'}
                   </h2>
                   <p className="mt-1 text-xs text-text-secondary">
                     {items.length.toLocaleString('fa-IR')} آموزش

@@ -307,7 +307,7 @@ function DeleteUsersDialog({ group, onClose }: { group: PersonGroup<Me>; onClose
           const self = u.id === me?.id;
           return (
             <li key={u.id}>
-              <label className="flex min-h-11 items-center gap-2">
+              <label className="flex min-h-12 items-center gap-2">
                 <input
                   type="checkbox"
                   disabled={self}

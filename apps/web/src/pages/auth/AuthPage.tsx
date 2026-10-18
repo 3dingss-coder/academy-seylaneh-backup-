@@ -1,6 +1,6 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Fingerprint, Phone, RefreshCw, UserRound } from 'lucide-react';
+import { ChevronLeft, Fingerprint, Phone, RefreshCw, UserRound } from 'lucide-react';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
 import { Input } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -16,32 +16,53 @@ import { track } from '@/lib/telemetry';
 import type { Role } from '@/lib/types';
 
 /**
- * Marketer sign-in / sign-up — visual truth: the «صفحه ثبت نام و ورود» reference board.
- * - Login = the deep-green welcome screen + white card.
- * - Sign-up = a four-step wizard (name → activity location → province/city → identity).
+ * Marketer sign-in / sign-up — visual truth: the «صفحه ثبت نام و ورود» reference board,
+ * rebuilt on the high-quality generated assets (`/brand/auth/*`).
  * Functional truth preserved: passwordless phone-or-national-code identity, province-dependent
- * identity kind, unknown-identifier → sign-up conversion, validations and the API payloads.
+ * identity kind, unknown-identifier → sign-up conversion, validations, API payloads, redirects.
+ *
+ * Measured design specs (board px × 390/275): card r28, input h50 r14 (#F4F0E9),
+ * CTA h68 full-pill #0E6E4E with a ~50px arrow circle at the end side, progress h10,
+ * step titles ~26px extrabold, back = 40px circle with a left chevron.
  */
 type Mode = 'login' | 'register';
 type Phase = 'form' | 'loading' | 'success' | 'error';
 
-const STEP_TITLES = [
+const STEP_DEFS = [
   {
     title: 'نام و نام خانوادگی',
     desc: 'لطفاً نام و نام خانوادگی خود را وارد کنید تا حساب شما ایجاد شود.',
+    art: '/brand/auth/auth-step-name.png',
+    bubble: 'اول با هم آشنا بشیم 😊',
+    bubbleSide: 'right' as const,
   },
   {
     title: 'محل فعالیت شما',
     desc: 'لطفاً محل فعالیت خود را مشخص کنید تا محتوای مناسب‌تری به شما ارائه دهیم.',
+    art: '/brand/auth/auth-step-area.png',
+    bubble: '',
+    bubbleSide: 'right' as const,
   },
-  { title: 'استان و شهر', desc: 'استان و شهر محل فعالیت خود را انتخاب کنید.' },
+  {
+    title: 'استان و شهر',
+    desc: 'استان و شهر محل فعالیت خود را انتخاب کنید.',
+    art: '/brand/auth/auth-step-city.png',
+    bubble: 'این اطلاعات به ما کمک می‌کند تا محتوای منطقه‌ای مرتبط با شهر شما را پیشنهاد دهیم.',
+    bubbleSide: 'left' as const,
+  },
   {
     title: 'کد ملی یا شماره موبایل',
     desc: 'با توجه به محل فعالیت شما، لطفاً کد ملی یا شماره موبایل خود را وارد کنید.',
+    art: '/brand/auth/auth-step-id.png',
+    bubble: 'با این اطلاعات حساب شما ایجاد می‌شود و می‌توانید وارد شوید.',
+    bubbleSide: 'left' as const,
   },
 ] as const;
 
-/** Signature pill CTA of the reference: label centred, circular arrow at the end side. */
+/** Input surface of the reference (inline styles beat the shared 8px token for exactness). */
+const inputStyle: CSSProperties = { borderRadius: 14, background: '#F4F0E9', minHeight: 50 };
+
+/** Signature pill CTA: label centred, circular arrow at the end side (reference buttons). */
 function PillButton({
   children,
   disabled,
@@ -53,7 +74,7 @@ function PillButton({
 }: {
   children: ReactNode;
   disabled?: boolean;
-  /** Looks inactive (design) but stays clickable so validation copy can explain what is missing. */
+  /** Looks inactive (like the reference's unfinished-step button) but stays clickable for validation. */
   soft?: boolean;
   loading?: boolean;
   tone?: 'primary' | 'retry';
@@ -61,41 +82,77 @@ function PillButton({
   onClick?: () => void;
 }) {
   const isRetry = tone === 'retry';
+  const surface = isRetry
+    ? 'bg-[#f6d7d3] text-[#b53c34]'
+    : soft
+      ? 'bg-[#86af99] text-white cursor-not-allowed'
+      : 'bg-[#0e6e4e] text-white hover:bg-[#0b5c41]';
   return (
     <button
       type={type}
       disabled={disabled || loading}
       onClick={onClick}
-      className={
-        isRetry
-          ? 'pressable flex min-h-14 w-full items-center gap-3 rounded-full bg-[#f6d7d3] px-3 py-3 text-[#b53c34] disabled:opacity-60'
-          : `pressable flex min-h-14 w-full items-center gap-3 rounded-full px-3 py-3 text-white shadow-sm ${
-              disabled || soft
-                ? 'cursor-not-allowed bg-[#86af99]'
-                : 'bg-[#0e6e4e] hover:bg-[#0b5c41]'
-            }`
-      }
+      style={{ minHeight: 60 }}
+      className={`pressable flex w-full items-center gap-3 rounded-full px-3 py-2.5 shadow-sm disabled:opacity-70 ${surface}`}
     >
-      <span className="flex-1 text-center text-base font-extrabold">{children}</span>
+      <span className="flex-1 text-center text-[17px] font-extrabold">{children}</span>
       <span
         aria-hidden
         className={
           isRetry
-            ? 'grid size-9 place-items-center rounded-full bg-[#b53c34]/15'
-            : 'grid size-9 place-items-center rounded-full bg-white/20'
+            ? 'grid size-10 place-items-center rounded-full bg-[#b53c34]/15'
+            : 'grid size-10 place-items-center rounded-full bg-white/25'
         }
       >
-        {isRetry ? <RefreshCw className="size-4.5" /> : <ArrowLeft className="size-4.5" />}
+        {isRetry ? <RefreshCw className="size-4.5" /> : <ArrowGlyph />}
       </span>
     </button>
   );
 }
 
+/** Circular-arrow glyph of the reference CTAs (arrow head toward the end side). */
+function ArrowGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  );
+}
+
+/** White speech bubble of the wizard illustrations (real text, live in the DOM). */
+function SpeechBubble({ text, side }: { text: string; side: 'left' | 'right' }) {
+  return (
+    <div
+      className={`absolute top-1 z-10 max-w-[62%] rounded-[16px] bg-white px-3.5 py-2.5 text-[12.5px] font-semibold leading-6 text-[#2e5c48] shadow-[0_8px_24px_-10px_rgba(11,45,31,0.35)] ${
+        side === 'right' ? 'right-0' : 'left-0'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`absolute -bottom-2 size-4 rotate-45 rounded-[3px] bg-white ${
+          side === 'right' ? 'right-6' : 'left-6'
+        }`}
+      />
+      {text}
+    </div>
+  );
+}
+
 /** Cream wizard page frame (steps + async state cards). */
-function AuthFrame({ children, wide }: { children: ReactNode; wide?: boolean }) {
+function AuthFrame({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center bg-[#fcf6f0] px-4 pb-10">
-      <div className={`w-full ${wide ? 'max-w-[480px]' : 'max-w-[420px]'}`}>{children}</div>
+      <div className="w-full max-w-[430px]">{children}</div>
     </div>
   );
 }
@@ -296,35 +353,35 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   if (phase === 'loading' || phase === 'success' || phase === 'error') {
     return (
       <AuthFrame>
-        <div className="mt-16 rounded-[24px] border border-[#eae1d4] bg-[#fefcf9] p-7 text-center shadow-sm">
+        <div className="mt-14 rounded-[28px] border border-[#eae1d4] bg-[#fefcf9] p-7 text-center shadow-sm">
           {phase === 'loading' && (
             <>
-              <img src="/brand/auth/loading.png" alt="" className="mx-auto w-56 max-w-full" />
-              <h1 className="mt-3 text-xl font-extrabold text-[#061a13]">
+              <img src="/brand/auth/auth-loading.png" alt="" className="mx-auto w-52 max-w-full" />
+              <h1 className="mt-2 text-[22px] font-extrabold text-[#061a13]">
                 در حال ایجاد حساب شما...
               </h1>
-              <p className="mt-2 text-sm leading-7 text-[#6b675c]">لطفاً چند لحظه صبر کنید...</p>
-              <div className="mx-auto mt-5 h-2 w-4/5 overflow-hidden rounded-full bg-[#eae1d4]">
+              <p className="mt-2 text-sm leading-7 text-[#7a756a]">لطفاً چند لحظه صبر کنید...</p>
+              <div className="mx-auto mt-5 h-2.5 w-4/5 overflow-hidden rounded-full bg-[#e4dcce]">
                 <div className="h-full w-2/3 rounded-full bg-[#1e8650]" />
               </div>
             </>
           )}
           {phase === 'success' && (
             <>
-              <img src="/brand/auth/success.png" alt="" className="mx-auto w-56 max-w-full" />
-              <h1 className="mt-3 text-2xl font-extrabold text-[#061a13]">خوش اومدی!</h1>
-              <p className="mt-2 text-sm leading-7 text-[#6b675c]">
+              <img src="/brand/auth/auth-success.png" alt="" className="mx-auto w-56 max-w-full" />
+              <h1 className="mt-2 text-[26px] font-extrabold text-[#061a13]">خوش اومدی!</h1>
+              <p className="mt-2 text-sm leading-7 text-[#7a756a]">
                 حساب شما با موفقیت ایجاد شد. در حال انتقال به داشبورد...
               </p>
             </>
           )}
           {phase === 'error' && (
             <>
-              <img src="/brand/auth/error.png" alt="" className="mx-auto w-56 max-w-full" />
-              <h1 className="mt-3 text-xl font-extrabold text-[#b53c34]">
+              <img src="/brand/auth/auth-error.png" alt="" className="mx-auto w-56 max-w-full" />
+              <h1 className="mt-2 text-[22px] font-extrabold text-[#b53c34]">
                 اطلاعات وارد شده صحیح نیست
               </h1>
-              <p className="mt-2 text-sm leading-7 text-[#6b675c]">
+              <p className="mt-2 text-sm leading-7 text-[#7a756a]">
                 لطفاً اطلاعات را بررسی کنید و دوباره تلاش کنید.
               </p>
               <div className="mx-auto mt-5 max-w-[280px]">
@@ -339,43 +396,35 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
     );
   }
 
-  // ── login: deep-green welcome screen + white card ─────────────────────────────────
+  // ── login: the welcome screen (bg art + mascot + white card) ───────────────────────
   if (mode === 'login') {
     return (
       <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#013021]">
-        <div
+        <img
+          src="/brand/auth/auth-welcome-bg.png"
+          alt=""
           aria-hidden
-          className="pointer-events-none absolute -top-32 -start-40 size-[420px] rounded-full bg-[#0e6e4e]/40 blur-3xl"
+          className="absolute inset-0 size-full object-cover"
         />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 -end-32 size-[380px] rounded-full bg-[#0e6e4e]/30 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-32 size-[420px] rounded-full bg-[#1a7d55]/45 blur-3xl"
-        />
-        <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-4 pb-4">
-          <h1 className="mt-12 text-center text-[28px] font-extrabold leading-10 text-white sm:text-3xl">
+        <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-3 pb-3">
+          <h1 className="mt-11 text-start text-[28px] font-extrabold leading-[46px] text-white">
             به سیلانه سبز
             <br />
             خوش آمدی!
           </h1>
-          <p className="mt-2 text-center text-sm text-white/80">یادگیری امروز، موفقیت فردا</p>
-          <div className="mt-2 flex flex-1 items-center justify-center">
-            <img
-              src="/brand/auth/welcome.png"
-              alt=""
-              aria-hidden
-              className="w-[320px] max-w-full [mask-image:radial-gradient(118%_112%_at_50%_44%,#000_55%,transparent_93%)]"
-            />
-          </div>
+          <p className="mt-1.5 text-start text-[15px] text-white/85">یادگیری امروز، موفقیت فردا</p>
+          <img
+            src="/brand/auth/auth-welcome-mascot.png"
+            alt=""
+            aria-hidden
+            className="mx-auto -mb-2 mt-2 w-[320px] max-w-full"
+          />
 
-          <div className="-mt-6 rounded-[24px] bg-[#fefcf9] p-5 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.5)]">
+          <div className="-mt-6 rounded-[28px] bg-[#fefcf9] p-5 shadow-[0_22px_60px_-24px_rgba(0,0,0,0.55)]">
             <form
               onSubmit={submitLogin}
               noValidate
-              className="flex flex-col gap-3"
+              className="flex flex-col gap-3.5"
               aria-busy={busy}
             >
               <Input
@@ -389,6 +438,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 onChange={(e) => setIdentifier(e.target.value)}
                 error={errors.identifier}
                 icon={<Phone className="size-5" />}
+                style={inputStyle}
                 disabled={busy}
               />
               <PillButton type="submit" loading={busy}>
@@ -403,7 +453,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 {info}
               </p>
             )}
-            <p className="mt-4 text-center text-[11px] leading-6 text-[#8a8578]">
+            <p className="mt-4 text-start text-[11px] leading-6 text-[#8a8578]">
               با ورود یا ثبت‌نام، قوانین استفاده و حریم خصوصی سیلانه سبز را می‌پذیرید.
             </p>
           </div>
@@ -412,134 +462,131 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
     );
   }
 
-  // ── register: four-step wizard ────────────────────────────────────────────────────
-  const stepDef = STEP_TITLES[Math.min(Math.max(step, 1), 4) - 1] ?? { title: '', desc: '' };
+  // ── register: four-step wizard (illustration → title → desc → fields → CTA) ─────────
+  const stepDef = STEP_DEFS[Math.min(Math.max(step, 1), 4) - 1] ?? STEP_DEFS[0];
   return (
     <AuthFrame>
-      <div className="pt-6">
+      <div className="pt-5">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             aria-label="بازگشت"
             onClick={() => (step > 1 ? setStep(step - 1) : switchMode('login'))}
-            className="pressable grid size-11 place-items-center rounded-full border border-[#e4dcce] bg-[#fefcf9] text-[#41413e]"
+            className="pressable grid size-10 place-items-center rounded-full border border-[#e4dcce] bg-[#fefcf9] text-[#41413e]"
           >
-            <ChevronRight className="size-5" aria-hidden />
+            <ChevronLeft className="size-5" aria-hidden />
           </button>
-          <p className="text-sm font-bold text-[#41413e]">
+          <p className="text-[13px] font-bold text-[#41413e]">
             مرحله {toPersianDigits(step)} از {toPersianDigits(4)}
           </p>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e4dcce]">
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#e4dcce]">
           <div
             className="h-full rounded-full bg-[#1e8650] transition-all duration-500"
             style={{ width: `${(step / 4) * 100}%` }}
           />
         </div>
 
-        <h1 className="mt-6 text-2xl font-extrabold text-[#061a13]">{stepDef.title}</h1>
-        <p className="mt-2 text-sm leading-7 text-[#6b675c]">{stepDef.desc}</p>
+        <div className="relative mt-3">
+          <img
+            src={stepDef.art}
+            alt=""
+            aria-hidden
+            className="mx-auto max-h-[300px] w-full max-w-[330px] object-contain"
+          />
+          {stepDef.bubble ? <SpeechBubble text={stepDef.bubble} side={stepDef.bubbleSide} /> : null}
+        </div>
+
+        <h1 className="mt-3 text-[26px] font-extrabold text-[#0f2a1d]">{stepDef.title}</h1>
+        <p className="mt-1.5 text-[14px] leading-7 text-[#7a756a]">{stepDef.desc}</p>
 
         {step === 1 && (
-          <>
-            <img src="/brand/auth/step-name.png" alt="" className="mx-auto mt-4 w-60 max-w-full" />
-            <div className="mt-4 flex flex-col gap-3">
-              <Input
-                label="نام"
-                placeholder="نام"
-                hideLabel
-                autoComplete="given-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                error={errors.firstName}
-                icon={<UserRound className="size-5" />}
-                disabled={busy}
-              />
-              <Input
-                label="نام خانوادگی"
-                placeholder="نام خانوادگی"
-                hideLabel
-                autoComplete="family-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                error={errors.lastName}
-                icon={<UserRound className="size-5" />}
-                disabled={busy}
-              />
-            </div>
-          </>
+          <div className="mt-4 flex flex-col gap-3">
+            <Input
+              label="نام"
+              placeholder="نام"
+              hideLabel
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              error={errors.firstName}
+              icon={<UserRound className="size-5" />}
+              style={inputStyle}
+              disabled={busy}
+            />
+            <Input
+              label="نام خانوادگی"
+              placeholder="نام خانوادگی"
+              hideLabel
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              error={errors.lastName}
+              icon={<UserRound className="size-5" />}
+              style={inputStyle}
+              disabled={busy}
+            />
+          </div>
         )}
 
         {step === 2 && (
-          <>
-            <img src="/brand/auth/step-area.png" alt="" className="mx-auto mt-4 w-64 max-w-full" />
-            <div className="mt-4">
-              <ResidencePicker
-                value={residence}
-                onChange={handleResidenceChange}
-                label="انتخاب محل فعالیت شما"
-                placeholder="انتخاب محل فعالیت شما"
-                hideCity
-                hideLabel
-                provinceError={errors.province}
-                disabled={busy}
-              />
-            </div>
-          </>
+          <div className="mt-4">
+            <ResidencePicker
+              value={residence}
+              onChange={handleResidenceChange}
+              label="انتخاب محل فعالیت شما"
+              placeholder="انتخاب محل فعالیت شما"
+              hideCity
+              hideLabel
+              provinceError={errors.province}
+              disabled={busy}
+            />
+          </div>
         )}
 
         {step === 3 && (
-          <>
-            <div className="mt-2">
-              <ResidencePicker
-                value={residence}
-                onChange={handleResidenceChange}
-                label="استان"
-                provinceError={errors.province}
-                cityError={errors.city}
-                disabled={busy}
-              />
-            </div>
-            <img src="/brand/auth/step-city.png" alt="" className="mx-auto mt-4 w-52 max-w-full" />
-            <p className="sr-only">
-              این اطلاعات به ما کمک می‌کند تا محتوای منطقه‌ای مرتبط با شهر شما را پیشنهاد دهیم.
-            </p>
-          </>
+          <div className="mt-4">
+            <ResidencePicker
+              value={residence}
+              onChange={handleResidenceChange}
+              label="استان"
+              provinceError={errors.province}
+              cityError={errors.city}
+              disabled={busy}
+            />
+          </div>
         )}
 
         {step === 4 && (
-          <>
-            <img src="/brand/auth/step-id.png" alt="" className="mx-auto mt-4 w-64 max-w-full" />
-            <p className="sr-only">با این اطلاعات حساب شما ایجاد می‌شود و می‌توانید وارد شوید.</p>
-            <div className="mt-4">
-              <Input
-                label={requiresNationalCode ? 'کد ملی' : 'شماره موبایل'}
-                placeholder={
-                  requiresNationalCode ? 'کد ملی خود را وارد کنید' : 'شماره موبایل خود را وارد کنید'
-                }
-                ltr
-                inputMode={requiresNationalCode ? 'numeric' : 'tel'}
-                autoComplete={requiresNationalCode ? 'off' : 'tel'}
-                maxLength={requiresNationalCode ? 10 : undefined}
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                error={errors.identifier}
-                hint={
-                  requiresNationalCode
-                    ? 'برای ورودهای بعدی از همین کد ملی استفاده می‌شود.'
-                    : undefined
-                }
-                icon={
-                  requiresNationalCode ? (
-                    <Fingerprint className="size-5" />
-                  ) : (
-                    <Phone className="size-5" />
-                  )
-                }
-                disabled={busy}
-              />
-            </div>
-          </>
+          <div className="mt-4">
+            <Input
+              label={requiresNationalCode ? 'کد ملی' : 'شماره موبایل'}
+              placeholder={
+                requiresNationalCode ? 'کد ملی خود را وارد کنید' : 'شماره موبایل خود را وارد کنید'
+              }
+              ltr
+              inputMode={requiresNationalCode ? 'numeric' : 'tel'}
+              autoComplete={requiresNationalCode ? 'off' : 'tel'}
+              maxLength={requiresNationalCode ? 10 : undefined}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              error={errors.identifier}
+              hint={
+                requiresNationalCode
+                  ? 'برای ورودهای بعدی از همین کد ملی استفاده می‌شود.'
+                  : undefined
+              }
+              icon={
+                requiresNationalCode ? (
+                  <Fingerprint className="size-5" />
+                ) : (
+                  <Phone className="size-5" />
+                )
+              }
+              style={inputStyle}
+              disabled={busy}
+            />
+          </div>
         )}
 
         {info && (
@@ -562,10 +609,10 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
             </PillButton>
           )}
         </div>
-        <div className="mt-3 flex justify-center">
+        <div className="mt-2 flex justify-center">
           <button
             type="button"
-            className="min-h-12 text-sm font-bold text-[#0e6e4e]"
+            className="min-h-12 text-[13px] font-bold text-[#0e6e4e]"
             onClick={() => switchMode('login')}
           >
             حساب دارید؟ وارد شوید

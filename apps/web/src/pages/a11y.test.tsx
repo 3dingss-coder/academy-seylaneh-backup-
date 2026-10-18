@@ -103,7 +103,7 @@ describe('a11y (axe, jsdom)', () => {
     expect(await violations(container)).toEqual([]);
   });
 
-  it('marketer home («کار بعدی»)', async () => {
+  it('marketer home («ادامه یادگیری»)', async () => {
     mockApi(signedIn());
     const { container } = renderApp('/');
     await screen.findByTestId('next-item');

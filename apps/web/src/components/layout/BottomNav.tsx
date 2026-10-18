@@ -1,9 +1,10 @@
 // Adapted from helper kit: «اپ بازاریاب/کامپوننت‌ها/common/BottomNav.tsx»
-// — 5 sales tabs → the 4 spec tabs (§16.5): خانه | آموزش‌ها | پیام‌ها | کارت‌ها;
-//   router NavLink instead of AppContext; 48px targets; tokens instead of emerald.
+// — board «تمامی صفحات اپلیکیشن بازاریاب» tabs: خانه | دوره‌ها | آزمون‌ها | مدال | پروفایل
+//   (پیام‌ها lives on the header bell «پیام‌ها و اعلان‌ها»; آزمون‌ها → /learn until the exams page);
+//   router links instead of AppContext; 48px targets; tokens instead of emerald.
 // Design refresh: floating frosted bar, active marker glides between tabs (transform only).
-import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Mail, Trophy, type LucideIcon } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { BookOpen, Home, ShieldCheck, Trophy, UserRound, type LucideIcon } from 'lucide-react';
 import { CountBadge } from '@/components/ui/CountBadge';
 import { cn } from '@/lib/cn';
 
@@ -12,15 +13,16 @@ export interface BottomNavItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
-  /** Extra path prefixes that belong to this tab (e.g. /packages → آموزش‌ها). */
+  /** Extra path prefixes that belong to this tab (e.g. /packages → دوره‌ها). */
   match?: string[];
 }
 
 const MARKETER_NAV: BottomNavItem[] = [
   { to: '/', label: 'خانه', icon: Home },
-  { to: '/learn', label: 'آموزش‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
-  { to: '/messages', label: 'پیام‌ها', icon: Mail },
-  { to: '/cards', label: 'کارت‌ها', icon: Trophy },
+  { to: '/learn', label: 'دوره‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
+  { to: '/learn', label: 'آزمون‌ها', icon: ShieldCheck },
+  { to: '/cards', label: 'مدال', icon: Trophy },
+  { to: '/profile', label: 'پروفایل', icon: UserRound },
 ];
 
 const inPath = (pathname: string, prefix: string) =>
@@ -55,19 +57,17 @@ export function BottomNav({ items = MARKETER_NAV }: { items?: BottomNavItem[] })
           <span className="mx-auto h-1 w-8 rounded-full bg-primary" />
         </span>
         <ul className="flex items-stretch justify-around px-1">
-          {items.map(({ to, label, icon: Icon, badge, match }, i) => (
-            <li key={to} className="flex-1">
-              <NavLink
+          {items.map(({ to, label, icon: Icon, badge }, i) => (
+            <li key={`${to}-${label}`} className="flex-1">
+              <Link
                 to={to}
-                end={to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-card text-xs',
-                    isActive || i === activeIdx || (match ?? []).some((p) => inPath(pathname, p))
-                      ? 'font-bold text-primary-fg'
-                      : 'font-medium text-text-secondary hover:text-text',
-                  )
-                }
+                aria-current={i === activeIdx ? 'page' : undefined}
+                className={cn(
+                  'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-card text-xs',
+                  i === activeIdx
+                    ? 'font-bold text-primary-fg'
+                    : 'font-medium text-text-secondary hover:text-text',
+                )}
               >
                 <span
                   className={cn(
@@ -83,7 +83,7 @@ export function BottomNav({ items = MARKETER_NAV }: { items?: BottomNavItem[] })
                   />
                 </span>
                 <span>{label}</span>
-              </NavLink>
+              </Link>
             </li>
           ))}
         </ul>

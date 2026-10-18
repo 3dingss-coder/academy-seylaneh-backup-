@@ -1,288 +1,441 @@
+import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
+  Award,
+  Bell,
   BellRing,
-  BookOpenCheck,
   Bot,
+  CalendarCheck,
   ChevronLeft,
-  Headphones,
-  Mail,
-  PlayCircle,
-  Sparkles,
-  Trophy,
+  Play,
+  ShieldCheck,
+  ShoppingBag,
 } from 'lucide-react';
 import {
-  Button,
+  CountBadge,
   CountdownChip,
   EmptyState,
+  ErrorState,
   PackageCardSkeleton,
   ProgressRing,
   Skeleton,
 } from '@/components/ui';
-import { QueryState, StaleBanner } from '@/components/common/QueryState';
+import { StaleBanner } from '@/components/common/QueryState';
 import { ProductImage } from '@/components/common/ProductImage';
-import { Mascot } from '@/components/brand/Mascot';
-import { PackageCard } from '@/components/learning/PackageCard';
 import { useAuth } from '@/lib/auth';
-import { cn } from '@/lib/cn';
 import { toPersianDigits } from '@/lib/digits';
-import { faDuration, faNumber } from '@/lib/format';
-import { qk, useHome } from '@/lib/queries';
-import { useQuery } from '@tanstack/react-query';
+import { faDuration } from '@/lib/format';
 import { api } from '@/lib/api';
+import { qk, useHome, useMessages, useNotifications } from '@/lib/queries';
 import { track } from '@/lib/telemetry';
 import type { Nudge } from '@/lib/types';
 
 const ACTION_LABEL = { start: 'شروع', resume: 'ادامه', quiz: 'شروع آزمون' } as const;
 
-/** M3 — Home («کار بعدی تو»): the single most important screen. Visual truth = after/m-home-*.png. */
+/**
+ * Marketer home (داشبورد اصلی) — visual truth = board «تمامی صفحات اپلیکیشن بازاریاب».
+ * Real home data/actions remain authoritative; board sample names and stats are ignored.
+ */
 export function HomePage() {
   const { user } = useAuth();
-  const home = useHome(user?.id);
-  const nav = useNavigate();
-  const loc = useLocation();
-  const highlight = (loc.state as { highlightNext?: boolean } | null)?.highlightNext;
+  const homeQ = useHome(user?.id);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const notifications = useNotifications();
+  const messages = useMessages();
+  const unread =
+    (notifications.data?.unread ?? 0) + (messages.data?.filter((m) => !m.readAt).length ?? 0);
+  const home = homeQ.data;
+  const next = home?.nextItem ?? null;
+  const nextPackage = home?.packages.find((p) => p.id === next?.packageId) ?? null;
+  const highlightNext = (location.state as { highlightNext?: boolean } | null)?.highlightNext;
+
   const nudges = useQuery({
     queryKey: qk.nudges,
     queryFn: ({ signal }) => api.get<Nudge[]>('/me/mentor/nudges', signal),
   });
   const topNudge = nudges.data?.[0];
 
-  return (
-    <div className="flex flex-col gap-5 pb-3">
-      <div className="px-1">
-        <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]} 👋</p>
-        <h1 className="mt-0.5 text-2xl font-extrabold text-text">کار بعدی تو</h1>
-      </div>
+  const fullName = user?.name ?? '';
+  const firstName = fullName.trim().split(/\s+/)[0] || 'کاربر گرامی';
+  const initial = fullName.trim().charAt(0) || '؟';
+  const greeting = <HomeGreeting firstName={firstName} initial={initial} unread={unread} />;
 
+  // Preserve the real query's loading, error, cached/offline, and empty states.
+  if (homeQ.isPending && !home) {
+    return (
+      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+        {greeting}
+        <div className="flex flex-col gap-3" aria-busy="true">
+          <Skeleton className="h-[214px] w-full rounded-[24px] lg:h-[260px]" />
+          <Skeleton className="h-[92px] w-full rounded-[20px]" />
+          <div className="grid grid-cols-4 gap-2.5">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="mx-auto h-[52px] w-[52px] rounded-[16px]" />
+            ))}
+          </div>
+          <PackageCardSkeleton />
+        </div>
+      </div>
+    );
+  }
+  if (!home && homeQ.isError) {
+    return (
+      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+        {greeting}
+        <ErrorState onRetry={() => void homeQ.refetch()} />
+      </div>
+    );
+  }
+  if (home && home.packages.length === 0) {
+    return (
+      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+        {greeting}
+        <StaleBanner
+          show={homeQ.isError && homeQ.data !== undefined}
+          onRetry={() => void homeQ.refetch()}
+        />
+        <EmptyState
+          title="هنوز آموزشی ندارید"
+          description="منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید."
+          illustration={
+            <img
+              src="/brand/m/m-empty.png"
+              alt=""
+              aria-hidden
+              className="h-32 w-auto object-contain"
+            />
+          }
+        />
+      </div>
+    );
+  }
+  if (!home) return null;
+
+  const suggestedPackages = home.packages.filter((p) => p.status !== 'completed').slice(0, 6);
+
+  return (
+    <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+      {greeting}
       <StaleBanner
-        show={home.isError && home.data !== undefined}
-        onRetry={() => void home.refetch()}
+        show={homeQ.isError && homeQ.data !== undefined}
+        onRetry={() => void homeQ.refetch()}
       />
 
-      <QueryState
-        query={home}
-        loading={
-          <div className="flex flex-col gap-3" aria-busy>
-            <Skeleton className="h-72 w-full rounded-[28px]" />
-            <PackageCardSkeleton />
-          </div>
-        }
-        isEmpty={(d) => d.packages.length === 0}
-        empty={
-          <EmptyState
-            title="هنوز آموزشی ندارید"
-            description="منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید."
-            illustration={<Mascot mood="thinking" className="h-32 w-auto" />}
-          />
-        }
+      {/* Hero: m-home-hero scene + white continue-card + play circle */}
+      <section
+        aria-label="ادامه یادگیری"
+        className={`relative h-[214px] overflow-hidden rounded-[24px] lg:h-[260px]${
+          highlightNext ? ' ring-4 ring-primary/25' : ''
+        }`}
       >
-        {(d) => (
-          <>
-            {d.nextItem ? (
-              <section
-                className={cn(
-                  'relative overflow-hidden rounded-[28px] bg-gradient-to-bl from-[#0a6a4c] to-[#064E3B] px-5 py-5 text-white shadow-[0_18px_50px_-24px_rgba(6,78,59,.55)] sm:px-7 sm:py-6',
-                  highlight && 'ring-4 ring-primary/25',
-                )}
-                data-testid="next-item"
+        <img
+          src="/brand/m/m-home-hero.png"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ transform: 'scaleX(-1)' }}
+        />
+        <div
+          className="absolute rounded-[18px] bg-white p-3.5"
+          style={{
+            bottom: 14,
+            left: 14,
+            width: '62%',
+            backgroundColor: '#FEFCF9',
+            boxShadow: '0 10px 26px rgba(16,42,33,0.16)',
+          }}
+          data-testid={next ? 'next-item' : undefined}
+        >
+          <p className="text-[10px] tracking-[0.02em]" style={{ color: '#8a8578' }}>
+            ادامه یادگیری
+          </p>
+          {next ? (
+            <>
+              <p
+                className="mt-1 line-clamp-2 text-[13.5px] font-bold leading-6"
+                style={{ color: '#17352a' }}
               >
-                {/* Soft glow + dot texture (match after/m-home-*.png hero surface). */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute -top-24 -start-28 size-80 rounded-full bg-white/[0.07]"
-                />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 opacity-40"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(rgba(255,255,255,0.14) 1.5px, transparent 1.5px)',
-                    backgroundSize: '20px 20px',
-                  }}
-                />
-
-                <div className="relative z-10">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d7f3e3] px-3 py-1 text-xs font-extrabold text-[#064E3B]">
-                    <span aria-hidden>🔥</span>
-                    کار بعدی
-                  </span>
-
-                  <div className="mt-4 flex flex-row items-center gap-4 md:flex-row-reverse md:items-start">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-xl font-extrabold leading-8 text-white sm:text-2xl">
-                        {d.nextItem.packageTitle}
-                      </h2>
-                      <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-white/75">
-                        {d.nextItem.sectionTitle}
-                      </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/85">
-                        {d.nextItem.mediaType === 'audio' ? (
-                          <Headphones className="size-4" aria-hidden />
-                        ) : (
-                          <PlayCircle className="size-4" aria-hidden />
-                        )}
-                        <span>{faDuration(d.nextItem.durationSec)}</span>
-                        {d.nextItem.deadlineAt && (
-                          <CountdownChip deadline={d.nextItem.deadlineAt} />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Real product image (contract: accessible name = package title). */}
-                    <ProductImage
-                      src={d.nextItem.imageUrl}
-                      alt={d.nextItem.packageTitle}
-                      className="size-28 shrink-0 rounded-[20px] border border-white/20 bg-white p-2 shadow-lg sm:size-32"
-                    />
-                  </div>
-
-                  <Button
-                    variant="light"
-                    size="lg"
-                    className="mt-5 min-h-14 w-full rounded-full px-6"
-                    icon={<PlayCircle className="size-5" aria-hidden />}
-                    onClick={() => {
-                      track('next_item_cta_clicked', { action: d.nextItem?.action ?? '' });
-                      nav(
-                        d.nextItem?.action === 'quiz'
-                          ? `/quiz/${d.nextItem.sectionId}`
-                          : `/sections/${d.nextItem?.sectionId}`,
-                      );
-                    }}
-                  >
-                    {ACTION_LABEL[d.nextItem.action]}
-                  </Button>
-                </div>
-              </section>
-            ) : (
-              <section className="relative overflow-hidden rounded-[28px] border border-border bg-surface p-6 shadow-sm">
-                <div className="flex items-center gap-5">
-                  <Mascot mood="success" className="h-36 w-auto" />
-                  <div>
-                    <p className="text-lg font-extrabold text-text">
-                      همه آموزش‌ها را تمام کردی! 🎉
-                    </p>
-                    <p className="mt-1 text-sm leading-7 text-text-secondary">
-                      به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            <section className="rounded-[24px] border border-border bg-surface p-5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <ProgressRing value={d.totalProgress} size={92} stroke={9} label="پیشرفت کلی" />
-                <div className="grid flex-1 grid-cols-3 gap-2">
-                  <Stat label="در حال انجام" value={d.counts.inProgress} />
-                  <Stat label="جدید" value={d.counts.new} />
-                  <Stat label="تکمیل" value={d.counts.completed} />
-                </div>
-              </div>
-              <Link
-                to="/cards"
-                className="pressable mt-4 flex min-h-14 items-center justify-between rounded-[18px] bg-accent-light px-4 text-accent-fg"
-              >
-                <span className="flex items-center gap-2 text-sm font-extrabold">
-                  <Trophy className="size-5" aria-hidden />
-                  امتیاز شما
-                </span>
-                <span className="text-lg font-extrabold">{faNumber(d.pointsBalance)}</span>
-              </Link>
-            </section>
-
-            <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2">
-              <QuickLink to="/learn" label="دوره‌ها" icon={BookOpenCheck} tone="amber" />
-              <QuickLink to="/messages" label="پیام‌ها" icon={Mail} tone="green" />
-              <QuickLink to="/cards" label="کارت‌ها" icon={Trophy} tone="violet" />
-              <QuickLink to="/mentor" label="منتور" icon={Bot} tone="blue" />
-            </nav>
-
-            {topNudge && (
-              <Link
-                to={topNudge.actionRef ?? '/mentor'}
-                className="pressable flex items-start gap-3 rounded-[20px] border border-info/20 bg-info-light p-4 text-sm text-text shadow-xs"
-              >
-                <Sparkles className="mt-0.5 size-5 shrink-0 text-info" aria-hidden />
-                <span>{topNudge.message}</span>
-              </Link>
-            )}
-
-            {d.counts.overdue > 0 && (
+                {next.packageTitle}
+              </p>
+              <p className="mt-0.5 truncate text-[11px]" style={{ color: '#8a8578' }}>
+                درس {toPersianDigits((nextPackage?.completedSections ?? 0) + 1)} از{' '}
+                {toPersianDigits(nextPackage?.sectionCount ?? 0)}
+              </p>
+              <span className="sr-only">
+                {next.sectionTitle} • مدت‌زمان {faDuration(next.durationSec)}
+              </span>
               <div
-                role="alert"
-                className="flex items-center gap-2 rounded-[18px] border border-danger/20 bg-danger-light p-4 text-sm text-danger-fg"
+                dir="rtl"
+                className="relative mt-2.5 h-[26px] overflow-hidden rounded-full"
+                style={{ background: '#EDE7DA' }}
               >
-                <BellRing className="size-5" aria-hidden />
-                مهلت {toPersianDigits(d.counts.overdue)} آموزش گذشته است. هر چه زودتر تمامش کن.
-              </div>
-            )}
-
-            <section aria-labelledby="my-trainings" className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h2 id="my-trainings" className="text-lg font-extrabold text-text">
-                  آموزش‌های من
-                </h2>
-                <Link
-                  to="/learn"
-                  className="flex min-h-12 items-center gap-0.5 px-2 text-sm font-bold text-primary-fg"
+                <div
+                  className="absolute inset-y-0 right-0 rounded-full transition-[width] duration-300 motion-reduce:transition-none"
+                  style={{ width: `${next.percent}%`, background: '#1e8650' }}
+                />
+                <span
+                  dir="ltr"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold"
+                  style={{ color: '#17352a' }}
                 >
-                  همه
-                  <ChevronLeft className="size-4" aria-hidden />
-                </Link>
+                  {`%${toPersianDigits(next.percent)}`}
+                </span>
               </div>
-              <div className="stagger grid gap-3 md:grid-cols-2">
-                {d.packages
-                  .filter((p) => p.status !== 'completed')
-                  .slice(0, 6)
-                  .map((p) => (
-                    <PackageCard key={p.id} p={p} />
-                  ))}
-              </div>
-            </section>
-          </>
-        )}
-      </QueryState>
+              {next.deadlineAt ? (
+                <div className="mt-1.5">
+                  <CountdownChip deadline={next.deadlineAt} />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  track('next_item_cta_clicked', { action: next.action });
+                  navigate(
+                    next.action === 'quiz'
+                      ? `/quiz/${next.sectionId}`
+                      : `/sections/${next.sectionId}`,
+                  );
+                }}
+                aria-label={`${ACTION_LABEL[next.action]}: ${next.sectionTitle}`}
+                className="absolute flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 motion-reduce:transition-none"
+                style={{
+                  bottom: -22,
+                  right: -16,
+                  background: '#17352a',
+                  boxShadow: '0 10px 22px rgba(16,42,33,0.32)',
+                }}
+              >
+                <Play
+                  size={19}
+                  fill="#fff"
+                  color="#fff"
+                  aria-hidden
+                  style={{ marginInlineStart: 2 }}
+                />
+              </button>
+            </>
+          ) : (
+            <EmptyNext />
+          )}
+        </div>
+      </section>
+
+      {/* Mentor nudge (F14) — real API nudge, hidden when there is no nudge. */}
+      {topNudge ? (
+        <Link
+          to={topNudge.actionRef ?? '/mentor'}
+          className="flex items-center gap-2.5 rounded-[16px] border border-border bg-card px-3.5 py-3 transition-colors hover:bg-surface"
+        >
+          <Bot size={17} aria-hidden style={{ color: '#2F9E68' }} />
+          <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: '#17352a' }}>
+            {topNudge.message}
+          </span>
+          <ChevronLeft size={15} aria-hidden style={{ color: '#8a8578' }} />
+        </Link>
+      ) : null}
+
+      {/* Overall progress */}
+      <section
+        aria-label="پیشرفت کل"
+        className="flex items-center justify-between rounded-[20px] border border-border bg-card p-4"
+        style={{ backgroundColor: '#FEFCF9', borderColor: '#E8E1D7' }}
+      >
+        <div>
+          <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
+            پیشرفت کل شما
+          </p>
+          <p className="mt-1 text-[11.5px]" style={{ color: '#8a8578' }}>
+            در حال حاضر {toPersianDigits(home.counts.inProgress)} درس باز است!
+          </p>
+        </div>
+        <ProgressRing
+          value={home.totalProgress}
+          size={58}
+          stroke={6.5}
+          label="پیشرفت کل"
+          center={
+            <span dir="ltr" className="absolute text-[13px] font-bold" style={{ color: '#17352a' }}>
+              {`%${toPersianDigits(home.totalProgress)}`}
+            </span>
+          }
+        />
+      </section>
+
+      {/* Board tiles are real navigation targets; exam list currently routes to the learning list. */}
+      <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2.5">
+        <StatTile
+          to="/learn"
+          icon={<CalendarCheck size={22} />}
+          label="دوره‌ها"
+          bg="#FBE9D6"
+          fg="#E07B39"
+        />
+        <StatTile
+          to="/learn"
+          icon={<ShoppingBag size={22} />}
+          label="مسیر یادگیری"
+          bg="#E2F2E8"
+          fg="#2F9E68"
+        />
+        <StatTile
+          to="/learn"
+          icon={<ShieldCheck size={22} />}
+          label="آزمون‌ها"
+          bg="#ECE7FA"
+          fg="#7B5AD6"
+        />
+        <StatTile to="/cards" icon={<Award size={22} />} label="مدال" bg="#E3EEFB" fg="#3D7ED8" />
+      </nav>
+
+      {/* Suggested courses — live package titles, metadata, links, and real deadlines. */}
+      <section aria-label="دوره‌های پیشنهادی" className="mt-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-bold" style={{ color: '#17352a' }}>
+            دوره‌های پیشنهادی
+          </h2>
+          <Link
+            to="/learn"
+            className="flex min-h-12 items-center text-[12px] font-medium text-primary hover:underline"
+          >
+            مشاهده همه ←
+          </Link>
+        </div>
+        <ul className="mt-2.5 flex flex-col gap-2.5">
+          {suggestedPackages.map((pkg) => (
+            <li key={pkg.id}>
+              <Link
+                to={`/packages/${pkg.id}`}
+                data-testid="package-card"
+                className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-2.5 transition-colors hover:bg-surface"
+                style={{ backgroundColor: '#FEFCF9', borderColor: '#E8E1D7' }}
+              >
+                <ProductImage
+                  src={pkg.product?.imageUrl}
+                  alt={pkg.title}
+                  className="h-[56px] w-[56px] !rounded-[12px] !border-0 !bg-transparent !shadow-none"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold" style={{ color: '#17352a' }}>
+                    {pkg.title}
+                  </p>
+                  <p className="mt-1 text-[11px]" style={{ color: '#8a8578' }}>
+                    {toPersianDigits(pkg.sectionCount)} درس •{' '}
+                    {toPersianDigits(pkg.estimatedMinutes)} دقیقه
+                  </p>
+                  {pkg.deadlineAt ? (
+                    <div className="mt-1">
+                      <CountdownChip deadline={pkg.deadlineAt} />
+                    </div>
+                  ) : null}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Preserve the home-page overdue alert; absent in the normal board state. */}
+      {home.counts.overdue > 0 ? (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-[18px] border border-danger/20 bg-danger-light p-4 text-sm text-danger-fg"
+        >
+          <BellRing className="size-5" aria-hidden />
+          مهلت {toPersianDigits(home.counts.overdue)} آموزش گذشته است. هر چه زودتر تمامش کن.
+        </div>
+      ) : null}
     </div>
   );
 }
 
-const QUICK_TONES = {
-  amber: 'bg-accent-light text-accent-fg',
-  green: 'bg-success-light text-success-fg',
-  violet: 'bg-violet-light text-violet-fg',
-  blue: 'bg-info-light text-info-fg',
-} as const;
-
-function QuickLink({
-  to,
-  label,
-  icon: Icon,
-  tone,
+function HomeGreeting({
+  firstName,
+  initial,
+  unread,
 }: {
-  to: string;
-  label: string;
-  icon: typeof BookOpenCheck;
-  tone: keyof typeof QUICK_TONES;
+  firstName: string;
+  initial: string;
+  unread: number;
 }) {
   return (
-    <Link
-      to={to}
-      className="pressable flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-[18px] border border-border bg-surface px-2 py-3 text-center shadow-xs hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <span className={cn('grid size-10 place-items-center rounded-[14px]', QUICK_TONES[tone])}>
-        <Icon className="size-5" aria-hidden />
-      </span>
-      <span className="text-xs font-extrabold text-text">{label}</span>
-    </Link>
+    <div className="flex items-center gap-3">
+      <div
+        aria-hidden
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold"
+        style={{ background: '#EFE9DC', color: '#17352a' }}
+      >
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
+          سلام {firstName} جان!
+        </p>
+        <p className="text-[11.5px]" style={{ color: '#8a8578' }}>
+          امروز یک قدم به هدفت نزدیک‌تر شو.
+        </p>
+      </div>
+      <Link
+        to="/messages"
+        aria-label={
+          unread
+            ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
+            : 'پیام‌ها و اعلان‌ها'
+        }
+        className="relative flex h-12 w-12 items-center justify-center rounded-full lg:hidden"
+      >
+        <Bell size={20} aria-hidden style={{ color: '#17352a' }} />
+        <CountBadge count={unread} className="absolute -top-0.5 left-0" />
+      </Link>
+    </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+/** Keep the original no-next success moment, using the delivered full-quality celebration asset. */
+function EmptyNext() {
   return (
-    <div className="text-center">
-      <p className="text-2xl font-extrabold text-text">{toPersianDigits(value)}</p>
-      <p className="mt-0.5 text-xs text-text-secondary">{label}</p>
+    <div className="mt-1">
+      <p className="text-[13px] font-bold" style={{ color: '#17352a' }}>
+        همه آموزش‌ها را تمام کردی! 🎉
+      </p>
+      <p className="mt-1 text-[11px] leading-5" style={{ color: '#8a8578' }}>
+        به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.
+      </p>
+      <img
+        src="/brand/m/m-celebrate-trophy.png"
+        alt=""
+        aria-hidden
+        className="mt-1 h-11 w-auto object-contain"
+      />
     </div>
+  );
+}
+
+function StatTile({
+  to,
+  icon,
+  label,
+  bg,
+  fg,
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  bg: string;
+  fg: string;
+}) {
+  return (
+    <Link to={to} className="flex min-h-[72px] flex-col items-center gap-1.5">
+      <span
+        className="flex h-[52px] w-[52px] items-center justify-center rounded-[16px]"
+        style={{ background: bg, color: fg }}
+      >
+        {icon}
+      </span>
+      <span className="whitespace-nowrap text-[10.5px] font-medium" style={{ color: '#17352a' }}>
+        {label}
+      </span>
+    </Link>
   );
 }

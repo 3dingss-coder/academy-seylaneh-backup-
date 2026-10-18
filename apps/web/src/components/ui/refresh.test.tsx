@@ -79,14 +79,15 @@ describe('design refresh — ui', () => {
 });
 
 describe('design refresh — navigation', () => {
-  it('BottomNav keeps «آموزش‌ها» active on package/section/quiz pages', () => {
+  it('BottomNav keeps «دوره‌ها» active on package/section/quiz pages', () => {
     render(
       <MemoryRouter initialEntries={['/packages/p1']}>
         <BottomNav />
       </MemoryRouter>,
     );
     // Handoff v2 Stage 1: green text uses the AA-safe text token (primary-fg #047857, 5.48:1)
-    expect(screen.getByRole('link', { name: /آموزش‌ها/ }).className).toContain('text-primary-fg');
+    // Board tabs: «آموزش‌ها» → «دوره‌ها» (visual remediation V3, marketer board).
+    expect(screen.getByRole('link', { name: /دوره‌ها/ }).className).toContain('text-primary-fg');
     expect(screen.getByRole('link', { name: /خانه/ }).className).not.toContain('text-primary-fg');
   });
 

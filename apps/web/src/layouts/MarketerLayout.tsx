@@ -1,6 +1,16 @@
 import { Suspense, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Bell, BookOpen, Bot, Home, Mail, Trophy, UserRound, WifiOff } from 'lucide-react';
+import {
+  Bell,
+  BookOpen,
+  Bot,
+  Home,
+  Mail,
+  ShieldCheck,
+  Trophy,
+  UserRound,
+  WifiOff,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLogo } from '@/components/brand/AppLogo';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -17,9 +27,9 @@ import { useMessages, useNotifications } from '@/lib/queries';
 
 const DESKTOP_NAV = [
   { to: '/', label: 'خانه', icon: Home },
-  { to: '/learn', label: 'آموزش‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
+  { to: '/learn', label: 'دوره‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
   { to: '/messages', label: 'پیام‌ها', icon: Mail },
-  { to: '/cards', label: 'کارت‌ها', icon: Trophy },
+  { to: '/cards', label: 'مدال', icon: Trophy },
   { to: '/mentor', label: 'منتور', icon: Bot },
 ];
 
@@ -50,8 +60,17 @@ export function MarketerLayout() {
   }, [qc]);
 
   return (
-    <div className="min-h-dvh bg-background pb-28 lg:pb-8">
-      <header className="sticky top-0 z-30 glass border-b border-border">
+    <div
+      className="min-h-dvh bg-background pb-28 lg:pb-8"
+      style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
+    >
+      <header
+        className={cn(
+          'sticky top-0 z-30 glass border-b border-border',
+          // The home board owns its mobile greeting/notification row; retain the shared desktop shell.
+          pathname === '/' && 'hidden lg:block',
+        )}
+      >
         <div className="mx-auto flex h-16 max-w-[960px] items-center justify-between gap-2 px-4">
           <Link to="/" aria-label="خانه">
             <AppLogo />
@@ -126,9 +145,10 @@ export function MarketerLayout() {
       <BottomNav
         items={[
           { to: '/', label: 'خانه', icon: Home },
-          { to: '/learn', label: 'آموزش‌ها', icon: BookOpen },
-          { to: '/messages', label: 'پیام‌ها', icon: Mail, badge: unread },
-          { to: '/cards', label: 'کارت‌ها', icon: Trophy },
+          { to: '/learn', label: 'دوره‌ها', icon: BookOpen },
+          { to: '/learn', label: 'آزمون‌ها', icon: ShieldCheck },
+          { to: '/cards', label: 'مدال', icon: Trophy },
+          { to: '/profile', label: 'پروفایل', icon: UserRound },
         ]}
       />
     </div>

@@ -150,15 +150,21 @@ describe('Toast', () => {
 });
 
 describe('BottomNav', () => {
-  it('renders the 4 spec tabs', () => {
+  it('renders the 5 board tabs (marketer board V3)', () => {
     render(
       <MemoryRouter>
         <BottomNav />
       </MemoryRouter>,
     );
-    for (const label of ['خانه', 'آموزش‌ها', 'پیام‌ها', 'کارت‌ها']) {
+    // Board «تمامی صفحات اپلیکیشن بازاریاب» tabs replace the v1 spec tabs («آموزش‌ها»→«دوره‌ها»،
+    // «پیام‌ها»→ header bell، «کارت‌ها»→«مدال»؛ + «آزمون‌ها» (→ /learn for now) and «پروفایل»).
+    for (const label of ['خانه', 'دوره‌ها', 'آزمون‌ها', 'مدال', 'پروفایل']) {
       expect(screen.getByRole('link', { name: new RegExp(label) })).toBeInTheDocument();
     }
+    // No exam-list route exists yet; per the user's choice, this tab points to /learn without
+    // falsely being announced current alongside «دوره‌ها».
+    expect(screen.getByRole('link', { name: 'آزمون‌ها' })).toHaveAttribute('href', '/learn');
+    expect(screen.getByRole('link', { name: 'آزمون‌ها' })).not.toHaveAttribute('aria-current');
   });
 });
 

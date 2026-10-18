@@ -77,37 +77,46 @@ afterEach(() => {
 });
 
 describe('HomePage — one dominant next action (marketer core principle)', () => {
-  it('renders the next-action focal card + CTA, metrics, points and my trainings', async () => {
+  it('renders the continue-card focal action + play CTA, progress ring and suggested courses', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     renderHome();
     expect(await screen.findByTestId('next-item')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'شروع' })).toBeInTheDocument();
-    expect(screen.getByText('کار بعدی')).toBeInTheDocument();
-    expect(screen.getByText('در حال انجام')).toBeInTheDocument();
-    expect(screen.getByText('جدید')).toBeInTheDocument();
-    expect(screen.getByText('تکمیل')).toBeInTheDocument();
-    expect(screen.getByText('امتیاز شما')).toBeInTheDocument();
-    expect(screen.getByText('آموزش‌های من')).toBeInTheDocument();
+    // The icon-only board CTA keeps the real action label accessible (fixture action = «start»).
+    expect(screen.getByRole('button', { name: /شروع: بخش اول/ })).toBeInTheDocument();
+    // board copy (marketer board «تمامی صفحات اپلیکیشن بازاریاب») replaces v1 copy:
+    // «کار بعدی»→«ادامه یادگیری», «امتیاز شما»→«پیشرفت کل شما», «آموزش‌های من»→«دوره‌های پیشنهادی»;
+    // the v1 count chips («در حال انجام»/«جدید»/«تکمیل») are not in the board — its 4 tiles replace them.
+    expect(screen.getByText('ادامه یادگیری')).toBeInTheDocument();
+    expect(screen.getByText('پیشرفت کل شما')).toBeInTheDocument();
+    expect(screen.getByText('دوره‌ها')).toBeInTheDocument();
+    expect(screen.getByText('مسیر یادگیری')).toBeInTheDocument();
+    expect(screen.getByText('آزمون‌ها')).toBeInTheDocument();
+    expect(screen.getByText('مدال')).toBeInTheDocument();
+    expect(screen.getByText('دوره‌های پیشنهادی')).toBeInTheDocument();
     expect(screen.getByTestId('package-card')).toBeInTheDocument();
   });
 
-  it('shows no mascot on the routine home screen (must not overwhelm)', async () => {
+  it('uses only hero art on the routine home screen (no empty/success illustration)', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     const { container } = renderHome();
     await screen.findByTestId('next-item');
-    expect(container.querySelector('img[src="/brand/mascot.webp"]')).toBeNull();
+    expect(container.querySelector('img[src="/brand/m/m-empty.png"]')).toBeNull();
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
   });
 
-  it('empty state carries the decorative mascot (empty state allowed)', async () => {
+  it('empty state carries the delivered empty illustration and keeps its copy', async () => {
     mockApi(homeRoutes({ ...HOME_ROUTINE, nextItem: null, packages: [] }));
     const { container } = renderHome();
     expect(await screen.findByText('هنوز آموزشی ندارید')).toBeInTheDocument();
-    const mascot = container.querySelector('img[src="/brand/mascot.webp"]');
-    expect(mascot).not.toBeNull();
-    expect(mascot).toHaveAttribute('alt', '');
+    expect(
+      screen.getByText('منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید.'),
+    ).toBeInTheDocument();
+    const illustration = container.querySelector('img[src="/brand/m/m-empty.png"]');
+    expect(illustration).not.toBeNull();
+    expect(illustration).toHaveAttribute('alt', '');
   });
 
-  it('all-done success moment carries the success mascot and keeps the message', async () => {
+  it('all-done success moment carries the delivered celebration asset and keeps the message', async () => {
     mockApi(
       homeRoutes({
         ...HOME_ROUTINE,
@@ -117,7 +126,8 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     );
     const { container } = renderHome();
     expect(await screen.findByText('همه آموزش‌ها را تمام کردی! 🎉')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/mascot.webp"]')).not.toBeNull();
+    expect(screen.getByText('به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.')).toBeInTheDocument();
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).not.toBeNull();
   });
 });
 

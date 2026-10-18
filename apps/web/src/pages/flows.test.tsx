@@ -24,7 +24,7 @@ const loggedIn = () => {
 };
 
 describe('M1 login → M3 home', () => {
-  it('logs in with phone, stores refresh token and shows «کار بعدی»', async () => {
+  it('logs in with phone, stores refresh token and shows «ادامه یادگیری»', async () => {
     const { calls } = mockApi({
       'POST /v1/auth/phone-login': () => ({
         data: { user: marketer, idToken: 't1', refreshToken: 'r1', expiresIn: 3600 },
@@ -446,7 +446,7 @@ describe('M7/M8 quiz', () => {
 });
 
 describe('F9 home error state — last-known state from local cache', () => {
-  it('cold start without network keeps the session and shows the cached «کار بعدی»', async () => {
+  it('cold start without network keeps the session and shows the cached «ادامه یادگیری»', async () => {
     mockApi({ ...loggedIn(), 'GET /v1/me/home': () => ({ data: home }) });
     const first = renderApp('/');
     expect(await screen.findByTestId('next-item')).toHaveTextContent('معرفی کلی محصول فورمی');

@@ -148,7 +148,7 @@ export function HomePage() {
           }}
           data-testid={next ? 'next-item' : undefined}
         >
-          <p className="text-[10px] tracking-[0.02em]" style={{ color: '#8a8578' }}>
+          <p className="text-[10px] tracking-[0.02em]" style={{ color: '#777166' }}>
             ادامه یادگیری
           </p>
           {next ? (
@@ -159,7 +159,7 @@ export function HomePage() {
               >
                 {next.packageTitle}
               </p>
-              <p className="mt-0.5 truncate text-[11px]" style={{ color: '#8a8578' }}>
+              <p className="mt-0.5 truncate text-[11px]" style={{ color: '#777166' }}>
                 درس {toPersianDigits((nextPackage?.completedSections ?? 0) + 1)} از{' '}
                 {toPersianDigits(nextPackage?.sectionCount ?? 0)}
               </p>
@@ -232,7 +232,7 @@ export function HomePage() {
           <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: '#17352a' }}>
             {topNudge.message}
           </span>
-          <ChevronLeft size={15} aria-hidden style={{ color: '#8a8578' }} />
+          <ChevronLeft size={15} aria-hidden style={{ color: '#777166' }} />
         </Link>
       ) : null}
 
@@ -246,7 +246,7 @@ export function HomePage() {
           <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
             پیشرفت کل شما
           </p>
-          <p className="mt-1 text-[11.5px]" style={{ color: '#8a8578' }}>
+          <p className="mt-1 text-[11.5px]" style={{ color: '#777166' }}>
             در حال حاضر {toPersianDigits(home.counts.inProgress)} درس باز است!
           </p>
         </div>
@@ -297,7 +297,7 @@ export function HomePage() {
           </h2>
           <Link
             to="/learn"
-            className="flex min-h-12 items-center text-[12px] font-medium text-primary hover:underline"
+            className="flex min-h-12 items-center text-[12px] font-medium text-primary-fg hover:underline"
           >
             مشاهده همه ←
           </Link>
@@ -320,7 +320,7 @@ export function HomePage() {
                   <p className="truncate text-[13px] font-bold" style={{ color: '#17352a' }}>
                     {pkg.title}
                   </p>
-                  <p className="mt-1 text-[11px]" style={{ color: '#8a8578' }}>
+                  <p className="mt-1 text-[11px]" style={{ color: '#777166' }}>
                     {toPersianDigits(pkg.sectionCount)} درس •{' '}
                     {toPersianDigits(pkg.estimatedMinutes)} دقیقه
                   </p>
@@ -372,7 +372,7 @@ function HomeGreeting({
         <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
           سلام {firstName} جان!
         </p>
-        <p className="text-[11.5px]" style={{ color: '#8a8578' }}>
+        <p className="text-[11.5px]" style={{ color: '#777166' }}>
           امروز یک قدم به هدفت نزدیک‌تر شو.
         </p>
       </div>
@@ -399,7 +399,7 @@ function EmptyNext() {
       <p className="text-[13px] font-bold" style={{ color: '#17352a' }}>
         همه آموزش‌ها را تمام کردی! 🎉
       </p>
-      <p className="mt-1 text-[11px] leading-5" style={{ color: '#8a8578' }}>
+      <p className="mt-1 text-[11px] leading-5" style={{ color: '#777166' }}>
         به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.
       </p>
       <img

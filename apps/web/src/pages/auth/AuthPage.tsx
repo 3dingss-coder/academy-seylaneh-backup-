@@ -85,14 +85,20 @@ function PillButton({
   const surface = isRetry
     ? 'bg-[#f6d7d3] text-[#b53c34]'
     : soft
-      ? 'bg-[#86af99] text-white cursor-not-allowed'
+      ? 'bg-[#86af99] text-[#17352a] cursor-not-allowed'
       : 'bg-[#0e6e4e] text-white hover:bg-[#0b5c41]';
   return (
     <button
       type={type}
       disabled={disabled || loading}
       onClick={onClick}
-      style={{ minHeight: 60 }}
+      style={{
+        minHeight: 60,
+        // Color changes immediately with validation so contrast checks never capture an in-between shade.
+        transition:
+          'transform var(--duration-fast) var(--ease-soft), box-shadow var(--duration-base) var(--ease-soft)',
+        ...(soft ? { backgroundColor: '#86af99', color: '#17352a' } : {}),
+      }}
       className={`pressable flex w-full items-center gap-3 rounded-full px-3 py-2.5 shadow-sm disabled:opacity-70 ${surface}`}
     >
       <span className="flex-1 text-center text-[17px] font-extrabold">{children}</span>
@@ -453,7 +459,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 {info}
               </p>
             )}
-            <p className="mt-4 text-start text-[11px] leading-6 text-[#8a8578]">
+            <p className="mt-4 text-start text-[11px] leading-6 text-[#777166]">
               با ورود یا ثبت‌نام، قوانین استفاده و حریم خصوصی سیلانه سبز را می‌پذیرید.
             </p>
           </div>
@@ -498,7 +504,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
         </div>
 
         <h1 className="mt-3 text-[26px] font-extrabold text-[#0f2a1d]">{stepDef.title}</h1>
-        <p className="mt-1.5 text-[14px] leading-7 text-[#7a756a]">{stepDef.desc}</p>
+        <p className="mt-1.5 text-[14px] leading-7 text-[#716b60]">{stepDef.desc}</p>
 
         {step === 1 && (
           <div className="mt-4 flex flex-col gap-3">

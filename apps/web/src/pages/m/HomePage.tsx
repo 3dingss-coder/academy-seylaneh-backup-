@@ -3,7 +3,6 @@ import {
   BellRing,
   BookOpenCheck,
   Bot,
-  CheckCircle2,
   ChevronLeft,
   Headphones,
   Mail,
@@ -35,7 +34,7 @@ import type { Nudge } from '@/lib/types';
 
 const ACTION_LABEL = { start: 'شروع', resume: 'ادامه', quiz: 'شروع آزمون' } as const;
 
-/** M3 — Home («کار بعدی»): the single most important screen. */
+/** M3 — Home («کار بعدی تو»): the single most important screen. Visual truth = after/m-home-*.png. */
 export function HomePage() {
   const { user } = useAuth();
   const home = useHome(user?.id);
@@ -50,18 +49,9 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-5 pb-3">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div>
-          <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]} جان!</p>
-          <h1 className="mt-0.5 text-xl font-extrabold text-text">امروز یک قدم جلوتر برو</h1>
-        </div>
-        <Link
-          to="/messages"
-          className="relative grid size-12 place-items-center rounded-full border border-border bg-surface shadow-sm"
-          aria-label="پیام‌ها و اعلان‌ها"
-        >
-          <BellRing className="size-5 text-text-secondary" aria-hidden />
-        </Link>
+      <div className="px-1">
+        <p className="text-sm text-text-secondary">سلام {user?.name.split(' ')[0]} 👋</p>
+        <h1 className="mt-0.5 text-2xl font-extrabold text-text">کار بعدی تو</h1>
       </div>
 
       <StaleBanner
@@ -73,7 +63,7 @@ export function HomePage() {
         query={home}
         loading={
           <div className="flex flex-col gap-3" aria-busy>
-            <Skeleton className="h-80 w-full rounded-[28px]" />
+            <Skeleton className="h-72 w-full rounded-[28px]" />
             <PackageCardSkeleton />
           </div>
         }
@@ -91,48 +81,65 @@ export function HomePage() {
             {d.nextItem ? (
               <section
                 className={cn(
-                  'relative min-h-[330px] overflow-hidden rounded-[30px] border border-[#eadfce] bg-[#fffaf2] px-5 py-5 shadow-[0_18px_50px_-28px_rgba(15,23,42,.28)] sm:min-h-[350px] sm:px-7 sm:py-7',
+                  'relative overflow-hidden rounded-[28px] bg-gradient-to-bl from-[#0a6a4c] to-[#064E3B] px-5 py-5 text-white shadow-[0_18px_50px_-24px_rgba(6,78,59,.55)] sm:px-7 sm:py-6',
                   highlight && 'ring-4 ring-primary/25',
                 )}
                 data-testid="next-item"
               >
+                {/* Soft glow + dot texture (match after/m-home-*.png hero surface). */}
                 <div
                   aria-hidden
-                  className="absolute -end-20 -top-24 size-64 rounded-full bg-[#e7f6e9]"
+                  className="pointer-events-none absolute -top-24 -start-28 size-80 rounded-full bg-white/[0.07]"
                 />
                 <div
                   aria-hidden
-                  className="absolute -bottom-28 -start-20 size-72 rounded-full bg-[#fff0cf]"
-                />
-                <div
-                  aria-hidden
-                  className="absolute end-10 top-16 h-24 w-12 rotate-[24deg] rounded-[100%_0] bg-primary/10"
+                  className="pointer-events-none absolute inset-0 opacity-40"
+                  style={{
+                    backgroundImage:
+                      'radial-gradient(rgba(255,255,255,0.14) 1.5px, transparent 1.5px)',
+                    backgroundSize: '20px 20px',
+                  }}
                 />
 
-                <div className="relative z-10 max-w-[58%] sm:max-w-[56%]">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-light px-3 py-1 text-xs font-extrabold text-accent-fg">
-                    <Sparkles className="size-3.5" aria-hidden />
+                <div className="relative z-10">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d7f3e3] px-3 py-1 text-xs font-extrabold text-[#064E3B]">
+                    <span aria-hidden>🔥</span>
                     کار بعدی
                   </span>
-                  <h2 className="mt-4 text-xl font-extrabold leading-8 text-text sm:text-2xl">
-                    {d.nextItem.packageTitle}
-                  </h2>
-                  <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-text-secondary">
-                    {d.nextItem.sectionTitle}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-                    {d.nextItem.mediaType === 'audio' ? (
-                      <Headphones className="size-4" aria-hidden />
-                    ) : (
-                      <PlayCircle className="size-4" aria-hidden />
-                    )}
-                    <span>{faDuration(d.nextItem.durationSec)}</span>
-                    {d.nextItem.deadlineAt && <CountdownChip deadline={d.nextItem.deadlineAt} />}
+
+                  <div className="mt-4 flex flex-row items-center gap-4 md:flex-row-reverse md:items-start">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl font-extrabold leading-8 text-white sm:text-2xl">
+                        {d.nextItem.packageTitle}
+                      </h2>
+                      <p className="mt-1.5 line-clamp-2 text-sm leading-7 text-white/75">
+                        {d.nextItem.sectionTitle}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/85">
+                        {d.nextItem.mediaType === 'audio' ? (
+                          <Headphones className="size-4" aria-hidden />
+                        ) : (
+                          <PlayCircle className="size-4" aria-hidden />
+                        )}
+                        <span>{faDuration(d.nextItem.durationSec)}</span>
+                        {d.nextItem.deadlineAt && (
+                          <CountdownChip deadline={d.nextItem.deadlineAt} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Real product image (contract: accessible name = package title). */}
+                    <ProductImage
+                      src={d.nextItem.imageUrl}
+                      alt={d.nextItem.packageTitle}
+                      className="size-28 shrink-0 rounded-[20px] border border-white/20 bg-white p-2 shadow-lg sm:size-32"
+                    />
                   </div>
 
                   <Button
+                    variant="light"
                     size="lg"
-                    className="mt-5 min-h-14 rounded-full px-6 shadow-md"
+                    className="mt-5 min-h-14 w-full rounded-full px-6"
                     icon={<PlayCircle className="size-5" aria-hidden />}
                     onClick={() => {
                       track('next_item_cta_clicked', { action: d.nextItem?.action ?? '' });
@@ -146,19 +153,9 @@ export function HomePage() {
                     {ACTION_LABEL[d.nextItem.action]}
                   </Button>
                 </div>
-
-                <div className="pointer-events-none absolute -bottom-4 -end-5 z-0 flex h-[290px] w-[48%] items-end justify-center sm:-end-2 sm:h-[320px]">
-                  {/* Real product image (contract: accessible name = package title, real catalog src) —
-                      the mascot stays reserved for empty/success/encouragement/mentor states. */}
-                  <ProductImage
-                    src={d.nextItem.imageUrl}
-                    alt={d.nextItem.packageTitle}
-                    className="size-44 rounded-[24px] border-white/60 shadow-lg sm:size-52"
-                  />
-                </div>
               </section>
             ) : (
-              <section className="relative overflow-hidden rounded-[30px] border border-[#eadfce] bg-[#fffaf2] p-6 shadow-sm">
+              <section className="relative overflow-hidden rounded-[28px] border border-border bg-surface p-6 shadow-sm">
                 <div className="flex items-center gap-5">
                   <Mascot mood="success" className="h-36 w-auto" />
                   <div>
@@ -172,6 +169,27 @@ export function HomePage() {
                 </div>
               </section>
             )}
+
+            <section className="rounded-[24px] border border-border bg-surface p-5 shadow-sm">
+              <div className="flex items-center gap-4">
+                <ProgressRing value={d.totalProgress} size={92} stroke={9} label="پیشرفت کلی" />
+                <div className="grid flex-1 grid-cols-3 gap-2">
+                  <Stat label="در حال انجام" value={d.counts.inProgress} />
+                  <Stat label="جدید" value={d.counts.new} />
+                  <Stat label="تکمیل" value={d.counts.completed} />
+                </div>
+              </div>
+              <Link
+                to="/cards"
+                className="pressable mt-4 flex min-h-14 items-center justify-between rounded-[18px] bg-accent-light px-4 text-accent-fg"
+              >
+                <span className="flex items-center gap-2 text-sm font-extrabold">
+                  <Trophy className="size-5" aria-hidden />
+                  امتیاز شما
+                </span>
+                <span className="text-lg font-extrabold">{faNumber(d.pointsBalance)}</span>
+              </Link>
+            </section>
 
             <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2">
               <QuickLink to="/learn" label="دوره‌ها" icon={BookOpenCheck} tone="amber" />
@@ -190,33 +208,6 @@ export function HomePage() {
               </Link>
             )}
 
-            <section className="rounded-[24px] border border-border bg-surface p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-base font-extrabold text-text">پیشرفت شما</p>
-                  <p className="mt-1 text-sm text-text-secondary">در مسیر عالی هستید!</p>
-                </div>
-                <ProgressRing value={d.totalProgress} size={92} stroke={9} label="پیشرفت کلی" />
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
-                <Stat label="در حال انجام" value={d.counts.inProgress} icon={PlayCircle} />
-                <Stat label="جدید" value={d.counts.new} icon={BookOpenCheck} />
-                <Stat label="تکمیل" value={d.counts.completed} icon={CheckCircle2} />
-              </div>
-              <Link
-                to="/cards"
-                className="pressable mt-4 flex min-h-14 items-center justify-between rounded-[18px] bg-accent-light px-4 text-accent-fg"
-              >
-                <span className="flex items-center gap-2 text-sm font-extrabold">
-                  <span className="grid size-9 place-items-center rounded-full bg-accent/20">
-                    <Trophy className="size-5" aria-hidden />
-                  </span>
-                  امتیاز شما
-                </span>
-                <span className="text-lg font-extrabold">{faNumber(d.pointsBalance)}</span>
-              </Link>
-            </section>
-
             {d.counts.overdue > 0 && (
               <div
                 role="alert"
@@ -229,12 +220,9 @@ export function HomePage() {
 
             <section aria-labelledby="my-trainings" className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 id="my-trainings" className="text-lg font-extrabold text-text">
-                    آموزش‌های من
-                  </h2>
-                  <p className="mt-0.5 text-xs text-text-secondary">مسیرهای فعال شما</p>
-                </div>
+                <h2 id="my-trainings" className="text-lg font-extrabold text-text">
+                  آموزش‌های من
+                </h2>
                 <Link
                   to="/learn"
                   className="flex min-h-12 items-center gap-0.5 px-2 text-sm font-bold text-primary-fg"
@@ -280,9 +268,9 @@ function QuickLink({
   return (
     <Link
       to={to}
-      className="pressable flex min-h-24 flex-col items-center justify-center gap-2 rounded-[20px] border border-border bg-surface px-2 py-3 text-center shadow-sm hover:-translate-y-0.5 hover:shadow-md"
+      className="pressable flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-[18px] border border-border bg-surface px-2 py-3 text-center shadow-xs hover:-translate-y-0.5 hover:shadow-md"
     >
-      <span className={cn('grid size-11 place-items-center rounded-[16px]', QUICK_TONES[tone])}>
+      <span className={cn('grid size-10 place-items-center rounded-[14px]', QUICK_TONES[tone])}>
         <Icon className="size-5" aria-hidden />
       </span>
       <span className="text-xs font-extrabold text-text">{label}</span>
@@ -290,20 +278,11 @@ function QuickLink({
   );
 }
 
-function Stat({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: typeof PlayCircle;
-}) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-card border border-border bg-background p-3 text-center">
-      <Icon className="mx-auto mb-2 size-5 text-primary-fg" aria-hidden />
-      <p className="text-xl font-extrabold text-text">{toPersianDigits(value)}</p>
-      <p className="mt-0.5 text-[11px] text-text-secondary">{label}</p>
+    <div className="text-center">
+      <p className="text-2xl font-extrabold text-text">{toPersianDigits(value)}</p>
+      <p className="mt-0.5 text-xs text-text-secondary">{label}</p>
     </div>
   );
 }

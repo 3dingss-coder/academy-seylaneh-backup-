@@ -177,8 +177,9 @@ export function HomePage() {
                 />
                 <span
                   dir="ltr"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold"
-                  style={{ color: '#17352a' }}
+                  className={`absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
+                    next.percent >= 20 ? 'bg-[#0e6e4e] text-white' : 'bg-[#EDE7DA] text-[#17352a]'
+                  }`}
                 >
                   {`%${toPersianDigits(next.percent)}`}
                 </span>

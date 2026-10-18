@@ -70,13 +70,16 @@ describe('a11y (axe, jsdom)', () => {
   it('login page', async () => {
     mockApi({});
     const { container } = renderApp('/login');
-    await screen.findByRole('button', { name: 'ورود' });
+    await screen.findByRole('button', { name: 'ورود و ادامه' });
     expect(await violations(container)).toEqual([]);
   });
 
   it('sign-up page, including the open province list', async () => {
     mockApi({});
     const { container } = renderApp('/register');
+    fireEvent.change(await screen.findByLabelText('نام'), { target: { value: 'نگار' } });
+    fireEvent.change(screen.getByLabelText('نام خانوادگی'), { target: { value: 'محمدی' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     fireEvent.click(await screen.findByLabelText('انتخاب محل فعالیت شما'));
     await screen.findByRole('listbox', { name: 'استان‌های ایران' });
     expect(await violations(container)).toEqual([]);
@@ -85,12 +88,16 @@ describe('a11y (axe, jsdom)', () => {
   it('sign-up page with the city list open', async () => {
     mockApi({});
     const { container } = renderApp('/register');
+    fireEvent.change(await screen.findByLabelText('نام'), { target: { value: 'نگار' } });
+    fireEvent.change(screen.getByLabelText('نام خانوادگی'), { target: { value: 'محمدی' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     fireEvent.click(await screen.findByLabelText('انتخاب محل فعالیت شما'));
     const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
     fireEvent.change(screen.getByRole('combobox', { name: 'جستجوی استان' }), {
       target: { value: 'یزد' },
     });
     fireEvent.click(within(provinces).getByRole('option', { name: 'یزد' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     fireEvent.click(screen.getByLabelText('شهر'));
     await screen.findByRole('listbox', { name: 'شهرهای استان یزد' });
     expect(await violations(container)).toEqual([]);

@@ -44,7 +44,7 @@ async function login(page: Page, identifier: string) {
   }
   await page.goto('/login');
   await page.getByLabel(/شماره موبایل/).fill(identifier);
-  await page.getByRole('button', { name: 'ورود' }).click();
+  await page.getByRole('button', { name: 'ورود و ادامه' }).click();
   // Wait until the session is established before navigating (avoids racing the login call).
   await expect(page).not.toHaveURL(/\/login$/, { timeout: 15_000 });
 }

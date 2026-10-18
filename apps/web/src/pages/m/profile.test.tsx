@@ -107,6 +107,6 @@ describe('ProfilePage — real account management', () => {
     );
     // the real logout endpoint is called and the app lands on login
     await waitFor(() => expect(calls.some((c) => c.key === 'POST /v1/auth/logout')).toBe(true));
-    await screen.findByRole('button', { name: 'ورود' }, { timeout: 15000 });
+    await screen.findByRole('button', { name: 'ورود و ادامه' }, { timeout: 15000 });
   }, 20000);
 });

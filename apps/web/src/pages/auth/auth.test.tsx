@@ -70,7 +70,7 @@ describe('AuthPage (must-preserve marketer flow)', () => {
     renderAuth();
     expect(screen.getByLabelText('شماره موبایل یا کد ملی')).toBeInTheDocument();
     expect(screen.queryByLabelText('رمز عبور')).toBeNull();
-    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ورود و ادامه' })).toBeInTheDocument();
   });
 
   it('unknown identifier converts to registration, keeping the entered identifier', async () => {
@@ -78,35 +78,56 @@ describe('AuthPage (must-preserve marketer flow)', () => {
     renderAuth();
     const idField = screen.getByLabelText('شماره موبایل یا کد ملی');
     fireEvent.change(idField, { target: { value: '09123456789' } });
-    fireEvent.click(screen.getByRole('button', { name: 'ورود' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
     expect(await screen.findByText(/هنوز ثبت‌نام نشده است/)).toBeInTheDocument();
-    expect(screen.getByLabelText('نام و نام خانوادگی')).toBeInTheDocument();
-    expect(screen.getByLabelText('انتخاب محل فعالیت شما')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ثبت‌نام و ورود' })).toBeInTheDocument();
 
-    // Complete the activity location: the province-dependent identity field reappears
-    // carrying the identifier the user already typed (phone province → شماره موبایل).
+    // Four-step wizard (reference board): name → activity location → province/city → identity.
+    expect(screen.getByText(/مرحله ۱ از ۴/)).toBeInTheDocument();
+    expect(screen.getByLabelText('نام')).toBeInTheDocument();
+    expect(screen.getByLabelText('نام خانوادگی')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'سارا' } });
+    fireEvent.change(screen.getByLabelText('نام خانوادگی'), { target: { value: 'محمدی' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+
+    // Activity location step: the province list opens under the wizard's picker label.
+    expect(screen.getByText(/مرحله ۲ از ۴/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('انتخاب محل فعالیت شما'));
     const provinces = await screen.findByRole('listbox', { name: 'استان‌های ایران' });
     fireEvent.click(await within(provinces).findByRole('option', { name: 'خراسان رضوی' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+
+    // Province/city step completes the activity location.
+    expect(screen.getByText(/مرحله ۳ از ۴/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('شهر'));
     const cities = await screen.findByRole('listbox', { name: /شهرهای استان/ });
     fireEvent.click(await within(cities).findByRole('option', { name: 'تربت حیدریه' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+
+    // Identity step carries the identifier the user already typed (phone province → شماره موبایل).
+    expect(screen.getByText(/مرحله ۴ از ۴/)).toBeInTheDocument();
     expect(screen.getByLabelText('شماره موبایل')).toHaveDisplayValue('09123456789');
-  });
-
-  it('register mode keeps name + residence + province-dependent identity + mode switch', () => {
-    renderAuth('register');
-    expect(screen.getByLabelText('نام و نام خانوادگی')).toBeInTheDocument();
-    expect(screen.getByLabelText('انتخاب محل فعالیت شما')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ثبت‌نام و ورود' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'حساب دارید؟ وارد شوید' }));
-    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
   });
 
-  it('shows the provided mascot asset as a decorative welcome presence', () => {
+  it('register mode keeps name + residence + province-dependent identity + mode switch', async () => {
+    renderAuth('register');
+    expect(screen.getByLabelText('نام')).toBeInTheDocument();
+    expect(screen.getByLabelText('نام خانوادگی')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ادامه' })).toBeInTheDocument();
+
+    // Residence collection stays in the flow (step 2 of the wizard).
+    fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'سارا' } });
+    fireEvent.change(screen.getByLabelText('نام خانوادگی'), { target: { value: 'محمدی' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+    expect(screen.getByLabelText('انتخاب محل فعالیت شما')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'حساب دارید؟ وارد شوید' }));
+    expect(screen.getByRole('button', { name: 'ورود و ادامه' })).toBeInTheDocument();
+  });
+
+  it('shows the welcome mascot illustration as a decorative presence', () => {
     const { container } = renderAuth();
-    const mascot = container.querySelector('img[src="/brand/mascot.webp"]');
+    const mascot = container.querySelector('img[src="/brand/auth/welcome.png"]');
     expect(mascot).not.toBeNull();
     expect(mascot).toHaveAttribute('alt', '');
   });

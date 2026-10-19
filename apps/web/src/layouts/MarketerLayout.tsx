@@ -69,13 +69,13 @@ export function MarketerLayout() {
           ? 'min-h-dvh bg-[#FCF7EE] pb-0'
           : isProfile
             ? 'min-h-dvh bg-[#FCF8F0] pb-28 lg:pb-8'
-            : 'min-h-dvh bg-background pb-28 lg:pb-8'
+            : 'min-h-dvh bg-[#FCF8F0] pb-28 lg:pb-8'
       }
       style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
     >
       <header
         className={cn(
-          'sticky top-0 z-30 glass border-b border-border',
+          'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',
           // The home and immersive learning-path screens own their page-specific headers.
           (pathname === '/' || isLearningPath || isProfile) && 'hidden',
         )}
@@ -95,7 +95,7 @@ export function MarketerLayout() {
                     'pressable flex min-h-12 items-center gap-1.5 rounded-card px-3 text-sm font-bold transition-colors',
                     isActive || match?.some((p) => pathname.startsWith(p))
                       ? 'bg-primary-light text-primary-fg'
-                      : 'text-text-secondary hover:bg-background',
+                      : 'text-text-secondary hover:bg-[#F7F3EA]',
                   )
                 }
               >
@@ -112,7 +112,7 @@ export function MarketerLayout() {
                   ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
                   : 'پیام‌ها و اعلان‌ها'
               }
-              className="relative flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-background"
+              className="relative flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
             >
               <Bell className="size-6" aria-hidden />
               <CountBadge count={unread} className="end-2 top-2" />
@@ -120,7 +120,7 @@ export function MarketerLayout() {
             <Link
               to="/profile"
               aria-label="پروفایل"
-              className="flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-background"
+              className="flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
             >
               <UserRound className="size-6" aria-hidden />
             </Link>

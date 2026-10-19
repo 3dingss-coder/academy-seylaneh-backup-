@@ -54,13 +54,15 @@ describe('ProfilePage — real account management', () => {
       }),
     );
     renderApp('/profile');
-    // identity block shows the real role label and the real contact
+    // identity block shows the real role, while editable account fields live behind
+    // the reference's «اطلاعات شخصی» row.
     await screen.findByText(/بازاریاب/, {}, { timeout: 15000 });
-    expect(screen.getByText(toPersianDigits('09121234567'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /اطلاعات شخصی/ }));
+    expect(await screen.findByText(toPersianDigits('09121234567'))).toBeInTheDocument();
     const name = screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement;
     expect(name.value).toBe('سارا محمدی');
     fireEvent.change(name, { target: { value: 'سارا محمدی‌نژاد' } });
-    fireEvent.click(screen.getByRole('button', { name: 'ذخیره نام' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره تغییرات' }));
     await screen.findByText('ذخیره شد.', {}, { timeout: 15000 });
     const body = calls.find((c) => c.key === 'PATCH /v1/me')?.body as { name: string };
     expect(body.name).toBe('سارا محمدی‌نژاد');
@@ -74,6 +76,7 @@ describe('ProfilePage — real account management', () => {
       }),
     );
     renderApp('/profile');
+    fireEvent.click(await screen.findByRole('button', { name: 'تنظیمات حساب' }, { timeout: 15000 }));
     await screen.findByLabelText('رمز فعلی', {}, { timeout: 15000 });
     fireEvent.change(screen.getByLabelText('رمز فعلی'), { target: { value: 'old-pass-1' } });
     fireEvent.change(screen.getByLabelText('رمز جدید'), { target: { value: 'کوتاه' } });

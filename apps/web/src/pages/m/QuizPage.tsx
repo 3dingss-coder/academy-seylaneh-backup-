@@ -199,11 +199,11 @@ function QuizFlow({
   // ── M8 result ──
   if (result) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
         {header}
         <Card
           tone={result.passed ? 'brand' : 'default'}
-          className="relative flex flex-col items-center gap-2 overflow-hidden py-6 text-center"
+          className="relative flex flex-col items-center gap-2 overflow-hidden !rounded-[28px] border-[#E8E1D6] bg-[#FFFDF8] py-7 text-center shadow-[0_16px_38px_-30px_rgba(32,60,52,.42)]"
           data-testid="quiz-result"
         >
           {result.passed && <Confetti />}
@@ -255,7 +255,7 @@ function QuizFlow({
                 <Card
                   key={r.questionId}
                   className={cn(
-                    'flex gap-3 border-s-4',
+                    'flex gap-3 !rounded-[20px] border-s-4 bg-[#FFFDF8] shadow-xs',
                     r.correct ? 'border-s-success' : 'border-s-danger',
                   )}
                 >
@@ -379,7 +379,7 @@ function QuizFlow({
     else
       body = (
         <>
-          <Card className="flex flex-col gap-2 text-sm text-text">
+          <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-5 text-sm text-text shadow-[0_12px_30px_-28px_rgba(32,60,52,.4)]">
             <p>• {toPersianDigits(d.quiz.questionCount)} سؤال چهارگزینه‌ای</p>
             <p>• نمره قبولی: {faPercent(d.quiz.passScore)}</p>
             <p>
@@ -399,7 +399,7 @@ function QuizFlow({
         </>
       );
     return (
-      <div className="flex flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
         {header}
         {body}
       </div>
@@ -410,9 +410,9 @@ function QuizFlow({
   if (!q) return null;
   const last = idx === questions.length - 1;
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
       {header}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 rounded-[20px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-xs">
         <ProgressBar
           value={((idx + 1) / questions.length) * 100}
           label="پیشرفت آزمون"
@@ -434,11 +434,11 @@ function QuizFlow({
               <label
                 key={o.key}
                 className={cn(
-                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-card border-2 bg-surface p-3 text-base',
+                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-[20px] border-2 bg-[#FFFDF8] p-3 text-base shadow-xs',
                   'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-info',
                   checked
                     ? 'border-primary bg-primary-light shadow-sm'
-                    : 'border-border hover:border-primary/40 hover:shadow-xs',
+                    : 'border-[#E7E0D6] hover:border-primary/40 hover:bg-white hover:shadow-xs',
                 )}
               >
                 <input

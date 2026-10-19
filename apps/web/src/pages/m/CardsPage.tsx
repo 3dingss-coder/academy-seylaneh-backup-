@@ -99,9 +99,7 @@ export function CardsPage() {
 
         <QueryState
           query={points}
-          loading={
-            <Skeleton className="h-[190px] w-full rounded-[28px] sm:h-[220px]" />
-          }
+          loading={<Skeleton className="h-[190px] w-full rounded-[28px] sm:h-[220px]" />}
         >
           {(p) => (
             <section aria-label="امتیاز کل">
@@ -165,9 +163,7 @@ export function CardsPage() {
               <h2 id="badges-title" className="text-lg font-extrabold text-[#143532] sm:text-xl">
                 نشان‌ها
               </h2>
-              <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">
-                نشان‌های کسب‌شده و قفل‌شده
-              </p>
+              <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">نشان‌های کسب‌شده و قفل‌شده</p>
             </div>
             <span
               aria-hidden
@@ -268,9 +264,7 @@ export function CardsPage() {
             <h2 id="ledger-title" className="text-lg font-extrabold text-[#143532] sm:text-xl">
               تاریخچه امتیاز
             </h2>
-            <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">
-              آخرین تغییرات امتیاز شما
-            </p>
+            <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">آخرین تغییرات امتیاز شما</p>
           </div>
 
           <QueryState

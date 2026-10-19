@@ -47,15 +47,8 @@ const ICONS: Record<string, NotificationIcon> = {
 
 function UnreadDot() {
   return (
-    <span
-      className="relative mt-1 flex size-2.5 shrink-0"
-      aria-label="خوانده نشده"
-      role="status"
-    >
-      <span
-        aria-hidden
-        className="animate-pulse-dot absolute inset-0 rounded-full bg-primary"
-      />
+    <span className="relative mt-1 flex size-2.5 shrink-0" aria-label="خوانده نشده" role="status">
+      <span aria-hidden className="animate-pulse-dot absolute inset-0 rounded-full bg-primary" />
       <span className="relative size-2.5 rounded-full bg-primary" aria-hidden />
     </span>
   );

@@ -223,9 +223,9 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               src="/brand/mascot.webp"
               alt=""
               aria-hidden
-              className="pointer-events-none absolute -start-8 bottom-0 h-[250px] w-auto max-w-[54%] select-none object-contain drop-shadow-md"
+              className="pointer-events-none absolute -left-8 bottom-0 h-[250px] w-auto max-w-[54%] select-none object-contain drop-shadow-md"
             />
-            <div className="relative z-10 ms-auto flex w-[48%] flex-col items-center pt-8">
+            <div className="relative z-10 ml-auto flex w-[48%] flex-col items-center pt-8">
               <div className="relative">
                 <div className="grid size-28 place-items-center overflow-hidden rounded-full border-[10px] border-[#D9E7E1] bg-[#F1F6F3] shadow-sm">
                   {avatar}
@@ -235,7 +235,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                   onClick={() => avatarInput.current?.click()}
                   disabled={busy === 'avatar'}
                   aria-label="تغییر عکس پروفایل"
-                  className="absolute -bottom-1 -end-1 grid size-11 place-items-center rounded-full border-4 border-[#FCF8F0] bg-[#075A73] text-white shadow-md disabled:opacity-50"
+                  className="absolute -bottom-1 -right-1 grid size-11 place-items-center rounded-full border-4 border-[#FCF8F0] bg-[#075A73] text-white shadow-md disabled:opacity-50"
                 >
                   <Camera className="size-5" aria-hidden />
                 </button>
@@ -313,7 +313,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                   ))}
                 </select>
                 <MapPin
-                  className="pointer-events-none absolute end-4 top-1/2 size-5 -translate-y-1/2 text-[#7A8582]"
+                  className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-[#7A8582]"
                   aria-hidden
                 />
               </div>
@@ -491,7 +491,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                 {unread > 0 && (
                   <span
                     aria-label={`${toPersianDigits(unread)} خوانده نشده`}
-                    className="absolute end-1 top-1 size-3 rounded-full border-2 border-[#FFFDF8] bg-[#EF4444]"
+                    className="absolute right-1 top-1 size-3 rounded-full border-2 border-[#FFFDF8] bg-[#EF4444]"
                   />
                 )}
               </button>
@@ -506,16 +506,16 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
           />
           <div
             aria-hidden
-            className="absolute -end-10 bottom-10 size-28 rounded-full bg-[#A9CF7B]/35 blur-2xl"
+            className="absolute -right-10 bottom-10 size-28 rounded-full bg-[#A9CF7B]/35 blur-2xl"
           />
           <img
             src="/brand/mascot.webp"
             alt=""
             aria-hidden
-            className="pointer-events-none absolute -start-7 bottom-0 h-[270px] w-auto max-w-[58%] select-none object-contain drop-shadow-lg"
+            className="pointer-events-none absolute -left-7 bottom-0 h-[270px] w-auto max-w-[58%] select-none object-contain drop-shadow-lg"
           />
 
-          <div className="absolute bottom-5 end-4 z-10 flex w-[58%] items-center gap-3 rounded-[28px] border border-white/80 bg-[#FFFDF8]/95 p-4 shadow-[0_15px_34px_-26px_rgba(29,69,57,0.5)] backdrop-blur-sm">
+          <div className="absolute bottom-5 right-4 z-10 flex w-[58%] items-center gap-3 rounded-[28px] border border-white/80 bg-[#FFFDF8]/95 p-4 shadow-[0_15px_34px_-26px_rgba(29,69,57,0.5)] backdrop-blur-sm">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-[#DDE9E4]">
               {avatar}
             </div>

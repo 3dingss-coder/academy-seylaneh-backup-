@@ -44,7 +44,7 @@ jobs:
       - name: Capture 390px and 1440px Cards screenshots
         working-directory: apps/web
         run: |
-          cat > /tmp/cards-shot.mjs <<'EOF'
+          cat > cards-shot.mjs <<'EOF'
           import { chromium } from '@playwright/test';
           import fs from 'node:fs/promises';
           const browser = await chromium.launch({ headless: true });
@@ -87,7 +87,7 @@ jobs:
           await fs.writeFile('/tmp/cards-artifacts/source-sha.txt', 'eb163dfc39a8f411cea3d428ddfb3db3f3ebaafd\n');
           await browser.close();
           EOF
-          node /tmp/cards-shot.mjs
+          node cards-shot.mjs
       - uses: actions/upload-artifact@v6
         with:
           name: cards-visual-artifacts

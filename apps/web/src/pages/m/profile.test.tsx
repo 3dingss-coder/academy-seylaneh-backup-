@@ -76,7 +76,9 @@ describe('ProfilePage — real account management', () => {
       }),
     );
     renderApp('/profile');
-    fireEvent.click(await screen.findByRole('button', { name: 'تنظیمات حساب' }, { timeout: 15000 }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'تنظیمات حساب' }, { timeout: 15000 }),
+    );
     await screen.findByLabelText('رمز فعلی', {}, { timeout: 15000 });
     fireEvent.change(screen.getByLabelText('رمز فعلی'), { target: { value: 'old-pass-1' } });
     fireEvent.change(screen.getByLabelText('رمز جدید'), { target: { value: 'کوتاه' } });

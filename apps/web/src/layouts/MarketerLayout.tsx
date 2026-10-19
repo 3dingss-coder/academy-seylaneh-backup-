@@ -130,7 +130,7 @@ export function MarketerLayout() {
       {!online && (
         <div
           role="status"
-          className="flex items-center justify-center gap-2 bg-warning-light px-4 py-2 text-sm font-bold text-text"
+          className="mx-auto mt-2 flex max-w-[920px] items-center justify-center gap-2 rounded-[18px] border border-warning/20 bg-warning-light px-4 py-2.5 text-sm font-bold text-text shadow-xs"
         >
           <WifiOff className="size-4 text-warning" aria-hidden />
           اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
@@ -142,10 +142,13 @@ export function MarketerLayout() {
         <PageTransition>
           <Suspense
             fallback={
-              <div className="flex flex-col gap-3" aria-busy>
-                <Skeleton className="h-8 w-1/2" />
-                <Skeleton className="h-40 w-full" />
-                <Skeleton className="h-14 w-full" />
+              <div
+                className="mx-auto flex w-full max-w-[920px] flex-col gap-3 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.35)]"
+                aria-busy
+              >
+                <Skeleton className="h-8 w-1/2 rounded-xl" />
+                <Skeleton className="h-40 w-full rounded-[20px]" />
+                <Skeleton className="h-14 w-full rounded-[18px]" />
               </div>
             }
           >

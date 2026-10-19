@@ -190,7 +190,9 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                 <h2 id="profile-password-heading" className="text-base font-black text-[#143F36]">
                   تغییر رمز
                 </h2>
-                <p className="mt-0.5 text-xs text-[#74817D]">برای حفظ امنیت حساب، رمز را محرمانه نگه دارید.</p>
+                <p className="mt-0.5 text-xs text-[#74817D]">
+                  برای حفظ امنیت حساب، رمز را محرمانه نگه دارید.
+                </p>
               </div>
             </div>
 

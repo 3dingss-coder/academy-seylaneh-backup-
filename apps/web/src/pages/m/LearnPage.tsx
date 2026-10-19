@@ -71,18 +71,18 @@ export function LearnPage() {
   }, [brand, brands]);
 
   return (
-    <div className="-mx-4 -mt-4 min-h-[calc(100dvh-4rem)] bg-[#FCF7EE] px-4 py-4">
-      <div className="mx-auto flex w-full max-w-[928px] flex-col gap-4">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+      <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5">
         <PageHeader title="آموزش‌ها" />
 
         <section
           aria-label="فیلتر آموزش‌ها"
-          className="rounded-hero border border-[#EEE7DC] bg-[#FFFCF6] p-3 shadow-xs sm:p-4"
+          className="rounded-[24px] border border-[#E9E1D5] bg-[#FFFDF8] p-3 shadow-[0_12px_30px_-28px_rgba(32,60,52,.4)] sm:p-4"
         >
           <div
             role="group"
             aria-label="وضعیت آموزش‌ها"
-            className="grid grid-cols-3 gap-1.5 rounded-full bg-[#F2EEE6] p-1.5 sm:gap-2"
+            className="grid grid-cols-3 gap-1.5 rounded-[18px] bg-[#F2EFE8] p-1.5 sm:gap-2"
           >
             {FILTERS.map(({ value, label }) => {
               const selected = tab === value;
@@ -96,7 +96,7 @@ export function LearnPage() {
                     'pressable flex min-h-12 min-w-0 items-center justify-center gap-1 rounded-full px-1.5 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fg sm:gap-1.5 sm:px-2 sm:text-sm',
                     selected
                       ? 'bg-cta text-on-cta shadow-sm'
-                      : 'text-text-secondary hover:bg-white/75 hover:text-text',
+                      : 'text-text-secondary hover:bg-[#FFFDF8] hover:text-text',
                   )}
                 >
                   <span className="truncate">{label}</span>
@@ -115,7 +115,7 @@ export function LearnPage() {
           </div>
 
           {brands.length > 1 && (
-            <div className="mt-4 border-t border-[#EEE7DC] pt-3">
+            <div className="mt-4 border-t border-[#ECE4D8] pt-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-bold text-text">برندها</p>
                 {brand && (
@@ -143,10 +143,10 @@ export function LearnPage() {
                       'pressable flex min-h-14 shrink-0 items-center gap-2 rounded-full border px-2 pe-4 text-sm font-bold transition-colors',
                       brand === b.id
                         ? 'border-primary bg-primary-light text-primary-fg shadow-sm'
-                        : 'border-border bg-white text-text-secondary hover:border-primary/40 hover:bg-primary-light/40',
+                        : 'border-[#E6DED2] bg-[#FFFDF8] text-text-secondary hover:border-primary/40 hover:bg-primary-light/40',
                     )}
                   >
-                    <span className="grid size-10 place-items-center rounded-full bg-white shadow-xs">
+                    <span className="grid size-10 place-items-center rounded-full bg-[#FFFDF8] shadow-xs">
                       <BrandLogo
                         name={b.name}
                         logoUrl={b.logoUrl}
@@ -184,7 +184,10 @@ export function LearnPage() {
                 illustration={<Mascot mood="thinking" className="h-28 w-auto" />}
               />
             ) : (
-              <section aria-labelledby="learn-list-title">
+              <section
+                aria-labelledby="learn-list-title"
+                className="rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.36)]"
+              >
                 <div className="mb-3 flex items-end justify-between gap-3">
                   <h2 id="learn-list-title" className="text-base font-extrabold text-text">
                     {tab === 'all'

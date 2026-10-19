@@ -148,7 +148,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
       setResidence({ province: updated.province ?? '', city: updated.city ?? '' });
       setWorkplace(updated.workplace ?? '');
       setErrors({});
-      toast.show({ type: 'success', message: 'تغییرات ذخیره شد.' });
+      toast.show({ type: 'success', message: 'ذخیره شد.' });
     } catch (err) {
       setErrors(err instanceof ApiError ? err.fields : {});
       toast.show({ type: 'error', message: errMsg(err) });
@@ -619,6 +619,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
           type="button"
           onClick={doLogout}
           disabled={busy === 'out'}
+          aria-label="خروج از حساب"
           className="pressable flex min-h-16 w-full items-center justify-center gap-3 rounded-[22px] border border-[#F3DED9] bg-[#FFF7F4] px-4 font-black text-[#E02D2D] shadow-sm disabled:opacity-50"
         >
           <LogOut className="size-6" aria-hidden />

@@ -87,130 +87,132 @@ function Player({ d }: { d: SectionDetail }) {
   return (
     <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
       <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-5">
-      <RememberPage
-        kind="section"
-        brandId={p.brand?.id ?? null}
-        brandName={p.brand?.name ?? null}
-        productId={p.product?.id ?? null}
-        productName={p.product?.name ?? null}
-        packageId={p.id}
-        packageTitle={p.title}
-        sectionId={s.id}
-        sectionTitle={s.title}
-        progressPercent={progress.percent}
-        activityLine={`قسمت «${s.title}» را باز کرد`}
-      />
-      <PageHeader
-        title={s.title}
-        back={`/packages/${p.id}`}
-        subtitle={
-          <span>
-            {p.title} • قسمت {toPersianDigits(d.position.index)} از{' '}
-            {toPersianDigits(d.position.total)}
-          </span>
-        }
-      />
-      <div className="lg:flex lg:gap-5">
-        <div className="flex flex-col gap-4 lg:flex-1">
-          {media.isPending ? (
-            <Skeleton className={cn('w-full', s.mediaType === 'audio' ? 'h-40' : 'aspect-video')} />
-          ) : media.isError ? (
-            <Card className="flex flex-col items-center gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] py-8 text-center">
-              <WifiOff className="size-8 text-muted" aria-hidden />
-              <ErrorState
-                message="پخش ممکن نشد. اتصال را بررسی کنید."
-                onRetry={() => void media.refetch()}
+        <RememberPage
+          kind="section"
+          brandId={p.brand?.id ?? null}
+          brandName={p.brand?.name ?? null}
+          productId={p.product?.id ?? null}
+          productName={p.product?.name ?? null}
+          packageId={p.id}
+          packageTitle={p.title}
+          sectionId={s.id}
+          sectionTitle={s.title}
+          progressPercent={progress.percent}
+          activityLine={`قسمت «${s.title}» را باز کرد`}
+        />
+        <PageHeader
+          title={s.title}
+          back={`/packages/${p.id}`}
+          subtitle={
+            <span>
+              {p.title} • قسمت {toPersianDigits(d.position.index)} از{' '}
+              {toPersianDigits(d.position.total)}
+            </span>
+          }
+        />
+        <div className="lg:flex lg:gap-5">
+          <div className="flex flex-col gap-4 lg:flex-1">
+            {media.isPending ? (
+              <Skeleton
+                className={cn('w-full', s.mediaType === 'audio' ? 'h-40' : 'aspect-video')}
               />
-            </Card>
-          ) : media.data.source === 'youtube' && media.data.youtubeId ? (
-            <YouTubeView
-              key={`${media.data.youtubeId}:${mediaRetryKey}`}
-              videoId={media.data.youtubeId}
-              start={pos}
-              onRetry={retryMedia}
-              tracker={tracker}
-              onTime={setPos}
-              onDuration={setDur}
-            />
-          ) : media.data.url ? (
-            <FileView
-              key={`${s.id}:${mediaRetryKey}`}
-              url={fileUrl(media.data.url)}
-              audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
-              start={pos}
-              poster={p.product?.imageUrl ?? p.brand?.logoUrl ?? null}
-              title={s.title}
-              tracker={tracker}
-              onTime={setPos}
-              onDuration={setDur}
-              onError={() => track('playback_error', { source: 'file' })}
-              onRetry={retryMedia}
-            />
-          ) : (
-            <ErrorState message="فایل این قسمت هنوز آماده نیست." />
-          )}
+            ) : media.isError ? (
+              <Card className="flex flex-col items-center gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] py-8 text-center">
+                <WifiOff className="size-8 text-muted" aria-hidden />
+                <ErrorState
+                  message="پخش ممکن نشد. اتصال را بررسی کنید."
+                  onRetry={() => void media.refetch()}
+                />
+              </Card>
+            ) : media.data.source === 'youtube' && media.data.youtubeId ? (
+              <YouTubeView
+                key={`${media.data.youtubeId}:${mediaRetryKey}`}
+                videoId={media.data.youtubeId}
+                start={pos}
+                onRetry={retryMedia}
+                tracker={tracker}
+                onTime={setPos}
+                onDuration={setDur}
+              />
+            ) : media.data.url ? (
+              <FileView
+                key={`${s.id}:${mediaRetryKey}`}
+                url={fileUrl(media.data.url)}
+                audio={s.mediaType === 'audio' || (media.data.mime ?? '').startsWith('audio/')}
+                start={pos}
+                poster={p.product?.imageUrl ?? p.brand?.logoUrl ?? null}
+                title={s.title}
+                tracker={tracker}
+                onTime={setPos}
+                onDuration={setDur}
+                onError={() => track('playback_error', { source: 'file' })}
+                onRetry={retryMedia}
+              />
+            ) : (
+              <ErrorState message="فایل این قسمت هنوز آماده نیست." />
+            )}
 
-          <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.42)]">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-bold text-text">
-                {progress.completed ? 'دیدن/شنیدن کامل شد' : 'پیشرفت این قسمت'}
-              </span>
-              <span className="text-text-secondary">
-                {clock(pos)} / {clock(dur)}
-              </span>
-            </div>
-            <ProgressBar value={playbackPercent} label="پیشرفت پخش" />
-            <p className="text-xs text-text-secondary">
-              {progress.completed ? (
-                <span className="inline-flex items-center gap-1 font-bold text-success-fg">
-                  <CheckCircle2 className="size-4" aria-hidden /> این قسمت را کامل کردی.
+            <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.42)]">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-bold text-text">
+                  {progress.completed ? 'دیدن/شنیدن کامل شد' : 'پیشرفت این قسمت'}
                 </span>
-              ) : (
-                `${quizReady ? 'آزمون بسته از همان اول باز است؛ دیدن یا شنیدن اجباری نیست. ' : ''}برای کامل شدن قسمت، حداقل ${faPercent(d.completionThreshold)} را ببین یا بشنو. (${faPercent(progress.percent)})`
-              )}
-            </p>
-          </Card>
-
-          {quizReady ? (
-            <Button
-              size="lg"
-              block
-              icon={<ClipboardCheck className="size-5" aria-hidden />}
-              onClick={() => nav(`/quiz/${quizSectionId}`)}
-              data-testid="start-quiz"
-            >
-              شروع آزمون
-            </Button>
-          ) : sectionDone ? (
-            <Button size="lg" block variant="secondary" onClick={() => nav(`/packages/${p.id}`)}>
-              بازگشت به بسته
-            </Button>
-          ) : null}
-        </div>
-        <aside className="mt-4 flex flex-col gap-3 lg:mt-0 lg:w-80">
-          {s.description && (
-            <Card className="!rounded-[22px] border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)]">
-              <h2 className="mb-1 text-sm font-bold text-text">درباره این قسمت</h2>
-              <p className="text-sm leading-7 text-text-secondary">{s.description}</p>
+                <span className="text-text-secondary">
+                  {clock(pos)} / {clock(dur)}
+                </span>
+              </div>
+              <ProgressBar value={playbackPercent} label="پیشرفت پخش" />
+              <p className="text-xs text-text-secondary">
+                {progress.completed ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-success-fg">
+                    <CheckCircle2 className="size-4" aria-hidden /> این قسمت را کامل کردی.
+                  </span>
+                ) : (
+                  `${quizReady ? 'آزمون بسته از همان اول باز است؛ دیدن یا شنیدن اجباری نیست. ' : ''}برای کامل شدن قسمت، حداقل ${faPercent(d.completionThreshold)} را ببین یا بشنو. (${faPercent(progress.percent)})`
+                )}
+              </p>
             </Card>
-          )}
-          <Link
-            to={`/packages/${p.id}`}
-            className="pressable flex items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)] hover:bg-white"
-          >
-            <ProductImage
-              src={p.product?.imageUrl ?? p.brand?.logoUrl}
-              alt={p.product?.name ?? p.brand?.name ?? p.title}
-              className="size-14"
-            />
-            <div className="min-w-0 text-sm">
-              <p className="font-bold text-text">{p.product?.name ?? p.brand?.name}</p>
-              <p className="text-xs text-text-secondary">{faDuration(s.durationSec)}</p>
-            </div>
-          </Link>
-        </aside>
-      </div>
-      <MentorLauncher packageId={p.id} />
+
+            {quizReady ? (
+              <Button
+                size="lg"
+                block
+                icon={<ClipboardCheck className="size-5" aria-hidden />}
+                onClick={() => nav(`/quiz/${quizSectionId}`)}
+                data-testid="start-quiz"
+              >
+                شروع آزمون
+              </Button>
+            ) : sectionDone ? (
+              <Button size="lg" block variant="secondary" onClick={() => nav(`/packages/${p.id}`)}>
+                بازگشت به بسته
+              </Button>
+            ) : null}
+          </div>
+          <aside className="mt-4 flex flex-col gap-3 lg:mt-0 lg:w-80">
+            {s.description && (
+              <Card className="!rounded-[22px] border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)]">
+                <h2 className="mb-1 text-sm font-bold text-text">درباره این قسمت</h2>
+                <p className="text-sm leading-7 text-text-secondary">{s.description}</p>
+              </Card>
+            )}
+            <Link
+              to={`/packages/${p.id}`}
+              className="pressable flex items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)] hover:bg-white"
+            >
+              <ProductImage
+                src={p.product?.imageUrl ?? p.brand?.logoUrl}
+                alt={p.product?.name ?? p.brand?.name ?? p.title}
+                className="size-14"
+              />
+              <div className="min-w-0 text-sm">
+                <p className="font-bold text-text">{p.product?.name ?? p.brand?.name}</p>
+                <p className="text-xs text-text-secondary">{faDuration(s.durationSec)}</p>
+              </div>
+            </Link>
+          </aside>
+        </div>
+        <MentorLauncher packageId={p.id} />
       </div>
     </div>
   );

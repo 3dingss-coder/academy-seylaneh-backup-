@@ -98,7 +98,10 @@ export function OnboardingPage() {
             className="absolute -left-10 bottom-4 size-36 rounded-full bg-[#F7D98B]/25 blur-2xl"
           />
 
-          <div key={i} className="animate-slide-in-end relative z-10 flex w-full flex-col items-center px-5 pb-5 pt-6 text-center">
+          <div
+            key={i}
+            className="animate-slide-in-end relative z-10 flex w-full flex-col items-center px-5 pb-5 pt-6 text-center"
+          >
             <div className="relative">
               <span
                 aria-hidden
@@ -108,10 +111,7 @@ export function OnboardingPage() {
               </span>
 
               <div className="relative mx-auto flex min-h-[180px] items-end justify-center">
-                <span
-                  aria-hidden
-                  className="absolute bottom-2 size-40 rounded-full bg-[#E2F2E8]"
-                />
+                <span aria-hidden className="absolute bottom-2 size-40 rounded-full bg-[#E2F2E8]" />
                 <Mascot mood={slide.mood} className="relative h-[188px] w-auto drop-shadow-md" />
               </div>
             </div>

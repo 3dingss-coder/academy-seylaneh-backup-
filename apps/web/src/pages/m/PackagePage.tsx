@@ -43,125 +43,127 @@ export function PackagePage() {
         return (
           <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
             <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-5 lg:flex-row lg:items-start">
-            <RememberPage
-              kind="package"
-              brandId={p.brand?.id ?? null}
-              brandName={p.brand?.name ?? null}
-              productId={p.product?.id ?? null}
-              productName={p.product?.name ?? null}
-              packageId={p.id}
-              packageTitle={p.title}
-              progressPercent={p.percent}
-              activityLine={`آموزش «${p.title}» را باز کرد`}
-            />
-            <div className="flex flex-col gap-4 lg:flex-1">
-              <PageHeader
-                title={p.title}
-                back="/learn/all"
-                subtitle={
-                  p.product
-                    ? `${p.brand?.name} • ${p.product.name}`
-                    : p.brand
-                      ? `آموزش برند ${p.brand.name}`
-                      : undefined
-                }
+              <RememberPage
+                kind="package"
+                brandId={p.brand?.id ?? null}
+                brandName={p.brand?.name ?? null}
+                productId={p.product?.id ?? null}
+                productName={p.product?.name ?? null}
+                packageId={p.id}
+                packageTitle={p.title}
+                progressPercent={p.percent}
+                activityLine={`آموزش «${p.title}» را باز کرد`}
               />
-              <Card className="flex gap-4 !rounded-[26px] border-[#E8E1D6] bg-[linear-gradient(135deg,#FFFDF8_0%,#F2F8F2_100%)] p-4 shadow-[0_14px_34px_-30px_rgba(32,60,52,.45)] sm:p-5">
-                <ProductImage
-                  src={p.product?.imageUrl ?? p.brand?.logoUrl}
-                  alt={p.product?.name ?? p.brand?.name ?? p.title}
-                  className="size-24 rounded-[20px] border border-[#ECE4D8] bg-[#FFFDF8] p-2 shadow-sm"
-                />
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <p className="text-sm leading-7 text-text-secondary">{p.description}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    {p.status === 'completed' ? (
-                      <StatusBadge status="completed" />
-                    ) : (
-                      p.deadlineAt && <CountdownChip deadline={p.deadlineAt} />
-                    )}
-                    {p.deadlineAt && (
-                      <span className="text-text-secondary">مهلت: {faDate(p.deadlineAt)}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ProgressBar value={p.percent} label="پیشرفت بسته" className="flex-1" />
-                    <span className="text-xs font-bold">{faPercent(p.percent)}</span>
-                  </div>
-                </div>
-              </Card>
-              {notes.length > 0 && (
-                <div
-                  role="note"
-                  className="flex flex-col gap-2 rounded-[20px] border border-warning/25 bg-warning-light p-4 shadow-xs"
-                >
-                  {notes.slice(0, 2).map((n) => (
-                    <p key={n.id} className="flex items-start gap-2 text-sm text-text">
-                      <MessageSquareQuote
-                        className="mt-0.5 size-4 shrink-0 text-warning"
-                        aria-hidden
-                      />
-                      <span>
-                        <b>{n.fromName}:</b> {n.body}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              )}
-              {quizSection && !quizSection.quizPassed && (
-                <Link
-                  to={`/quiz/${quizSection.id}`}
-                  data-testid="package-quiz"
-                  className="pressable flex min-h-14 items-center justify-center gap-2 rounded-[20px] border border-info/25 bg-info-light text-base font-bold text-info-fg shadow-xs hover:shadow-sm"
-                >
-                  <ClipboardCheck className="size-5" aria-hidden /> آزمون این محصول
-                </Link>
-              )}
-              {quizSection?.quizPassed && (
-                <p className="rounded-[20px] border border-success/15 bg-success-light p-3 text-center text-sm font-bold text-success-fg">
-                  آزمون این محصول را قبول شده‌ای ✅
-                </p>
-              )}
-              {current && (
-                <Button
-                  size="lg"
-                  block
-                  icon={<PlayCircle className="size-5" aria-hidden />}
-                  onClick={() =>
-                    nav(
-                      current.state === 'quiz' ? `/quiz/${current.id}` : `/sections/${current.id}`,
-                    )
+              <div className="flex flex-col gap-4 lg:flex-1">
+                <PageHeader
+                  title={p.title}
+                  back="/learn/all"
+                  subtitle={
+                    p.product
+                      ? `${p.brand?.name} • ${p.product.name}`
+                      : p.brand
+                        ? `آموزش برند ${p.brand.name}`
+                        : undefined
                   }
-                >
-                  {current.state === 'quiz'
-                    ? 'شروع آزمون'
-                    : current.state === 'in_progress'
-                      ? 'ادامه قسمت فعلی'
-                      : 'شروع قسمت'}
-                </Button>
-              )}
-            </div>
-            <section
-              aria-labelledby="sections-title"
-              className="flex flex-col gap-3 rounded-[26px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_14px_34px_-30px_rgba(32,60,52,.4)] lg:w-96"
-            >
-              <h2 id="sections-title" className="text-base font-bold text-text">
-                ویدیو و پادکست ({toPersianDigits(live.length)})
-              </h2>
-              {live.length === 0 ? (
-                <EmptyState
-                  title="این بسته هنوز قسمتی ندارد"
-                  description="به مدیر اطلاع داده شد."
                 />
-              ) : (
-                <ol className="stagger flex flex-col gap-2">
-                  {live.map((s) => (
-                    <SectionRow key={s.id} s={s} />
-                  ))}
-                </ol>
-              )}
-            </section>
-            <MentorLauncher packageId={p.id} />
+                <Card className="flex gap-4 !rounded-[26px] border-[#E8E1D6] bg-[linear-gradient(135deg,#FFFDF8_0%,#F2F8F2_100%)] p-4 shadow-[0_14px_34px_-30px_rgba(32,60,52,.45)] sm:p-5">
+                  <ProductImage
+                    src={p.product?.imageUrl ?? p.brand?.logoUrl}
+                    alt={p.product?.name ?? p.brand?.name ?? p.title}
+                    className="size-24 rounded-[20px] border border-[#ECE4D8] bg-[#FFFDF8] p-2 shadow-sm"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <p className="text-sm leading-7 text-text-secondary">{p.description}</p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {p.status === 'completed' ? (
+                        <StatusBadge status="completed" />
+                      ) : (
+                        p.deadlineAt && <CountdownChip deadline={p.deadlineAt} />
+                      )}
+                      {p.deadlineAt && (
+                        <span className="text-text-secondary">مهلت: {faDate(p.deadlineAt)}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ProgressBar value={p.percent} label="پیشرفت بسته" className="flex-1" />
+                      <span className="text-xs font-bold">{faPercent(p.percent)}</span>
+                    </div>
+                  </div>
+                </Card>
+                {notes.length > 0 && (
+                  <div
+                    role="note"
+                    className="flex flex-col gap-2 rounded-[20px] border border-warning/25 bg-warning-light p-4 shadow-xs"
+                  >
+                    {notes.slice(0, 2).map((n) => (
+                      <p key={n.id} className="flex items-start gap-2 text-sm text-text">
+                        <MessageSquareQuote
+                          className="mt-0.5 size-4 shrink-0 text-warning"
+                          aria-hidden
+                        />
+                        <span>
+                          <b>{n.fromName}:</b> {n.body}
+                        </span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {quizSection && !quizSection.quizPassed && (
+                  <Link
+                    to={`/quiz/${quizSection.id}`}
+                    data-testid="package-quiz"
+                    className="pressable flex min-h-14 items-center justify-center gap-2 rounded-[20px] border border-info/25 bg-info-light text-base font-bold text-info-fg shadow-xs hover:shadow-sm"
+                  >
+                    <ClipboardCheck className="size-5" aria-hidden /> آزمون این محصول
+                  </Link>
+                )}
+                {quizSection?.quizPassed && (
+                  <p className="rounded-[20px] border border-success/15 bg-success-light p-3 text-center text-sm font-bold text-success-fg">
+                    آزمون این محصول را قبول شده‌ای ✅
+                  </p>
+                )}
+                {current && (
+                  <Button
+                    size="lg"
+                    block
+                    icon={<PlayCircle className="size-5" aria-hidden />}
+                    onClick={() =>
+                      nav(
+                        current.state === 'quiz'
+                          ? `/quiz/${current.id}`
+                          : `/sections/${current.id}`,
+                      )
+                    }
+                  >
+                    {current.state === 'quiz'
+                      ? 'شروع آزمون'
+                      : current.state === 'in_progress'
+                        ? 'ادامه قسمت فعلی'
+                        : 'شروع قسمت'}
+                  </Button>
+                )}
+              </div>
+              <section
+                aria-labelledby="sections-title"
+                className="flex flex-col gap-3 rounded-[26px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_14px_34px_-30px_rgba(32,60,52,.4)] lg:w-96"
+              >
+                <h2 id="sections-title" className="text-base font-bold text-text">
+                  ویدیو و پادکست ({toPersianDigits(live.length)})
+                </h2>
+                {live.length === 0 ? (
+                  <EmptyState
+                    title="این بسته هنوز قسمتی ندارد"
+                    description="به مدیر اطلاع داده شد."
+                  />
+                ) : (
+                  <ol className="stagger flex flex-col gap-2">
+                    {live.map((s) => (
+                      <SectionRow key={s.id} s={s} />
+                    ))}
+                  </ol>
+                )}
+              </section>
+              <MentorLauncher packageId={p.id} />
             </div>
           </div>
         );

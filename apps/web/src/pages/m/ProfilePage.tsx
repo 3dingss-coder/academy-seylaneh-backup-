@@ -2,7 +2,6 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Award,
   Bell,
   Camera,
   ChevronLeft,
@@ -117,8 +116,13 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
 
     const patch: Record<string, unknown> = {};
     if (name.trim() !== user.name) patch.name = name.trim();
-    if ((residence.province || null) !== (user.province ?? null)) patch.province = residence.province;
-    if ((residence.city || null) !== (user.city ?? null)) patch.city = residence.city;
+    const residenceChanged =
+      (residence.province || null) !== (user.province ?? null) ||
+      (residence.city || null) !== (user.city ?? null);
+    if (residenceChanged) {
+      patch.province = residence.province;
+      patch.city = residence.city;
+    }
     if ((workplace || null) !== (user.workplace ?? null)) patch.workplace = workplace || null;
     if (!Object.keys(patch).length) return;
 

@@ -239,6 +239,28 @@ describe('LearningPathPage — live course roadmap and all-education handoff', (
       '/learn/all',
     );
   });
+
+  it('alternates mascot side from left to right across segments as courses grow', async () => {
+    const manyPackages: PackageSummary[] = [
+      { ...PKG, id: 'p1', title: 'آموزش کیت درمانی فورمی', status: 'completed', pathOrder: 1 },
+      { ...PKG, id: 'p2', title: 'آموزش فوم شستشوی صورت بابل', status: 'in_progress', pathOrder: 2 },
+      { ...PKG, id: 'p3', title: 'آموزش کرم گرم کننده آتل', status: 'new', pathOrder: 3 },
+      { ...PKG, id: 'p4', title: 'آموزش کرم ترک پا ویت آس', status: 'new', pathOrder: 4 },
+      { ...PKG, id: 'p5', title: 'آموزش ضدآفتاب استیکی پیکسل', status: 'new', pathOrder: 5 },
+      { ...PKG, id: 'p6', title: 'آموزش فروش برند آیس بال', status: 'new', pathOrder: 6 },
+    ];
+    mockApi({ 'GET /v1/me/packages': () => ({ data: manyPackages }) });
+    renderLearningPath();
+
+    expect(await screen.findByText('۱. آموزش کیت درمانی فورمی')).toBeInTheDocument();
+    expect(screen.getByText('۵. آموزش ضدآفتاب استیکی پیکسل')).toBeInTheDocument();
+    expect(screen.getByText('۶. آموزش فروش برند آیس بال')).toBeInTheDocument();
+
+    const segments = screen.getAllByTestId('learning-path-segment');
+    expect(segments).toHaveLength(2);
+    expect(segments[0]).toHaveAttribute('data-mascot-side', 'left');
+    expect(segments[1]).toHaveAttribute('data-mascot-side', 'right');
+  });
 });
 
 describe('MentorPage — real mentor surface, mascot as supportive mentor state', () => {

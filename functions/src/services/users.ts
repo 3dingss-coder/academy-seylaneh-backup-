@@ -10,6 +10,7 @@ import {
   normalizePhone,
   phoneToAuthEmail,
 } from '../lib/ids';
+import { EXT, MEDIA_RULES, sniff } from '../lib/media';
 import { provinceUsesNationalCode } from '../domain/nationalCode';
 import { StoreConflictError, type Doc } from '../store/types';
 import {
@@ -224,6 +225,9 @@ export function publicUser(u: Doc<User>) {
   return {
     id: u.id,
     name: u.name,
+    avatarUrl: u.avatarUrl ?? null,
+    workplace: u.workplace ?? null,
+    hasNationalCode: Boolean(u.nationalCodeHash),
     phone: u.phone,
     email: u.email,
     province: u.province ?? null,
@@ -326,6 +330,9 @@ export async function register(
   }
   const user: User = {
     name: input.name,
+    avatarUrl: null,
+    avatarPath: null,
+    workplace: null,
     phone: idf.kind === 'phone' ? idf.phone : null,
     email: idf.kind === 'email' ? idf.email : null,
     nationalCodeHash: idf.kind === 'nationalCode' ? idf.nationalCodeHash : null,
@@ -514,15 +521,91 @@ export async function requestPasswordReset(d: Deps, identifier: string) {
 }
 
 // ─── Profile (Me) ───────────────────────────────────────────────────────────
-export const patchMeSchema = z.object({ name: text(2, 60, 'نام') });
+export const patchMeSchema = z
+  .object({
+    name: text(2, 60, 'نام').optional(),
+    province: provinceSchema.optional(),
+    city: citySchema.optional(),
+    workplace: z.string().trim().max(80, 'محل فعالیت خیلی طولانی است.').nullable().optional(),
+  })
+  .superRefine(checkResidence)
+  .refine((v) => Object.keys(v).length > 0, 'هیچ تغییری ارسال نشده است.');
+
+export const avatarUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(200),
+  mime: z.string().trim().max(100),
+  sizeBytes: z.number().int().positive(),
+});
+
+export const avatarFinalizeSchema = z.object({
+  path: z.string().min(1).max(240),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: passwordSchema,
 });
 
 export async function updateMe(d: Deps, user: Doc<User>, input: z.infer<typeof patchMeSchema>) {
-  await d.store.update(`users/${user.id}`, { name: input.name, updatedAt: nowIso(d) });
-  return publicUser({ ...user, name: input.name });
+  const patch: Partial<User> = { updatedAt: nowIso(d) };
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.workplace !== undefined) patch.workplace = input.workplace;
+  if (input.province !== undefined || input.city !== undefined) Object.assign(patch, residence(input));
+  await d.store.update(`users/${user.id}`, patch as Record<string, unknown>);
+  return publicUser({ ...user, ...patch });
+}
+
+export async function createAvatarUploadUrl(
+  d: Deps,
+  user: Doc<User>,
+  input: z.infer<typeof avatarUploadSchema>,
+) {
+  const rule = MEDIA_RULES.image;
+  const mime = input.mime.toLowerCase();
+  if (!rule.mimes.includes(mime))
+    throw new ApiError('VALIDATION', 'فقط تصویر PNG، JPEG یا WebP مجاز است.');
+  if (input.sizeBytes > rule.maxBytes)
+    throw new ApiError(
+      'VALIDATION',
+      `حجم عکس پروفایل حداکثر ${Math.round(rule.maxBytes / 1024 / 1024)} مگابایت است.`,
+    );
+  const ext = EXT[mime] ?? 'bin';
+  const path = `avatars/${user.id}/avatar-${d.store.newId()}.${ext}`;
+  return {
+    path,
+    upload: await d.blob.createUploadUrl(path, mime, rule.maxBytes),
+  };
+}
+
+export async function finalizeAvatar(
+  d: Deps,
+  user: Doc<User>,
+  input: z.infer<typeof avatarFinalizeSchema>,
+) {
+  const prefix = `avatars/${user.id}/avatar-`;
+  if (!input.path.startsWith(prefix)) throw new ApiError('FORBIDDEN', 'مسیر عکس پروفایل معتبر نیست.');
+  const stat = await d.blob.stat(input.path);
+  if (!stat) throw new ApiError('CONFLICT', 'فایل هنوز آپلود نشده است. دوباره تلاش کنید.');
+  const rule = MEDIA_RULES.image;
+  if (stat.size <= 0 || stat.size > rule.maxBytes) {
+    await d.blob.delete(input.path).catch(() => {});
+    throw new ApiError('VALIDATION', 'حجم عکس پروفایل معتبر نیست.');
+  }
+  const head = await d.blob.readRange(input.path, 0, Math.min(stat.size, 63));
+  const detected = sniff(head);
+  if (!detected || !detected.kinds.includes('image')) {
+    await d.blob.delete(input.path).catch(() => {});
+    throw new ApiError('VALIDATION', 'محتوای فایل تصویر معتبر نیست.');
+  }
+  const avatarUrl = await d.blob.publicUrl(input.path);
+  const previous = user.avatarPath;
+  await d.store.update(`users/${user.id}`, {
+    avatarPath: input.path,
+    avatarUrl,
+    updatedAt: nowIso(d),
+  });
+  if (previous && previous !== input.path) await d.blob.delete(previous).catch(() => {});
+  return publicUser({ ...user, avatarPath: input.path, avatarUrl });
 }
 
 export async function changePassword(

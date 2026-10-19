@@ -288,7 +288,12 @@ export function MentorChat({
   };
   const msgs = history.data ?? [];
   return (
-    <div className={cn('flex min-h-0 flex-col', className)}>
+    <div
+      className={cn(
+        'flex min-h-0 flex-col rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-[0_14px_34px_-30px_rgba(32,60,52,.38)]',
+        className,
+      )}
+    >
       <div className="flex-1 space-y-3 overflow-y-auto p-1" aria-live="polite">
         {history.isPending && <Skeleton className="h-16 w-3/4" />}
         {!history.isPending && msgs.length === 0 && !pending && (
@@ -304,7 +309,7 @@ export function MentorChat({
                   key={s}
                   type="button"
                   onClick={() => submit(undefined, s)}
-                  className="pressable min-h-12 rounded-full border border-border bg-surface px-4 text-sm text-text shadow-xs hover:border-primary/40 hover:bg-primary-light"
+                  className="pressable min-h-12 rounded-full border border-[#E5DDD1] bg-[#FFFEFA] px-4 text-sm text-text shadow-xs hover:border-primary/40 hover:bg-primary-light"
                 >
                   {s}
                 </button>
@@ -325,7 +330,7 @@ export function MentorChat({
                 'max-w-[85%] whitespace-pre-line rounded-[18px] px-3.5 py-2 text-sm leading-7 shadow-xs',
                 m.role === 'user'
                   ? 'rounded-se-md bg-cta bg-brand-gradient text-on-cta'
-                  : 'rounded-ee-md border border-border bg-surface text-text',
+                  : 'rounded-ee-md border border-[#E6DED2] bg-[#FFFDF8] text-text',
               )}
             >
               {m.text}
@@ -378,7 +383,7 @@ export function MentorChat({
             <div className="animate-fade-up flex justify-end">
               <div
                 role="status"
-                className="flex items-center gap-1 rounded-[18px] rounded-ee-md border border-border bg-surface px-4 py-3 text-text-secondary"
+                className="flex items-center gap-1 rounded-[18px] rounded-ee-md border border-[#E6DED2] bg-[#FFFDF8] px-4 py-3 text-text-secondary"
               >
                 <span className="sr-only">در حال فکر کردن…</span>
                 {[0, 1, 2].map((i) => (
@@ -400,7 +405,7 @@ export function MentorChat({
           {attachments.map((a, i) => (
             <span
               key={`${a.kind}-${i}`}
-              className="flex max-w-full items-center gap-1 rounded-full border border-border bg-surface px-2 py-1 text-xs text-text"
+              className="flex max-w-full items-center gap-1 rounded-full border border-[#E6DED2] bg-[#FFFDF8] px-2 py-1 text-xs text-text"
             >
               {a.preview ? (
                 <img src={a.preview} alt="" className="size-8 rounded-full object-cover" />
@@ -420,7 +425,7 @@ export function MentorChat({
       )}
       <form
         onSubmit={submit}
-        className="mt-2 flex w-full min-w-0 items-center gap-1 border-t border-border pt-2"
+        className="mt-3 flex w-full min-w-0 items-center gap-1 rounded-[22px] border border-[#E7E0D6] bg-[#FCFAF5] p-2 shadow-inner"
       >
         <label htmlFor="mentor-input" className="sr-only">
           سؤال شما
@@ -431,7 +436,7 @@ export function MentorChat({
           maxLength={4000}
           onChange={(e) => setText(e.target.value)}
           placeholder={listening ? 'در حال شنیدن… بعد از سکوت ارسال می‌شود' : 'سؤالت را بنویس…'}
-          className="min-h-12 min-w-0 flex-1 rounded-full border border-border bg-surface px-3 text-base shadow-xs transition-[border-color,box-shadow] focus:border-info focus:outline-none focus:ring-4 focus:ring-info/15"
+          className="min-h-12 min-w-0 flex-1 rounded-full border border-[#E1D9CD] bg-white px-3 text-base shadow-xs transition-[border-color,box-shadow] focus:border-info focus:outline-none focus:ring-4 focus:ring-info/15"
         />
         <div className="relative shrink-0">
           <Button

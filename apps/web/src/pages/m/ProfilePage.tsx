@@ -59,13 +59,27 @@ function SectionHeader({
   onBack?: () => void;
   actions?: React.ReactNode;
 }) {
+  if (onBack) {
+    return (
+      <div className="relative flex min-h-14 items-center justify-center">
+        <div className="absolute left-0">
+          <BackButton onClick={onBack} />
+        </div>
+        <h1 className="text-center text-[28px] font-black tracking-tight text-[#075A4D] sm:text-[32px]">
+          {title}
+        </h1>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-14 items-center justify-between gap-3">
-      <div className="flex min-w-12 items-center">{onBack && <BackButton onClick={onBack} />}</div>
-      <h1 className="text-center text-[28px] font-black tracking-tight text-[#075A4D] sm:text-[32px]">
+      <h1 className="text-[28px] font-black tracking-tight text-[#075A4D] sm:text-[32px]">
         {title}
       </h1>
-      <div className="flex min-w-12 items-center justify-end gap-2">{actions}</div>
+      <div dir="ltr" className="flex min-w-12 items-center justify-end gap-2">
+        {actions}
+      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: eb163dfc39a8f411cea3d428ddfb3db3f3ebaafd
+          ref: c2f631d4c0db3829b961c13934f2b60af992af2b
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -84,7 +84,7 @@ jobs:
             await page.screenshot({ path: '/tmp/cards-artifacts/cards-desktop-1440.png', fullPage: true });
             await context.close();
           }
-          await fs.writeFile('/tmp/cards-artifacts/source-sha.txt', 'eb163dfc39a8f411cea3d428ddfb3db3f3ebaafd\n');
+          await fs.writeFile('/tmp/cards-artifacts/source-sha.txt', 'c2f631d4c0db3829b961c13934f2b60af992af2b\n');
           await browser.close();
           EOF
           node cards-shot.mjs

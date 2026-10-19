@@ -5,9 +5,7 @@ import {
   Bell,
   Camera,
   ChevronLeft,
-  CircleHelp,
   Crown,
-  Info,
   KeyRound,
   LockKeyhole,
   LogOut,
@@ -33,7 +31,7 @@ import { qk, useHome, useMessages, useNotifications } from '@/lib/queries';
 import { toPersianDigits } from '@/lib/digits';
 import type { BadgeView, Me } from '@/lib/types';
 
-type ProfileView = 'overview' | 'personal' | 'notifications' | 'security' | 'support' | 'about';
+type ProfileView = 'overview' | 'personal' | 'notifications' | 'security';
 
 const WORKPLACES = ['فروشگاه مرکزی', 'فروشگاه شعبه', 'ویزیت میدانی', 'آنلاین'];
 
@@ -237,9 +235,9 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               src="/brand/mascot.webp"
               alt=""
               aria-hidden
-              className="pointer-events-none absolute -left-8 bottom-0 h-[250px] w-auto max-w-[54%] select-none object-contain drop-shadow-md"
+              className="pointer-events-none absolute -right-8 bottom-0 h-[250px] w-auto max-w-[54%] select-none object-contain drop-shadow-md"
             />
-            <div className="relative z-10 ml-auto flex w-[48%] flex-col items-center pt-8">
+            <div className="relative z-10 mr-auto flex w-[48%] flex-col items-center pt-8">
               <div className="relative">
                 <div className="grid size-28 place-items-center overflow-hidden rounded-full border-[10px] border-[#D9E7E1] bg-[#F1F6F3] shadow-sm">
                   {avatar}
@@ -409,39 +407,6 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
     );
   }
 
-  if (view === 'support' || view === 'about') {
-    return (
-      <div className={shellClass}>
-        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
-          <SectionHeader
-            title={view === 'support' ? 'پشتیبانی' : 'درباره سیلانه'}
-            onBack={() => setView('overview')}
-          />
-          <Card className="!rounded-[24px] bg-[#FFFDF8] p-6 text-center">
-            {view === 'support' ? (
-              <>
-                <CircleHelp className="mx-auto size-12 text-[#8A50E7]" aria-hidden />
-                <h2 className="mt-4 text-xl font-black text-[#153D36]">تیم پشتیبانی سیلانه</h2>
-                <p className="mt-2 text-sm leading-7 text-[#6D7774]">
-                  برای مسائل مربوط به حساب یا آموزش‌ها با مدیر فروش یا پشتیبانی سازمان خود در تماس
-                  باشید.
-                </p>
-              </>
-            ) : (
-              <>
-                <Info className="mx-auto size-12 text-[#66736F]" aria-hidden />
-                <h2 className="mt-4 text-xl font-black text-[#153D36]">آکادمی سیلانه</h2>
-                <p className="mt-2 text-sm leading-7 text-[#6D7774]">
-                  محیط آموزش و رشد حرفه‌ای بازاریابان سیلانه.
-                </p>
-              </>
-            )}
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   const menuItems = [
     {
       title: 'اطلاعات شخصی',
@@ -463,20 +428,6 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
       icon: Bell,
       iconClass: 'bg-[#FFB323] text-white',
       onClick: () => setView('notifications' as const),
-    },
-    {
-      title: 'پشتیبانی',
-      subtitle: 'تماس با تیم پشتیبانی',
-      icon: CircleHelp,
-      iconClass: 'bg-[#8A50E7] text-white',
-      onClick: () => setView('support' as const),
-    },
-    {
-      title: 'درباره سیلانه',
-      subtitle: 'نسخه اپلیکیشن و قوانین',
-      icon: Info,
-      iconClass: 'bg-[#858C8A] text-white',
-      onClick: () => setView('about' as const),
     },
   ];
 
@@ -526,10 +477,10 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
             src="/brand/mascot.webp"
             alt=""
             aria-hidden
-            className="pointer-events-none absolute -left-7 bottom-0 h-[270px] w-auto max-w-[58%] select-none object-contain drop-shadow-lg"
+            className="pointer-events-none absolute -right-7 bottom-0 h-[270px] w-auto max-w-[58%] select-none object-contain drop-shadow-lg"
           />
 
-          <div className="absolute bottom-5 right-4 z-10 flex w-[58%] items-center gap-3 rounded-[28px] border border-white/80 bg-[#FFFDF8]/95 p-4 shadow-[0_15px_34px_-26px_rgba(29,69,57,0.5)] backdrop-blur-sm">
+          <div className="absolute bottom-5 left-4 z-10 flex w-[58%] items-center gap-3 rounded-[28px] border border-white/80 bg-[#FFFDF8]/95 p-4 shadow-[0_15px_34px_-26px_rgba(29,69,57,0.5)] backdrop-blur-sm">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-[#DDE9E4]">
               {avatar}
             </div>

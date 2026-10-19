@@ -4,8 +4,12 @@ export type Role = 'marketer' | 'manager' | 'admin' | 'superadmin';
 export interface Me {
   id: string;
   name: string;
-  /** Optional signed URL for the user's uploaded profile photo. */
+  /** Optional URL for the user's uploaded profile photo. */
   avatarUrl?: string | null;
+  /** Optional workplace label selected in profile. */
+  workplace?: string | null;
+  /** Identity kind is exposed without revealing the stored national-code digest. */
+  hasNationalCode?: boolean;
   phone: string | null;
   email: string | null;
   /** Residence («محل سکونت») captured at sign-up; null on accounts created before it existed. */

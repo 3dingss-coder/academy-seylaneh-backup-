@@ -57,7 +57,7 @@ describe('ProfilePage — real account management', () => {
     // identity block shows the real role, while editable account fields live behind
     // the reference's «اطلاعات شخصی» row.
     await screen.findByText(/بازاریاب/, {}, { timeout: 15000 });
-    fireEvent.click(screen.getByRole('button', { name: /اطلاعات شخصی/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'ویرایش اطلاعات شخصی' }));
     expect(await screen.findByText(toPersianDigits('09121234567'))).toBeInTheDocument();
     const name = screen.getByLabelText('نام و نام خانوادگی') as HTMLInputElement;
     expect(name.value).toBe('سارا محمدی');

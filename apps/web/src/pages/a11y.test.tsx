@@ -114,8 +114,8 @@ describe('a11y (axe, jsdom)', () => {
     mockApi(signedIn());
     const { container } = renderApp('/profile');
     await screen.findByRole('button', { name: /خروج/ });
-    // The preference card is the newest part of this screen: a locked switch must still announce its
-    // state and its reason, so wait for it before axe looks at the tree.
+    fireEvent.click(screen.getByRole('button', { name: /تنظیمات اعلان‌ها/ }));
+    // A protected switch must still announce its state and reason on the dedicated settings surface.
     await screen.findByRole('switch', { name: 'اعلان‌های تکالیف و مهلت‌ها' });
     expect(await violations(container)).toEqual([]);
   });
@@ -123,6 +123,7 @@ describe('a11y (axe, jsdom)', () => {
   it('profile, with a category switch clicked', async () => {
     mockApi(signedIn());
     const { container } = renderApp('/profile');
+    fireEvent.click(await screen.findByRole('button', { name: /تنظیمات اعلان‌ها/ }));
     const quizzes = await screen.findByRole('switch', { name: 'اعلان‌های آزمون‌ها' });
     fireEvent.click(quizzes);
     await screen.findByRole('switch', { name: 'اعلان‌های آزمون‌ها', checked: false });

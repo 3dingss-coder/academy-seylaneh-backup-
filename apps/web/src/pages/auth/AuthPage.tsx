@@ -449,7 +449,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
           <section className="relative z-20 mx-3 -mt-8 rounded-[28px] border border-[#EAE2D6] bg-[#FFFDF8] p-5 shadow-[0_20px_52px_-34px_rgba(27,61,51,0.5)] sm:p-6">
             <div className="mb-4">
               <h2 className="text-lg font-black text-[#153E35]">ورود به حساب</h2>
-              <p className="mt-1 text-sm leading-7 text-[#71807C]">
+              <p className="mt-1 text-sm leading-7 text-[#596A65]">
                 شماره موبایل یا کد ملی ثبت‌شده را وارد کنید.
               </p>
             </div>
@@ -488,7 +488,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
               </p>
             )}
 
-            <p className="mt-4 text-center text-[11px] leading-6 text-[#817A70]">
+            <p className="mt-4 text-center text-[11px] leading-6 text-[#625D55]">
               با ورود یا ثبت‌نام، قوانین استفاده و حریم خصوصی سیلانه سبز را می‌پذیرید.
             </p>
           </section>

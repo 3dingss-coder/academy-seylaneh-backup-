@@ -157,8 +157,12 @@ function SpeechBubble({ text, side }: { text: string; side: 'left' | 'right' }) 
 /** Cream wizard page frame (steps + async state cards). */
 function AuthFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center bg-[#fcf6f0] px-4 pb-10">
-      <div className="w-full max-w-[430px]">{children}</div>
+    <div className="relative flex min-h-dvh flex-col items-center overflow-hidden bg-[#FCF8F0] px-4 pb-10">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-28 start-1/2 size-72 -translate-x-1/2 rounded-full bg-[#DDF1E7]/70 blur-3xl"
+      />
+      <div className="relative z-10 w-full max-w-[460px]">{children}</div>
     </div>
   );
 }
@@ -359,7 +363,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   if (phase === 'loading' || phase === 'success' || phase === 'error') {
     return (
       <AuthFrame>
-        <div className="mt-14 rounded-[28px] border border-[#eae1d4] bg-[#fefcf9] p-7 text-center shadow-sm">
+        <div className="mt-14 overflow-hidden rounded-[30px] border border-[#E9E1D5] bg-[#FFFDF8] p-7 text-center shadow-[0_18px_44px_-34px_rgba(22,66,53,0.42)]">
           {phase === 'loading' && (
             <>
               <img src="/brand/auth/auth-loading.png" alt="" className="mx-auto w-52 max-w-full" />
@@ -367,8 +371,8 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 در حال ایجاد حساب شما...
               </h1>
               <p className="mt-2 text-sm leading-7 text-[#7a756a]">لطفاً چند لحظه صبر کنید...</p>
-              <div className="mx-auto mt-5 h-2.5 w-4/5 overflow-hidden rounded-full bg-[#e4dcce]">
-                <div className="h-full w-2/3 rounded-full bg-[#1e8650]" />
+              <div className="mx-auto mt-5 h-2.5 w-4/5 overflow-hidden rounded-full bg-[#E7E4DC]">
+                <div className="h-full w-2/3 rounded-full bg-[#0B7A60]" />
               </div>
             </>
           )}
@@ -405,28 +409,51 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   // ── login: the welcome screen (bg art + mascot + white card) ───────────────────────
   if (mode === 'login') {
     return (
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#013021]">
-        <img
-          src="/brand/auth/auth-welcome-bg.png"
-          alt=""
+      <div className="relative min-h-dvh overflow-hidden bg-[#FCF8F0] px-4 pb-6 pt-5">
+        <div
           aria-hidden
-          className="absolute inset-0 size-full object-cover"
+          className="pointer-events-none absolute -top-24 start-1/2 size-80 -translate-x-1/2 rounded-full bg-[#E5F3EA] blur-3xl"
         />
-        <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-3 pb-3">
-          <h1 className="mt-11 text-start text-[28px] font-extrabold leading-[46px] text-white">
-            به سیلانه سبز
-            <br />
-            خوش آمدی!
-          </h1>
-          <p className="mt-1.5 text-start text-[15px] text-white/85">یادگیری امروز، موفقیت فردا</p>
-          <img
-            src="/brand/auth/auth-welcome-mascot.png"
-            alt=""
-            aria-hidden
-            className="mx-auto -mb-2 mt-2 w-[320px] max-w-full"
-          />
 
-          <div className="-mt-6 rounded-[28px] bg-[#fefcf9] p-5 shadow-[0_22px_60px_-24px_rgba(0,0,0,0.55)]">
+        <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-2.75rem)] w-full max-w-[460px] flex-col justify-center">
+          <section className="relative overflow-hidden rounded-[32px] bg-[#075A46] shadow-[0_22px_52px_-34px_rgba(4,78,59,0.58)]">
+            <img
+              src="/brand/auth/auth-welcome-bg.png"
+              alt=""
+              aria-hidden
+              className="absolute inset-0 size-full object-cover opacity-90"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,65,49,.12),rgba(3,65,49,.56))]"
+            />
+
+            <div className="relative z-10 min-h-[355px] px-6 pt-7">
+              <h1 className="text-start text-[30px] font-black leading-[1.55] text-white">
+                به سیلانه سبز
+                <br />
+                خوش آمدی!
+              </h1>
+              <p className="mt-1 text-start text-[14px] font-medium text-white/85">
+                یادگیری امروز، موفقیت فردا
+              </p>
+              <img
+                src="/brand/auth/auth-welcome-mascot.png"
+                alt=""
+                aria-hidden
+                className="pointer-events-none absolute -bottom-5 start-1/2 w-[300px] max-w-[88%] -translate-x-1/2 select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
+              />
+            </div>
+          </section>
+
+          <section className="relative z-20 mx-3 -mt-8 rounded-[28px] border border-[#EAE2D6] bg-[#FFFDF8] p-5 shadow-[0_20px_52px_-34px_rgba(27,61,51,0.5)] sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-black text-[#153E35]">ورود به حساب</h2>
+              <p className="mt-1 text-sm leading-7 text-[#71807C]">
+                شماره موبایل یا کد ملی ثبت‌شده را وارد کنید.
+              </p>
+            </div>
+
             <form
               onSubmit={submitLogin}
               noValidate
@@ -451,19 +478,21 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 ورود و ادامه
               </PillButton>
             </form>
+
             {info && (
               <p
                 role="status"
-                className="mt-3 rounded-2xl bg-[#eaf3ee] px-3 py-2 text-xs leading-6 text-[#2c5c48]"
+                className="mt-3 rounded-2xl bg-[#EAF5EF] px-3 py-2 text-xs leading-6 text-[#2C5C48]"
               >
                 {info}
               </p>
             )}
-            <p className="mt-4 text-start text-[11px] leading-6 text-[#777166]">
+
+            <p className="mt-4 text-center text-[11px] leading-6 text-[#817A70]">
               با ورود یا ثبت‌نام، قوانین استفاده و حریم خصوصی سیلانه سبز را می‌پذیرید.
             </p>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     );
   }
@@ -472,39 +501,39 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
   const stepDef = STEP_DEFS[Math.min(Math.max(step, 1), 4) - 1] ?? STEP_DEFS[0];
   return (
     <AuthFrame>
-      <div className="pt-5">
+      <div className="pb-4 pt-6">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             aria-label="بازگشت"
             onClick={() => (step > 1 ? setStep(step - 1) : switchMode('login'))}
-            className="pressable grid size-10 place-items-center rounded-full border border-[#e4dcce] bg-[#fefcf9] text-[#41413e]"
+            className="pressable grid size-11 place-items-center rounded-full border border-[#E7DED1] bg-[#FFFDF8] text-[#315A52] shadow-sm"
           >
             <ChevronLeft className="size-5" aria-hidden />
           </button>
-          <p className="text-[13px] font-bold text-[#41413e]">
+          <p className="rounded-full bg-[#EEF6F1] px-3 py-1.5 text-[13px] font-bold text-[#315A52]">
             مرحله {toPersianDigits(step)} از {toPersianDigits(4)}
           </p>
         </div>
-        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#e4dcce]">
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#E8E5DD]">
           <div
-            className="h-full rounded-full bg-[#1e8650] transition-all duration-500"
+            className="h-full rounded-full bg-[#0B7A60] transition-all duration-500"
             style={{ width: `${(step / 4) * 100}%` }}
           />
         </div>
 
-        <div className="relative mt-3">
+        <div className="relative mt-5 overflow-hidden rounded-[28px] bg-[#FFFDF8]/70 px-3 pt-2">
           <img
             src={stepDef.art}
             alt=""
             aria-hidden
-            className="mx-auto max-h-[300px] w-full max-w-[330px] object-contain"
+            className="mx-auto max-h-[290px] w-full max-w-[330px] object-contain"
           />
           {stepDef.bubble ? <SpeechBubble text={stepDef.bubble} side={stepDef.bubbleSide} /> : null}
         </div>
 
-        <h1 className="mt-3 text-[26px] font-extrabold text-[#0f2a1d]">{stepDef.title}</h1>
-        <p className="mt-1.5 text-[14px] leading-7 text-[#716b60]">{stepDef.desc}</p>
+        <h1 className="mt-5 text-[27px] font-black text-[#113F35]">{stepDef.title}</h1>
+        <p className="mt-1.5 text-[14px] leading-7 text-[#74807D]">{stepDef.desc}</p>
 
         {step === 1 && (
           <div className="mt-4 flex flex-col gap-3">

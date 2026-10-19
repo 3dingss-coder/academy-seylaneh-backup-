@@ -312,7 +312,10 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                     </option>
                   ))}
                 </select>
-                <MapPin className="pointer-events-none absolute end-4 top-1/2 size-5 -translate-y-1/2 text-[#7A8582]" aria-hidden />
+                <MapPin
+                  className="pointer-events-none absolute end-4 top-1/2 size-5 -translate-y-1/2 text-[#7A8582]"
+                  aria-hidden
+                />
               </div>
             </div>
 
@@ -497,8 +500,14 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
         />
 
         <div className="relative min-h-[285px] overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_72%_24%,#E6F2E7_0%,transparent_31%),radial-gradient(circle_at_18%_45%,#F5F0C9_0%,transparent_34%),linear-gradient(180deg,#FFFDF6_0%,#EEF4E4_100%)]">
-          <div aria-hidden className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(0deg,rgba(130,178,96,.22),transparent)]" />
-          <div aria-hidden className="absolute -end-10 bottom-10 size-28 rounded-full bg-[#A9CF7B]/35 blur-2xl" />
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(0deg,rgba(130,178,96,.22),transparent)]"
+          />
+          <div
+            aria-hidden
+            className="absolute -end-10 bottom-10 size-28 rounded-full bg-[#A9CF7B]/35 blur-2xl"
+          />
           <img
             src="/brand/mascot.webp"
             alt=""
@@ -578,7 +587,9 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               onClick={onClick}
               className="pressable flex min-h-[82px] w-full items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] px-4 py-3 text-start shadow-[0_10px_28px_-26px_rgba(32,60,52,0.45)]"
             >
-              <span className={cn('grid size-12 shrink-0 place-items-center rounded-[15px]', iconClass)}>
+              <span
+                className={cn('grid size-12 shrink-0 place-items-center rounded-[15px]', iconClass)}
+              >
                 <Icon className="size-6" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">

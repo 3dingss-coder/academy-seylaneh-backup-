@@ -550,7 +550,8 @@ export async function updateMe(d: Deps, user: Doc<User>, input: z.infer<typeof p
   const patch: Partial<User> = { updatedAt: nowIso(d) };
   if (input.name !== undefined) patch.name = input.name;
   if (input.workplace !== undefined) patch.workplace = input.workplace;
-  if (input.province !== undefined || input.city !== undefined) Object.assign(patch, residence(input));
+  if (input.province !== undefined || input.city !== undefined)
+    Object.assign(patch, residence(input));
   await d.store.update(`users/${user.id}`, patch as Record<string, unknown>);
   return publicUser({ ...user, ...patch });
 }
@@ -583,7 +584,8 @@ export async function finalizeAvatar(
   input: z.infer<typeof avatarFinalizeSchema>,
 ) {
   const prefix = `avatars/${user.id}/avatar-`;
-  if (!input.path.startsWith(prefix)) throw new ApiError('FORBIDDEN', 'مسیر عکس پروفایل معتبر نیست.');
+  if (!input.path.startsWith(prefix))
+    throw new ApiError('FORBIDDEN', 'مسیر عکس پروفایل معتبر نیست.');
   const stat = await d.blob.stat(input.path);
   if (!stat) throw new ApiError('CONFLICT', 'فایل هنوز آپلود نشده است. دوباره تلاش کنید.');
   const rule = MEDIA_RULES.image;

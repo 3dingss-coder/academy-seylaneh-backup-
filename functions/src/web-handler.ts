@@ -334,7 +334,9 @@ export function createFetchHandler(
         return serveBytes(request, file.data, file.contentType, baseHeaders);
       }
 
-      const pubMatch = /^\/files\/public\/((?:brands|products|branding|avatars)\/.+)$/.exec(subPath);
+      const pubMatch = /^\/files\/public\/((?:brands|products|branding|avatars)\/.+)$/.exec(
+        subPath,
+      );
       if (pubMatch && (request.method === 'GET' || request.method === 'HEAD')) {
         const rawPath = (pubMatch[1] ?? '')
           .split('/')

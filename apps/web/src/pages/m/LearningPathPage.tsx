@@ -223,7 +223,8 @@ export function LearningPathPage() {
                             >
                               {segPackages.map((course, idxInSeg) => {
                                 const index = segIdx * ITEMS_PER_SEGMENT + idxInSeg;
-                                const pos = SEGMENT_NODE_POSITIONS[idxInSeg]!;
+                                const pos = SEGMENT_NODE_POSITIONS[idxInSeg];
+                                if (!pos) return null;
                                 const circleLeft = mascotOnRight
                                   ? 100 - pos.circleLeftPct
                                   : pos.circleLeftPct;

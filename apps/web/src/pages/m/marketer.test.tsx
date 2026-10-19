@@ -243,7 +243,13 @@ describe('LearningPathPage — live course roadmap and all-education handoff', (
   it('alternates mascot side from left to right across segments as courses grow', async () => {
     const manyPackages: PackageSummary[] = [
       { ...PKG, id: 'p1', title: 'آموزش کیت درمانی فورمی', status: 'completed', pathOrder: 1 },
-      { ...PKG, id: 'p2', title: 'آموزش فوم شستشوی صورت بابل', status: 'in_progress', pathOrder: 2 },
+      {
+        ...PKG,
+        id: 'p2',
+        title: 'آموزش فوم شستشوی صورت بابل',
+        status: 'in_progress',
+        pathOrder: 2,
+      },
       { ...PKG, id: 'p3', title: 'آموزش کرم گرم کننده آتل', status: 'new', pathOrder: 3 },
       { ...PKG, id: 'p4', title: 'آموزش کرم ترک پا ویت آس', status: 'new', pathOrder: 4 },
       { ...PKG, id: 'p5', title: 'آموزش ضدآفتاب استیکی پیکسل', status: 'new', pathOrder: 5 },

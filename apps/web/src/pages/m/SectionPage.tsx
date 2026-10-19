@@ -85,7 +85,8 @@ function Player({ d }: { d: SectionDetail }) {
   const quizReady = !(d.packageQuizPassed ?? s.quizPassed);
   const sectionDone = !quizReady;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-5">
       <RememberPage
         kind="section"
         brandId={p.brand?.id ?? null}
@@ -109,12 +110,12 @@ function Player({ d }: { d: SectionDetail }) {
           </span>
         }
       />
-      <div className="lg:flex lg:gap-6">
+      <div className="lg:flex lg:gap-5">
         <div className="flex flex-col gap-4 lg:flex-1">
           {media.isPending ? (
             <Skeleton className={cn('w-full', s.mediaType === 'audio' ? 'h-40' : 'aspect-video')} />
           ) : media.isError ? (
-            <Card className="flex flex-col items-center gap-2 py-8 text-center">
+            <Card className="flex flex-col items-center gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] py-8 text-center">
               <WifiOff className="size-8 text-muted" aria-hidden />
               <ErrorState
                 message="پخش ممکن نشد. اتصال را بررسی کنید."
@@ -149,7 +150,7 @@ function Player({ d }: { d: SectionDetail }) {
             <ErrorState message="فایل این قسمت هنوز آماده نیست." />
           )}
 
-          <Card className="flex flex-col gap-2">
+          <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.42)]">
             <div className="flex items-center justify-between text-sm">
               <span className="font-bold text-text">
                 {progress.completed ? 'دیدن/شنیدن کامل شد' : 'پیشرفت این قسمت'}
@@ -188,14 +189,14 @@ function Player({ d }: { d: SectionDetail }) {
         </div>
         <aside className="mt-4 flex flex-col gap-3 lg:mt-0 lg:w-80">
           {s.description && (
-            <Card>
+            <Card className="!rounded-[22px] border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)]">
               <h2 className="mb-1 text-sm font-bold text-text">درباره این قسمت</h2>
               <p className="text-sm leading-7 text-text-secondary">{s.description}</p>
             </Card>
           )}
           <Link
             to={`/packages/${p.id}`}
-            className="flex items-center gap-3 rounded-card border border-border bg-surface p-3"
+            className="pressable flex items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)] hover:bg-white"
           >
             <ProductImage
               src={p.product?.imageUrl ?? p.brand?.logoUrl}
@@ -210,6 +211,7 @@ function Player({ d }: { d: SectionDetail }) {
         </aside>
       </div>
       <MentorLauncher packageId={p.id} />
+      </div>
     </div>
   );
 }
@@ -282,7 +284,7 @@ function FileView({
       {failed ? (
         <Card
           role="alert"
-          className="flex flex-col items-center gap-3 py-6 text-center text-danger-fg"
+          className="flex flex-col items-center gap-3 !rounded-[24px] border-[#F0D8D3] bg-[#FFF8F5] py-6 text-center text-danger-fg"
           data-testid="media-error"
         >
           <p>

@@ -160,7 +160,7 @@ function AuthFrame({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-dvh flex-col items-center overflow-hidden bg-[#FCF8F0] px-4 pb-10">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-28 start-1/2 size-72 -translate-x-1/2 rounded-full bg-[#DDF1E7]/70 blur-3xl"
+        className="pointer-events-none absolute -top-28 left-1/2 size-72 -translate-x-1/2 rounded-full bg-[#DDF1E7]/70 blur-3xl"
       />
       <div className="relative z-10 w-full max-w-[460px]">{children}</div>
     </div>
@@ -412,7 +412,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
       <div className="relative min-h-dvh overflow-hidden bg-[#FCF8F0] px-4 pb-6 pt-5">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-24 start-1/2 size-80 -translate-x-1/2 rounded-full bg-[#E5F3EA] blur-3xl"
+          className="pointer-events-none absolute -top-24 left-1/2 size-80 -translate-x-1/2 rounded-full bg-[#E5F3EA] blur-3xl"
         />
 
         <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-2.75rem)] w-full max-w-[460px] flex-col justify-center">
@@ -441,7 +441,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 src="/brand/auth/auth-welcome-mascot.png"
                 alt=""
                 aria-hidden
-                className="pointer-events-none absolute -bottom-5 start-1/2 w-[300px] max-w-[88%] -translate-x-1/2 select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
+                className="pointer-events-none absolute -bottom-5 left-1/2 w-[300px] max-w-[88%] -translate-x-1/2 select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
               />
             </div>
           </section>

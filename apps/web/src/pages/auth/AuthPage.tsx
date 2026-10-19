@@ -428,7 +428,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
               className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,65,49,.12),rgba(3,65,49,.56))]"
             />
 
-            <div className="relative z-10 min-h-[355px] px-6 pt-7">
+            <div className="relative z-10 flex min-h-[355px] flex-col px-6 pt-7">
               <h1 className="text-start text-[30px] font-black leading-[1.55] text-white">
                 به سیلانه سبز
                 <br />
@@ -441,7 +441,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 src="/brand/auth/auth-welcome-mascot.png"
                 alt=""
                 aria-hidden
-                className="pointer-events-none absolute -bottom-5 left-1/2 w-[300px] max-w-[88%] -translate-x-1/2 select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
+                className="pointer-events-none mx-auto mt-auto w-[320px] max-w-[92%] select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
               />
             </div>
           </section>

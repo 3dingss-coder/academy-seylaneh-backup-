@@ -27,6 +27,11 @@ const ICONS: Record<string, LucideIcon> = {
   star: Star,
 };
 
+const DEFAULT_ICON_TONE = {
+  shell: 'from-orange-50 to-amber-50 border-orange-200',
+  icon: 'bg-orange-500 text-white',
+};
+
 const ICON_TONES: Record<string, { shell: string; icon: string }> = {
   sprout: {
     shell: 'from-emerald-50 to-emerald-100 border-emerald-200',
@@ -40,10 +45,7 @@ const ICON_TONES: Record<string, { shell: string; icon: string }> = {
     shell: 'from-violet-50 to-purple-50 border-violet-200',
     icon: 'bg-violet-600 text-white',
   },
-  medal: {
-    shell: 'from-orange-50 to-amber-50 border-orange-200',
-    icon: 'bg-orange-500 text-white',
-  },
+  medal: DEFAULT_ICON_TONE,
   star: {
     shell: 'from-yellow-50 to-amber-50 border-yellow-200',
     icon: 'bg-amber-500 text-white',
@@ -187,7 +189,7 @@ export function CardsPage() {
               <ul className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {list.map((b) => {
                   const Icon = ICONS[b.icon] ?? Medal;
-                  const tone = ICON_TONES[b.icon] ?? ICON_TONES.medal;
+                  const tone = ICON_TONES[b.icon] ?? DEFAULT_ICON_TONE;
                   return (
                     <li key={b.id} className="min-w-0">
                       <Card

@@ -148,7 +148,9 @@ export function CardsPage() {
                       >
                         <CountUp value={p.balance} format={faNumber} />
                       </p>
-                      <span className="pb-1 text-sm font-bold text-[#6f7f7c] sm:text-base">امتیاز</span>
+                      <span className="pb-1 text-sm font-bold text-[#6f7f7c] sm:text-base">
+                        امتیاز
+                      </span>
                     </div>
                   </div>
                 </div>

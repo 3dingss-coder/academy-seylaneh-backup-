@@ -533,7 +533,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
         </div>
 
         <h1 className="mt-5 text-[27px] font-black text-[#113F35]">{stepDef.title}</h1>
-        <p className="mt-1.5 text-[14px] leading-7 text-[#74807D]">{stepDef.desc}</p>
+        <p className="mt-1.5 text-[14px] leading-7 text-[#596A65]">{stepDef.desc}</p>
 
         {step === 1 && (
           <div className="mt-4 flex flex-col gap-3">

@@ -72,7 +72,7 @@ export function HomePage() {
   // Preserve the real query's loading, error, cached/offline, and empty states.
   if (homeQ.isPending && !home) {
     return (
-      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <div className="flex flex-col gap-3" aria-busy="true">
           <Skeleton className="h-[250px] w-full rounded-[24px] sm:h-[270px]" />
@@ -84,20 +84,20 @@ export function HomePage() {
           </div>
           <PackageCardSkeleton />
         </div>
-      </div>
+      </div></div>
     );
   }
   if (!home && homeQ.isError) {
     return (
-      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <ErrorState onRetry={() => void homeQ.refetch()} />
-      </div>
+      </div></div>
     );
   }
   if (home && home.packages.length === 0) {
     return (
-      <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <StaleBanner
           show={homeQ.isError && homeQ.data !== undefined}
@@ -115,7 +115,7 @@ export function HomePage() {
             />
           }
         />
-      </div>
+      </div></div>
     );
   }
   if (!home) return null;
@@ -123,7 +123,7 @@ export function HomePage() {
   const suggestedPackages = home.packages.filter((p) => p.status !== 'completed').slice(0, 6);
 
   return (
-    <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
       {greeting}
       <StaleBanner
         show={homeQ.isError && homeQ.data !== undefined}
@@ -133,7 +133,7 @@ export function HomePage() {
       {/* Hero: reference-matched warm scene, live next lesson and one real CTA. */}
       <section
         aria-label="ادامه یادگیری"
-        className={`relative h-[250px] overflow-hidden rounded-[24px] sm:h-[270px]${
+        className={`relative h-[265px] overflow-hidden rounded-[30px] border border-[#E9E1D5] shadow-[0_18px_42px_-34px_rgba(26,67,55,.45)] sm:h-[285px]${
           highlightNext ? ' ring-4 ring-primary/25' : ''
         }`}
         style={{ backgroundColor: '#F7E8C4' }}
@@ -157,11 +157,11 @@ export function HomePage() {
         <div
           className="absolute rounded-[20px] p-4"
           style={{
-            bottom: 15,
+            bottom: 16,
             left: 14,
-            width: '64%',
-            backgroundColor: '#FFFCF4',
-            boxShadow: '0 10px 26px rgba(16,42,33,0.16)',
+            width: '66%',
+            backgroundColor: 'rgba(255,253,248,.97)',
+            boxShadow: '0 16px 34px -24px rgba(16,42,33,0.45)',
           }}
           data-testid={next ? 'next-item' : undefined}
         >
@@ -221,7 +221,7 @@ export function HomePage() {
       {topNudge ? (
         <Link
           to={topNudge.actionRef ?? '/mentor'}
-          className="flex items-center gap-2.5 rounded-[16px] border border-border bg-card px-3.5 py-3 transition-colors hover:bg-surface"
+          className="pressable flex min-h-14 items-center gap-3 rounded-[20px] border border-[#E7E0D6] bg-[#FFFDF8] px-4 py-3 shadow-[0_10px_26px_-24px_rgba(32,60,52,.36)] hover:bg-white"
         >
           <Bot size={17} aria-hidden style={{ color: '#2F9E68' }} />
           <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: '#17352a' }}>
@@ -234,7 +234,7 @@ export function HomePage() {
       {/* Overall progress */}
       <section
         aria-label="پیشرفت کلی شما"
-        className="flex items-center justify-between rounded-[22px] border border-border bg-card p-4"
+        className="flex items-center justify-between rounded-[24px] border border-[#E7E0D6] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.4)]"
         style={{ backgroundColor: '#FEFCF9', borderColor: '#E8E1D7' }}
       >
         <div>
@@ -266,7 +266,7 @@ export function HomePage() {
       </section>
 
       {/* Education opens the learning path; the course list stays available at /learn/all. */}
-      <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2.5">
+      <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2.5 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-2.5 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]">
         <StatTile
           to="/learn/all"
           icon={<CalendarCheck size={22} />}
@@ -292,7 +292,7 @@ export function HomePage() {
       </nav>
 
       {/* Suggested courses — live package titles, metadata, links, and real deadlines. */}
-      <section aria-label="دوره‌های پیشنهادی" className="mt-1">
+      <section aria-label="دوره‌های پیشنهادی" className="mt-1 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold" style={{ color: '#17352a' }}>
             دوره‌های پیشنهادی
@@ -310,7 +310,7 @@ export function HomePage() {
               <Link
                 to={`/packages/${pkg.id}`}
                 data-testid="package-card"
-                className="flex items-center gap-3 rounded-[20px] border border-border bg-card p-3 transition-colors hover:bg-surface"
+                className="pressable flex items-center gap-3 rounded-[20px] border border-[#ECE4D8] bg-[#FFFEFA] p-3 transition-colors hover:bg-white"
                 style={{ backgroundColor: '#FFFCF6', borderColor: '#E8E1D7' }}
               >
                 <ProductImage
@@ -348,6 +348,7 @@ export function HomePage() {
           مهلت {toPersianDigits(home.counts.overdue)} آموزش گذشته است. هر چه زودتر تمامش کن.
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
@@ -369,7 +370,7 @@ function HomeGreeting({
     avatarUrl && failedSrc !== avatarUrl ? avatarUrl : failedSrc !== mascotSrc ? mascotSrc : null;
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] px-3 py-3 shadow-[0_10px_28px_-26px_rgba(32,60,52,.38)]">
       <Link
         to="/profile"
         aria-label={`پروفایل ${firstName}`}
@@ -449,7 +450,7 @@ function StatTile({
   return (
     <Link
       to={to}
-      className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-[19px] border border-[#EFE9DE] bg-[#FFFCF6] px-1.5 py-2 shadow-[0_2px_10px_rgba(49,44,34,0.035)] transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none"
+      className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-[18px] px-1.5 py-2 transition-transform hover:-translate-y-0.5 hover:bg-[#F9F7F0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none"
     >
       <span
         className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[17px]"

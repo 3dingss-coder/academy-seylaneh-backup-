@@ -265,7 +265,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
             />
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-text">شماره موبایل</label>
+              <p className="text-sm font-semibold text-text">شماره موبایل</p>
               <div className="flex min-h-14 items-center gap-3 rounded-[18px] bg-[#EFEEE9] px-4 text-[#6E7775]">
                 <LockKeyhole className="size-5 shrink-0" aria-hidden />
                 <span dir="ltr" className="flex-1 text-end">
@@ -275,7 +275,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-text">کد ملی</label>
+              <p className="text-sm font-semibold text-text">کد ملی</p>
               <div className="flex min-h-14 items-center gap-3 rounded-[18px] border border-[#E1DDD4] bg-[#FFFDF8] px-4">
                 <ShieldCheck className="size-5 shrink-0 text-[#7B8582]" aria-hidden />
                 <span className="flex-1 text-end text-[#344A45]">

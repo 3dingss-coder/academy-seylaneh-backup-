@@ -42,7 +42,7 @@ export function BottomNav({ items = MARKETER_NAV }: { items?: BottomNavItem[] })
       aria-label="ناوبری اصلی"
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
     >
-      <div className="pointer-events-auto mx-auto max-w-md rounded-[24px] border border-[#EAE4DA] bg-[#FFFCF6]/95 shadow-[0_8px_28px_rgba(30,44,35,0.12)] backdrop-blur-xl">
+      <div className="pointer-events-auto mx-auto max-w-md rounded-[24px] border border-[#EAE2D7] bg-[#FFFDF8]/96 shadow-[0_10px_30px_-18px_rgba(30,62,52,0.22)] backdrop-blur-xl">
         <ul className="flex items-stretch justify-around px-1.5">
           {items.map(({ to, label, icon: Icon, badge }, i) => (
             <li key={`${to}-${label}`} className="flex-1">
@@ -50,10 +50,10 @@ export function BottomNav({ items = MARKETER_NAV }: { items?: BottomNavItem[] })
                 to={to}
                 aria-current={i === activeIdx ? 'page' : undefined}
                 className={cn(
-                  'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-card text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary',
+                  'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[16px] text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary',
                   i === activeIdx
-                    ? 'font-bold text-primary-fg'
-                    : 'font-medium text-text-secondary hover:text-text',
+                    ? 'bg-primary-light/70 font-bold text-primary-fg'
+                    : 'font-medium text-text-secondary hover:bg-[#F7F3EA] hover:text-text',
                 )}
               >
                 <span className="relative">

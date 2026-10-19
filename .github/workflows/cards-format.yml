@@ -1,0 +1,34 @@
+name: Cards format helper
+
+on:
+  push:
+    branches:
+      - chatgpt/cards-pixel-faithful-redesign
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: chatgpt/cards-pixel-faithful-redesign
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write apps/web/src/pages/m/CardsPage.tsx
+      - name: Commit formatted Cards page
+        run: |
+          if git diff --quiet -- apps/web/src/pages/m/CardsPage.tsx; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/pages/m/CardsPage.tsx
+          git commit -m "style(cards): format page with Prettier"
+          git push origin HEAD:chatgpt/cards-pixel-faithful-redesign

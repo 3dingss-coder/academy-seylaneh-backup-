@@ -72,7 +72,8 @@ export function HomePage() {
   // Preserve the real query's loading, error, cached/offline, and empty states.
   if (homeQ.isPending && !home) {
     return (
-      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <div className="flex flex-col gap-3" aria-busy="true">
           <Skeleton className="h-[250px] w-full rounded-[24px] sm:h-[270px]" />
@@ -84,20 +85,24 @@ export function HomePage() {
           </div>
           <PackageCardSkeleton />
         </div>
-      </div></div>
+        </div>
+      </div>
     );
   }
   if (!home && homeQ.isError) {
     return (
-      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <ErrorState onRetry={() => void homeQ.refetch()} />
-      </div></div>
+        </div>
+      </div>
     );
   }
   if (home && home.packages.length === 0) {
     return (
-      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
+      <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
         {greeting}
         <StaleBanner
           show={homeQ.isError && homeQ.data !== undefined}
@@ -115,7 +120,8 @@ export function HomePage() {
             />
           }
         />
-      </div></div>
+        </div>
+      </div>
     );
   }
   if (!home) return null;
@@ -123,7 +129,8 @@ export function HomePage() {
   const suggestedPackages = home.packages.filter((p) => p.status !== 'completed').slice(0, 6);
 
   return (
-    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6"><div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+      <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
       {greeting}
       <StaleBanner
         show={homeQ.isError && homeQ.data !== undefined}
@@ -266,7 +273,10 @@ export function HomePage() {
       </section>
 
       {/* Education opens the learning path; the course list stays available at /learn/all. */}
-      <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2.5 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-2.5 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]">
+      <nav
+        aria-label="میانبرها"
+        className="grid grid-cols-4 gap-2.5 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-2.5 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]"
+      >
         <StatTile
           to="/learn/all"
           icon={<CalendarCheck size={22} />}
@@ -292,7 +302,10 @@ export function HomePage() {
       </nav>
 
       {/* Suggested courses — live package titles, metadata, links, and real deadlines. */}
-      <section aria-label="دوره‌های پیشنهادی" className="mt-1 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]">
+      <section
+        aria-label="دوره‌های پیشنهادی"
+        className="mt-1 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.38)]"
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold" style={{ color: '#17352a' }}>
             دوره‌های پیشنهادی

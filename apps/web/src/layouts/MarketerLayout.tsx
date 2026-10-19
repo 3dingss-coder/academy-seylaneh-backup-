@@ -38,6 +38,7 @@ const DESKTOP_NAV = [
 export function MarketerLayout() {
   const { pathname } = useLocation();
   const isLearningPath = pathname === '/learn';
+  const isProfile = pathname === '/profile';
   const notifications = useNotifications();
   const messages = useMessages();
   const qc = useQueryClient();
@@ -64,7 +65,11 @@ export function MarketerLayout() {
   return (
     <div
       className={
-        isLearningPath ? 'min-h-dvh bg-[#FCF7EE] pb-0' : 'min-h-dvh bg-background pb-28 lg:pb-8'
+        isLearningPath
+          ? 'min-h-dvh bg-[#FCF7EE] pb-0'
+          : isProfile
+            ? 'min-h-dvh bg-[#FCF8F0] pb-28 lg:pb-8'
+            : 'min-h-dvh bg-background pb-28 lg:pb-8'
       }
       style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
     >
@@ -72,7 +77,7 @@ export function MarketerLayout() {
         className={cn(
           'sticky top-0 z-30 glass border-b border-border',
           // The home and immersive learning-path screens own their page-specific headers.
-          (pathname === '/' || isLearningPath) && 'hidden',
+          (pathname === '/' || isLearningPath || isProfile) && 'hidden',
         )}
       >
         <div className="mx-auto flex h-16 max-w-[960px] items-center justify-between gap-2 px-4">

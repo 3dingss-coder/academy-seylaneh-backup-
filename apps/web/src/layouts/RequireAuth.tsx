@@ -10,19 +10,24 @@ import { StaffLoginPage } from '@/pages/auth/StaffLoginPage';
 export function FullPageSpinner() {
   return (
     <div
-      className="flex min-h-dvh items-center justify-center"
+      className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#FCF8F0] px-6"
       role="status"
       aria-label="در حال بارگذاری"
     >
-      <div className="flex flex-col items-center gap-3">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 start-1/2 size-80 -translate-x-1/2 rounded-full bg-[#E6F3EA] blur-3xl"
+      />
+      <div className="relative z-10 flex min-w-48 flex-col items-center rounded-[28px] border border-[#E9E1D5] bg-[#FFFDF8] px-8 py-7 shadow-[0_18px_44px_-34px_rgba(22,66,53,0.42)]">
         <img
           src="/brand/mascot.webp"
           alt=""
           width={96}
           height={124}
-          className="h-auto w-24 motion-safe:animate-bounce"
+          className="h-auto w-24 motion-safe:animate-float"
         />
-        <Spinner className="size-5 text-primary-fg" />
+        <Spinner className="mt-3 size-5 text-primary-fg" />
+        <p className="mt-2 text-sm font-bold text-text-secondary">در حال آماده‌سازی...</p>
       </div>
     </div>
   );

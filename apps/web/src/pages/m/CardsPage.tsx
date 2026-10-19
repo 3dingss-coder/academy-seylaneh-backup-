@@ -127,19 +127,16 @@ export function CardsPage() {
                   width={250}
                   height={320}
                   aria-hidden
-                  className="pointer-events-none absolute bottom-[-42px] left-[-22px] h-[205px] w-auto select-none object-contain sm:bottom-[-54px] sm:left-2 sm:h-[270px] lg:left-12"
+                  className="pointer-events-none absolute bottom-[-42px] right-[-22px] h-[205px] w-auto select-none object-contain sm:bottom-[-54px] sm:right-2 sm:h-[270px] lg:right-12"
                 />
 
                 <div className="relative z-10 flex min-h-[190px] items-center sm:min-h-[220px]">
-                  <div className="w-[66%] min-w-0 py-6 pe-2 ps-2 sm:w-[58%] sm:pe-8 lg:w-[52%]">
+                  <div className="mr-auto w-[62%] min-w-0 py-6 pe-2 ps-2 sm:w-[54%] sm:ps-8 lg:w-[48%]">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#fff1bd] text-[#b86900] shadow-[inset_0_0_0_1px_rgba(212,151,28,.24)]">
                         <Award className="size-6" aria-hidden />
                       </span>
-                      <div>
-                        <p className="text-sm font-bold text-[#6e766f] sm:text-base">امتیاز کل</p>
-                        <p className="text-xs text-[#909892]">دستاوردهای یادگیری شما</p>
-                      </div>
+                      <p className="text-base font-extrabold text-[#5f6f6a] sm:text-lg">امتیاز کل</p>
                     </div>
                     <div className="flex items-end gap-2">
                       <p
@@ -165,7 +162,6 @@ export function CardsPage() {
               <h2 id="badges-title" className="text-lg font-extrabold text-[#143532] sm:text-xl">
                 نشان‌ها
               </h2>
-              <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">نشان‌های کسب‌شده و قفل‌شده</p>
             </div>
             <span
               aria-hidden
@@ -246,12 +242,7 @@ export function CardsPage() {
                             {faDate(b.earnedAt)}
                           </p>
                         )}
-                        {!b.earned && (
-                          <p className="mt-auto flex items-center gap-1 pt-3 text-[11px] font-bold text-[#7a827f]">
-                            <Lock className="size-3" aria-hidden />
-                            قفل شده
-                          </p>
-                        )}
+
                       </Card>
                     </li>
                   );
@@ -266,7 +257,6 @@ export function CardsPage() {
             <h2 id="ledger-title" className="text-lg font-extrabold text-[#143532] sm:text-xl">
               تاریخچه امتیاز
             </h2>
-            <p className="mt-0.5 text-xs text-[#7c8885] sm:text-sm">آخرین تغییرات امتیاز شما</p>
           </div>
 
           <QueryState

@@ -136,7 +136,9 @@ export function CardsPage() {
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#fff1bd] text-[#b86900] shadow-[inset_0_0_0_1px_rgba(212,151,28,.24)]">
                         <Award className="size-6" aria-hidden />
                       </span>
-                      <p className="text-base font-extrabold text-[#5f6f6a] sm:text-lg">امتیاز کل</p>
+                      <p className="text-base font-extrabold text-[#5f6f6a] sm:text-lg">
+                        امتیاز کل
+                      </p>
                     </div>
                     <div className="flex items-end gap-2">
                       <p
@@ -242,7 +244,6 @@ export function CardsPage() {
                             {faDate(b.earnedAt)}
                           </p>
                         )}
-
                       </Card>
                     </li>
                   );

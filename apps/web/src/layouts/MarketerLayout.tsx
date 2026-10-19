@@ -1,12 +1,13 @@
 import { Suspense, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
+  Award,
   Bell,
   BookOpen,
   Bot,
   Home,
   Mail,
-  ShieldCheck,
+  SquarePlay,
   Trophy,
   UserRound,
   WifiOff,
@@ -27,7 +28,7 @@ import { useMessages, useNotifications } from '@/lib/queries';
 
 const DESKTOP_NAV = [
   { to: '/', label: 'خانه', icon: Home },
-  { to: '/learn', label: 'دوره‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
+  { to: '/learn', label: 'آموزش‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
   { to: '/messages', label: 'پیام‌ها', icon: Mail },
   { to: '/cards', label: 'مدال', icon: Trophy },
   { to: '/mentor', label: 'منتور', icon: Bot },
@@ -36,6 +37,7 @@ const DESKTOP_NAV = [
 /** Marketer shell: header (logo, bell, profile) + bottom nav on mobile, top nav on desktop. */
 export function MarketerLayout() {
   const { pathname } = useLocation();
+  const isLearningPath = pathname === '/learn';
   const notifications = useNotifications();
   const messages = useMessages();
   const qc = useQueryClient();
@@ -61,14 +63,16 @@ export function MarketerLayout() {
 
   return (
     <div
-      className="min-h-dvh bg-background pb-28 lg:pb-8"
+      className={
+        isLearningPath ? 'min-h-dvh bg-[#FCF7EE] pb-0' : 'min-h-dvh bg-background pb-28 lg:pb-8'
+      }
       style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
     >
       <header
         className={cn(
           'sticky top-0 z-30 glass border-b border-border',
-          // The home board owns its mobile greeting/notification row; retain the shared desktop shell.
-          pathname === '/' && 'hidden lg:block',
+          // The home and immersive learning-path screens own their page-specific headers.
+          (pathname === '/' || isLearningPath) && 'hidden',
         )}
       >
         <div className="mx-auto flex h-16 max-w-[960px] items-center justify-between gap-2 px-4">
@@ -127,7 +131,9 @@ export function MarketerLayout() {
           اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
         </div>
       )}
-      <main className="mx-auto max-w-[960px] px-4 py-4">
+      <main
+        className={isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[960px] px-4 py-4'}
+      >
         <PageTransition>
           <Suspense
             fallback={
@@ -142,15 +148,21 @@ export function MarketerLayout() {
           </Suspense>
         </PageTransition>
       </main>
-      <BottomNav
-        items={[
-          { to: '/', label: 'خانه', icon: Home },
-          { to: '/learn', label: 'دوره‌ها', icon: BookOpen },
-          { to: '/learn', label: 'آزمون‌ها', icon: ShieldCheck },
-          { to: '/cards', label: 'مدال', icon: Trophy },
-          { to: '/profile', label: 'پروفایل', icon: UserRound },
-        ]}
-      />
+      {!isLearningPath && (
+        <BottomNav
+          items={[
+            { to: '/', label: 'خانه', icon: Home },
+            {
+              to: '/learn',
+              label: 'آموزش‌ها',
+              icon: SquarePlay,
+              match: ['/packages', '/sections', '/quiz'],
+            },
+            { to: '/cards', label: 'مدال', icon: Award },
+            { to: '/profile', label: 'پروفایل', icon: UserRound },
+          ]}
+        />
+      )}
     </div>
   );
 }

@@ -5,26 +5,41 @@ import { ProductImage } from '@/components/common/ProductImage';
 import { toPersianDigits } from '@/lib/digits';
 import { faDuration, faPercent } from '@/lib/format';
 import type { PackageSummary } from '@/lib/types';
+import { cn } from '@/lib/cn';
 
 /**
- * Package card (M3/M4) — row construction matches after/m-*.png «آموزش‌های من» rows:
- * brand eyebrow + title + meta (duration • parts • deadline chip) + progress bar,
- * real product image (or brand logo for brand-level packages) at the start side.
+ * Package card used on the home and learning pages. The education layout puts the real
+ * product/brand image on the left, matching the approved course-list reference.
  */
-export function PackageCard({ p }: { p: PackageSummary }) {
+export function PackageCard({
+  p,
+  layout = 'default',
+}: {
+  p: PackageSummary;
+  layout?: 'default' | 'education';
+}) {
   const image = p.product?.imageUrl ?? p.brand?.logoUrl;
+  const educationLayout = layout === 'education';
   return (
     <Link
       to={`/packages/${p.id}`}
-      className="pressable group grid min-h-36 grid-cols-[96px_1fr] gap-4 overflow-hidden rounded-[20px] border border-border bg-surface p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:border-primary sm:grid-cols-[104px_1fr]"
+      className={cn(
+        'pressable group grid min-h-36 gap-4 overflow-hidden rounded-[20px] border border-border bg-surface p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:border-primary',
+        educationLayout
+          ? 'grid-cols-[1fr_96px] sm:grid-cols-[1fr_112px]'
+          : 'grid-cols-[96px_1fr] sm:grid-cols-[104px_1fr]',
+      )}
       data-testid="package-card"
     >
       <ProductImage
         src={image}
         alt={p.product?.name ?? p.brand?.name ?? p.title}
-        className="size-24 self-start rounded-[18px] border border-border bg-background object-contain p-2 shadow-xs transition-transform duration-300 ease-soft group-hover:scale-[1.03] sm:size-28"
+        className={cn(
+          'size-24 self-start rounded-[18px] border border-border bg-background object-contain p-2 shadow-xs transition-transform duration-300 ease-soft group-hover:scale-[1.03] sm:size-28',
+          educationLayout && 'order-2',
+        )}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={cn('flex min-w-0 flex-1 flex-col', educationLayout && 'order-1')}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-extrabold text-primary-fg">
             {p.brand?.name}

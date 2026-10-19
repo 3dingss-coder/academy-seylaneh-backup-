@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -34,8 +34,8 @@ import type { Nudge } from '@/lib/types';
 const ACTION_LABEL = { start: 'شروع', resume: 'ادامه', quiz: 'شروع آزمون' } as const;
 
 /**
- * Marketer home (داشبورد اصلی) — visual truth = board «تمامی صفحات اپلیکیشن بازاریاب».
- * Real home data/actions remain authoritative; board sample names and stats are ignored.
+ * Marketer home (داشبورد اصلی) — visual truth = the per-page reference in Drive.
+ * Real home data/actions remain authoritative; reference sample names and stats are never hard-coded.
  */
 export function HomePage() {
   const { user } = useAuth();
@@ -60,7 +60,14 @@ export function HomePage() {
   const fullName = user?.name ?? '';
   const firstName = fullName.trim().split(/\s+/)[0] || 'کاربر گرامی';
   const initial = fullName.trim().charAt(0) || '؟';
-  const greeting = <HomeGreeting firstName={firstName} initial={initial} unread={unread} />;
+  const greeting = (
+    <HomeGreeting
+      firstName={firstName}
+      initial={initial}
+      avatarUrl={user?.avatarUrl}
+      unread={unread}
+    />
+  );
 
   // Preserve the real query's loading, error, cached/offline, and empty states.
   if (homeQ.isPending && !home) {
@@ -68,7 +75,7 @@ export function HomePage() {
       <div className="mx-1 flex flex-col gap-3 pt-5 lg:mx-auto lg:max-w-[480px]">
         {greeting}
         <div className="flex flex-col gap-3" aria-busy="true">
-          <Skeleton className="h-[214px] w-full rounded-[24px] lg:h-[260px]" />
+          <Skeleton className="h-[250px] w-full rounded-[24px] sm:h-[270px]" />
           <Skeleton className="h-[92px] w-full rounded-[20px]" />
           <div className="grid grid-cols-4 gap-2.5">
             {Array.from({ length: 4 }, (_, i) => (
@@ -123,12 +130,13 @@ export function HomePage() {
         onRetry={() => void homeQ.refetch()}
       />
 
-      {/* Hero: m-home-hero scene + white continue-card + play circle */}
+      {/* Hero: reference-matched warm scene, live next lesson and one real CTA. */}
       <section
         aria-label="ادامه یادگیری"
-        className={`relative h-[214px] overflow-hidden rounded-[24px] lg:h-[260px]${
+        className={`relative h-[250px] overflow-hidden rounded-[24px] sm:h-[270px]${
           highlightNext ? ' ring-4 ring-primary/25' : ''
         }`}
+        style={{ backgroundColor: '#F7E8C4' }}
       >
         <img
           src="/brand/m/m-home-hero.png"
@@ -137,58 +145,44 @@ export function HomePage() {
           className="absolute inset-0 h-full w-full object-cover"
           style={{ transform: 'scaleX(-1)' }}
         />
+        {/* Temporary warm veil keeps the current landscape art close to the brighter Drive reference. */}
         <div
-          className="absolute rounded-[18px] bg-white p-3.5"
+          aria-hidden
+          className="absolute inset-0"
           style={{
-            bottom: 14,
+            background:
+              'linear-gradient(90deg, rgba(255,247,225,.96) 0%, rgba(255,247,225,.88) 42%, rgba(255,247,225,.36) 63%, rgba(255,247,225,0) 82%)',
+          }}
+        />
+        <div
+          className="absolute rounded-[20px] p-4"
+          style={{
+            bottom: 15,
             left: 14,
-            width: '62%',
-            backgroundColor: '#FEFCF9',
+            width: '64%',
+            backgroundColor: '#FFFCF4',
             boxShadow: '0 10px 26px rgba(16,42,33,0.16)',
           }}
           data-testid={next ? 'next-item' : undefined}
         >
-          <p className="text-[10px] tracking-[0.02em]" style={{ color: '#777166' }}>
-            ادامه یادگیری
-          </p>
           {next ? (
             <>
+              <p className="text-[15px] font-extrabold leading-6" style={{ color: '#11704F' }}>
+                ادامه یادگیری
+              </p>
               <p
-                className="mt-1 line-clamp-2 text-[13.5px] font-bold leading-6"
+                className="mt-1 line-clamp-2 text-[15px] font-bold leading-6"
                 style={{ color: '#17352a' }}
               >
                 {next.packageTitle}
               </p>
-              <p className="mt-0.5 truncate text-[11px]" style={{ color: '#777166' }}>
+              <p className="mt-0.5 truncate text-[12px]" style={{ color: '#777166' }}>
                 درس {toPersianDigits((nextPackage?.completedSections ?? 0) + 1)} از{' '}
                 {toPersianDigits(nextPackage?.sectionCount ?? 0)}
               </p>
               <span className="sr-only">
                 {next.sectionTitle} • مدت‌زمان {faDuration(next.durationSec)}
               </span>
-              <div
-                dir="rtl"
-                className="relative mt-2.5 h-[26px] overflow-hidden rounded-full"
-                style={{ background: '#EDE7DA' }}
-              >
-                <div
-                  className="absolute inset-y-0 right-0 rounded-full transition-[width] duration-300 motion-reduce:transition-none"
-                  style={{ width: `${next.percent}%`, background: '#1e8650' }}
-                />
-                <span
-                  dir="ltr"
-                  className={`absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
-                    next.percent >= 20 ? 'bg-[#0e6e4e] text-white' : 'bg-[#EDE7DA] text-[#17352a]'
-                  }`}
-                >
-                  {`%${toPersianDigits(next.percent)}`}
-                </span>
-              </div>
-              {next.deadlineAt ? (
-                <div className="mt-1.5">
-                  <CountdownChip deadline={next.deadlineAt} />
-                </div>
-              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -200,25 +194,25 @@ export function HomePage() {
                   );
                 }}
                 aria-label={`${ACTION_LABEL[next.action]}: ${next.sectionTitle}`}
-                className="absolute flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 motion-reduce:transition-none"
-                style={{
-                  bottom: -22,
-                  right: -16,
-                  background: '#17352a',
-                  boxShadow: '0 10px 22px rgba(16,42,33,0.32)',
-                }}
+                className="relative mt-3 flex h-11 w-full items-center justify-center rounded-full px-10 text-sm font-bold text-white transition-transform hover:scale-[1.02] motion-reduce:transition-none"
+                style={{ background: '#087B55' }}
               >
-                <Play
-                  size={19}
-                  fill="#fff"
-                  color="#fff"
+                {ACTION_LABEL[next.action]}
+                <span
                   aria-hidden
-                  style={{ marginInlineStart: 2 }}
-                />
+                  className="absolute -right-2 flex size-12 items-center justify-center rounded-full border-[3px] border-white bg-[#203A58] shadow-lg"
+                >
+                  <Play size={18} fill="#fff" color="#fff" style={{ marginInlineStart: 2 }} />
+                </span>
               </button>
             </>
           ) : (
-            <EmptyNext />
+            <>
+              <p className="text-[15px] font-extrabold leading-6" style={{ color: '#11704F' }}>
+                ادامه یادگیری
+              </p>
+              <EmptyNext />
+            </>
           )}
         </div>
       </section>
@@ -239,35 +233,42 @@ export function HomePage() {
 
       {/* Overall progress */}
       <section
-        aria-label="پیشرفت کل"
-        className="flex items-center justify-between rounded-[20px] border border-border bg-card p-4"
+        aria-label="پیشرفت کلی شما"
+        className="flex items-center justify-between rounded-[22px] border border-border bg-card p-4"
         style={{ backgroundColor: '#FEFCF9', borderColor: '#E8E1D7' }}
       >
         <div>
-          <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
-            پیشرفت کل شما
+          <p className="text-[16px] font-extrabold" style={{ color: '#17352a' }}>
+            پیشرفت کلی شما
           </p>
-          <p className="mt-1 text-[11.5px]" style={{ color: '#777166' }}>
-            در حال حاضر {toPersianDigits(home.counts.inProgress)} درس باز است!
+          <p className="mt-2 text-[13px] font-medium" style={{ color: '#777166' }}>
+            در مسیر عالی هستید!
           </p>
+          <span className="sr-only">
+            {toPersianDigits(home.counts.inProgress)} درس در حال یادگیری است.
+          </span>
         </div>
         <ProgressRing
           value={home.totalProgress}
-          size={58}
-          stroke={6.5}
+          size={96}
+          stroke={9}
           label="پیشرفت کل"
           center={
-            <span dir="ltr" className="absolute text-[13px] font-bold" style={{ color: '#17352a' }}>
-              {`%${toPersianDigits(home.totalProgress)}`}
+            <span
+              dir="ltr"
+              className="absolute text-[19px] font-extrabold"
+              style={{ color: '#17352a' }}
+            >
+              {`${toPersianDigits(home.totalProgress)}٪`}
             </span>
           }
         />
       </section>
 
-      {/* Board tiles are real navigation targets; exam list currently routes to the learning list. */}
+      {/* Education opens the learning path; the course list stays available at /learn/all. */}
       <nav aria-label="میانبرها" className="grid grid-cols-4 gap-2.5">
         <StatTile
-          to="/learn"
+          to="/learn/all"
           icon={<CalendarCheck size={22} />}
           label="دوره‌ها"
           bg="#FBE9D6"
@@ -281,7 +282,7 @@ export function HomePage() {
           fg="#2F9E68"
         />
         <StatTile
-          to="/learn"
+          to="/learn/all"
           icon={<ShieldCheck size={22} />}
           label="آزمون‌ها"
           bg="#ECE7FA"
@@ -297,7 +298,7 @@ export function HomePage() {
             دوره‌های پیشنهادی
           </h2>
           <Link
-            to="/learn"
+            to="/learn/all"
             className="flex min-h-12 items-center text-[12px] font-medium text-primary-fg hover:underline"
           >
             مشاهده همه ←
@@ -309,13 +310,13 @@ export function HomePage() {
               <Link
                 to={`/packages/${pkg.id}`}
                 data-testid="package-card"
-                className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-2.5 transition-colors hover:bg-surface"
-                style={{ backgroundColor: '#FEFCF9', borderColor: '#E8E1D7' }}
+                className="flex items-center gap-3 rounded-[20px] border border-border bg-card p-3 transition-colors hover:bg-surface"
+                style={{ backgroundColor: '#FFFCF6', borderColor: '#E8E1D7' }}
               >
                 <ProductImage
                   src={pkg.product?.imageUrl}
                   alt={pkg.title}
-                  className="h-[56px] w-[56px] !rounded-[12px] !border-0 !bg-transparent !shadow-none"
+                  className="h-[72px] w-[72px] shrink-0 !rounded-[14px] !border-0 !bg-transparent !shadow-none"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold" style={{ color: '#17352a' }}>
@@ -354,27 +355,46 @@ export function HomePage() {
 function HomeGreeting({
   firstName,
   initial,
+  avatarUrl,
   unread,
 }: {
   firstName: string;
   initial: string;
+  avatarUrl?: string | null;
   unread: number;
 }) {
+  const mascotSrc = '/brand/m/m-empty.png';
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src =
+    avatarUrl && failedSrc !== avatarUrl ? avatarUrl : failedSrc !== mascotSrc ? mascotSrc : null;
+
   return (
     <div className="flex items-center gap-3">
-      <div
-        aria-hidden
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold"
-        style={{ background: '#EFE9DC', color: '#17352a' }}
+      <Link
+        to="/profile"
+        aria-label={`پروفایل ${firstName}`}
+        className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E8E1D7] bg-[#EAF4E8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        {initial}
-      </div>
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            aria-hidden
+            className={`h-full w-full ${src === mascotSrc ? 'object-contain p-0.5' : 'object-cover'}`}
+            onError={() => setFailedSrc(src)}
+          />
+        ) : (
+          <span aria-hidden className="text-[15px] font-bold" style={{ color: '#17352a' }}>
+            {initial}
+          </span>
+        )}
+      </Link>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-bold" style={{ color: '#17352a' }}>
+        <p className="text-[16px] font-extrabold" style={{ color: '#17352a' }}>
           سلام {firstName} جان!
         </p>
-        <p className="text-[11.5px]" style={{ color: '#777166' }}>
-          امروز یک قدم به هدفت نزدیک‌تر شو.
+        <p className="text-[12px]" style={{ color: '#777166' }}>
+          امروز یک قدم دیگر به موفقیت نزدیک‌تر شدی!
         </p>
       </div>
       <Link
@@ -384,9 +404,9 @@ function HomeGreeting({
             ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
             : 'پیام‌ها و اعلان‌ها'
         }
-        className="relative flex h-12 w-12 items-center justify-center rounded-full lg:hidden"
+        className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
       >
-        <Bell size={20} aria-hidden style={{ color: '#17352a' }} />
+        <Bell size={23} aria-hidden style={{ color: '#17352a' }} />
         <CountBadge count={unread} className="absolute -top-0.5 left-0" />
       </Link>
     </div>
@@ -427,14 +447,17 @@ function StatTile({
   fg: string;
 }) {
   return (
-    <Link to={to} className="flex min-h-[72px] flex-col items-center gap-1.5">
+    <Link
+      to={to}
+      className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-[19px] border border-[#EFE9DE] bg-[#FFFCF6] px-1.5 py-2 shadow-[0_2px_10px_rgba(49,44,34,0.035)] transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none"
+    >
       <span
-        className="flex h-[52px] w-[52px] items-center justify-center rounded-[16px]"
+        className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[17px]"
         style={{ background: bg, color: fg }}
       >
         {icon}
       </span>
-      <span className="whitespace-nowrap text-[10.5px] font-medium" style={{ color: '#17352a' }}>
+      <span className="whitespace-nowrap text-[11px] font-semibold" style={{ color: '#17352a' }}>
         {label}
       </span>
     </Link>

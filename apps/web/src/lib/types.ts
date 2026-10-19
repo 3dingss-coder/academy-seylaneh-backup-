@@ -4,6 +4,8 @@ export type Role = 'marketer' | 'manager' | 'admin' | 'superadmin';
 export interface Me {
   id: string;
   name: string;
+  /** Optional signed URL for the user's uploaded profile photo. */
+  avatarUrl?: string | null;
   phone: string | null;
   email: string | null;
   /** Residence («محل سکونت») captured at sign-up; null on accounts created before it existed. */

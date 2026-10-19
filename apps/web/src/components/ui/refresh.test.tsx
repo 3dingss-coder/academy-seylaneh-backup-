@@ -79,17 +79,19 @@ describe('design refresh — ui', () => {
 });
 
 describe('design refresh — navigation', () => {
-  it('BottomNav keeps «دوره‌ها» active on package/section/quiz pages', () => {
-    render(
-      <MemoryRouter initialEntries={['/packages/p1']}>
-        <BottomNav />
-      </MemoryRouter>,
-    );
-    // Handoff v2 Stage 1: green text uses the AA-safe text token (primary-fg #047857, 5.48:1)
-    // Board tabs: «آموزش‌ها» → «دوره‌ها» (visual remediation V3, marketer board).
-    expect(screen.getByRole('link', { name: /دوره‌ها/ }).className).toContain('text-primary-fg');
-    expect(screen.getByRole('link', { name: /خانه/ }).className).not.toContain('text-primary-fg');
-  });
+  it.each(['/learn/all', '/packages/p1', '/sections/s1', '/quiz/s1'])(
+    'BottomNav keeps «آموزش‌ها» active on course route %s',
+    (path) => {
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <BottomNav />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('link', { name: 'آموزش‌ها' }).className).toContain('text-primary-fg');
+      expect(screen.getByRole('link', { name: 'خانه' }).className).not.toContain('text-primary-fg');
+      expect(screen.queryByRole('link', { name: 'آزمون‌ها' })).toBeNull();
+    },
+  );
 
   it('isItemActive: exact for top-level entries, prefix for deeper ones, aliases for details', () => {
     const dash = { to: '/admin', label: 'د', icon: Users };

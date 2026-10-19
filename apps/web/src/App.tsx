@@ -19,6 +19,7 @@ import { marketerPages } from '@/lib/marketerPages';
 // Panels are code-split: marketers (mobile, weak networks) never download admin code.
 // Marketer sub-pages load on demand; only Home and the sign-in screens ship in the first bundle.
 const CardsPage = lazy(marketerPages.CardsPage);
+const LearningPathPage = lazy(marketerPages.LearningPathPage);
 const LearnPage = lazy(marketerPages.LearnPage);
 const MentorPage = lazy(marketerPages.MentorPage);
 const MessagesPage = lazy(marketerPages.MessagesPage);
@@ -73,7 +74,8 @@ export function AppRoutes() {
           }
         >
           <Route index element={<HomePage />} />
-          <Route path="learn" element={<LearnPage />} />
+          <Route path="learn" element={<LearningPathPage />} />
+          <Route path="learn/all" element={<LearnPage />} />
           <Route path="packages/:id" element={<PackagePage />} />
           <Route path="sections/:id" element={<SectionPage />} />
           <Route path="quiz/:sectionId" element={<QuizPage />} />

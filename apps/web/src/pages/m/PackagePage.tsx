@@ -56,7 +56,7 @@ export function PackagePage() {
             <div className="flex flex-col gap-4 lg:flex-1">
               <PageHeader
                 title={p.title}
-                back="/learn"
+                back="/learn/all"
                 subtitle={
                   p.product
                     ? `${p.brand?.name} • ${p.product.name}`

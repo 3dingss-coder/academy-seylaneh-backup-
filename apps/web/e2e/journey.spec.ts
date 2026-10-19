@@ -161,7 +161,13 @@ test('fresh marketer can open later sections without finishing earlier ones', as
 }) => {
   await login(page, FRESH_MARKETER);
   await page.goto('/learn');
-  await page.getByRole('tab', { name: /جدید/ }).click();
+  await expect(page.getByRole('heading', { name: 'مسیر یادگیری من' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('link', { name: 'بازگشت به خانه' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'ناوبری اصلی' })).toHaveCount(0);
+  await page.getByTestId('all-courses-link').click();
+  await expect(page).toHaveURL(/\/learn\/all$/);
   await expect(page.getByTestId('package-card').first()).toBeVisible();
   // Multi-part package (فورمی): no sequential lock, part 2 is open from the start.
   await page.goto('/packages/seed-pkg-formi');

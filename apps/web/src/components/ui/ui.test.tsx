@@ -150,21 +150,17 @@ describe('Toast', () => {
 });
 
 describe('BottomNav', () => {
-  it('renders the 5 board tabs (marketer board V3)', () => {
+  it('renders the four marketer tabs and keeps exams inside each course', () => {
     render(
       <MemoryRouter>
         <BottomNav />
       </MemoryRouter>,
     );
-    // Board «تمامی صفحات اپلیکیشن بازاریاب» tabs replace the v1 spec tabs («آموزش‌ها»→«دوره‌ها»،
-    // «پیام‌ها»→ header bell، «کارت‌ها»→«مدال»؛ + «آزمون‌ها» (→ /learn for now) and «پروفایل»).
-    for (const label of ['خانه', 'دوره‌ها', 'آزمون‌ها', 'مدال', 'پروفایل']) {
-      expect(screen.getByRole('link', { name: new RegExp(label) })).toBeInTheDocument();
+    for (const label of ['خانه', 'آموزش‌ها', 'مدال', 'پروفایل']) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
     }
-    // No exam-list route exists yet; per the user's choice, this tab points to /learn without
-    // falsely being announced current alongside «دوره‌ها».
-    expect(screen.getByRole('link', { name: 'آزمون‌ها' })).toHaveAttribute('href', '/learn');
-    expect(screen.getByRole('link', { name: 'آزمون‌ها' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'آموزش‌ها' })).toHaveAttribute('href', '/learn');
+    expect(screen.queryByRole('link', { name: 'آزمون‌ها' })).toBeNull();
   });
 });
 

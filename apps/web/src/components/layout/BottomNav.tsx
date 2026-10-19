@@ -1,10 +1,8 @@
-// Adapted from helper kit: «اپ بازاریاب/کامپوننت‌ها/common/BottomNav.tsx»
-// — board «تمامی صفحات اپلیکیشن بازاریاب» tabs: خانه | دوره‌ها | آزمون‌ها | مدال | پروفایل
-//   (پیام‌ها lives on the header bell «پیام‌ها و اعلان‌ها»; آزمون‌ها → /learn until the exams page);
-//   router links instead of AppContext; 48px targets; tokens instead of emerald.
-// Design refresh: floating frosted bar, active marker glides between tabs (transform only).
+// Marketer mobile tabs: خانه | آموزش‌ها | مدال | پروفایل.
+// Tests stay inside their course; messages remain on the header bell.
+// Targets stay at least 48px, with a warm white floating bar and calm active state.
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ShieldCheck, Trophy, UserRound, type LucideIcon } from 'lucide-react';
+import { Award, Home, SquarePlay, UserRound, type LucideIcon } from 'lucide-react';
 import { CountBadge } from '@/components/ui/CountBadge';
 import { cn } from '@/lib/cn';
 
@@ -13,15 +11,19 @@ export interface BottomNavItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
-  /** Extra path prefixes that belong to this tab (e.g. /packages → دوره‌ها). */
+  /** Extra path prefixes that belong to this tab (e.g. /packages → آموزش‌ها). */
   match?: string[];
 }
 
 const MARKETER_NAV: BottomNavItem[] = [
   { to: '/', label: 'خانه', icon: Home },
-  { to: '/learn', label: 'دوره‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
-  { to: '/learn', label: 'آزمون‌ها', icon: ShieldCheck },
-  { to: '/cards', label: 'مدال', icon: Trophy },
+  {
+    to: '/learn',
+    label: 'آموزش‌ها',
+    icon: SquarePlay,
+    match: ['/packages', '/sections', '/quiz'],
+  },
+  { to: '/cards', label: 'مدال', icon: Award },
   { to: '/profile', label: 'پروفایل', icon: UserRound },
 ];
 
@@ -40,41 +42,21 @@ export function BottomNav({ items = MARKETER_NAV }: { items?: BottomNavItem[] })
       aria-label="ناوبری اصلی"
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
     >
-      <div className="glass pointer-events-auto relative mx-auto max-w-md rounded-[22px] border border-border/70 shadow-lg">
-        {/* sliding marker */}
-        <span
-          aria-hidden
-          className={cn(
-            'absolute top-0 flex h-1 transition-[transform,opacity] duration-300 ease-soft',
-            activeIdx < 0 && 'opacity-0',
-          )}
-          style={{
-            width: `${100 / items.length}%`,
-            insetInlineStart: 0,
-            transform: `translateX(${Math.max(activeIdx, 0) * (document.dir === 'ltr' ? 100 : -100)}%)`,
-          }}
-        >
-          <span className="mx-auto h-1 w-8 rounded-full bg-primary" />
-        </span>
-        <ul className="flex items-stretch justify-around px-1">
+      <div className="pointer-events-auto mx-auto max-w-md rounded-[24px] border border-[#EAE4DA] bg-[#FFFCF6]/95 shadow-[0_8px_28px_rgba(30,44,35,0.12)] backdrop-blur-xl">
+        <ul className="flex items-stretch justify-around px-1.5">
           {items.map(({ to, label, icon: Icon, badge }, i) => (
             <li key={`${to}-${label}`} className="flex-1">
               <Link
                 to={to}
                 aria-current={i === activeIdx ? 'page' : undefined}
                 className={cn(
-                  'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-card text-xs',
+                  'pressable relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-card text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary',
                   i === activeIdx
                     ? 'font-bold text-primary-fg'
                     : 'font-medium text-text-secondary hover:text-text',
                 )}
               >
-                <span
-                  className={cn(
-                    'relative transition-transform duration-300 ease-spring',
-                    i === activeIdx && '-translate-y-0.5 scale-110',
-                  )}
-                >
+                <span className="relative">
                   <Icon className="size-6" aria-hidden />
                   <CountBadge
                     count={badge ?? 0}

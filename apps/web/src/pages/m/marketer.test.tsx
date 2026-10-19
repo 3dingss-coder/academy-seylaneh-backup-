@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,8 @@ import type { HomeData, PackageSummary } from '@/lib/types';
 import { EmptyState, ToastProvider } from '@/components/ui';
 import { Mascot } from '@/components/brand/Mascot';
 import { HomePage } from './HomePage';
+import { LearnPage } from './LearnPage';
+import { LearningPathPage } from './LearningPathPage';
 import { MentorPage } from './MentorPage';
 
 vi.mock('@/lib/auth', () => ({
@@ -64,6 +66,28 @@ function renderHome() {
   );
 }
 
+function renderLearn() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <LearnPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderLearningPath() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <LearningPathPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 const homeRoutes = (data: HomeData) => ({
   'GET /v1/me/home': () => ({ data }),
   'GET /v1/me/mentor/nudges': () => ({ data: [] }),
@@ -81,26 +105,31 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     mockApi(homeRoutes(HOME_ROUTINE));
     renderHome();
     expect(await screen.findByTestId('next-item')).toBeInTheDocument();
-    // The icon-only board CTA keeps the real action label accessible (fixture action = «start»).
+    // The visible button keeps the real action label accessible (fixture action = «start»).
     expect(screen.getByRole('button', { name: /شروع: بخش اول/ })).toBeInTheDocument();
-    // board copy (marketer board «تمامی صفحات اپلیکیشن بازاریاب») replaces v1 copy:
-    // «کار بعدی»→«ادامه یادگیری», «امتیاز شما»→«پیشرفت کل شما», «آموزش‌های من»→«دوره‌های پیشنهادی»;
-    // the v1 count chips («در حال انجام»/«جدید»/«تکمیل») are not in the board — its 4 tiles replace them.
+    // Fixed microcopy follows the approved page reference; names, course content and progress stay live.
     expect(screen.getByText('ادامه یادگیری')).toBeInTheDocument();
-    expect(screen.getByText('پیشرفت کل شما')).toBeInTheDocument();
+    expect(screen.getByText('پیشرفت کلی شما')).toBeInTheDocument();
+    expect(screen.getByText('در مسیر عالی هستید!')).toBeInTheDocument();
+    expect(screen.getByText('امروز یک قدم دیگر به موفقیت نزدیک‌تر شدی!')).toBeInTheDocument();
     expect(screen.getByText('دوره‌ها')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'دوره‌ها' })).toHaveAttribute('href', '/learn/all');
     expect(screen.getByText('مسیر یادگیری')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'مسیر یادگیری' })).toHaveAttribute('href', '/learn');
     expect(screen.getByText('آزمون‌ها')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'آزمون‌ها' })).toHaveAttribute('href', '/learn/all');
     expect(screen.getByText('مدال')).toBeInTheDocument();
     expect(screen.getByText('دوره‌های پیشنهادی')).toBeInTheDocument();
     expect(screen.getByTestId('package-card')).toBeInTheDocument();
   });
 
-  it('uses only hero art on the routine home screen (no empty/success illustration)', async () => {
+  it('uses the mascot as the default profile avatar and keeps success art out of the routine state', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     const { container } = renderHome();
     await screen.findByTestId('next-item');
-    expect(container.querySelector('img[src="/brand/m/m-empty.png"]')).toBeNull();
+    const avatar = container.querySelector('img[src="/brand/m/m-empty.png"]');
+    expect(avatar).not.toBeNull();
+    expect(avatar).toHaveAttribute('alt', '');
     expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
   });
 
@@ -128,6 +157,87 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     expect(await screen.findByText('همه آموزش‌ها را تمام کردی! 🎉')).toBeInTheDocument();
     expect(screen.getByText('به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.')).toBeInTheDocument();
     expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).not.toBeNull();
+  });
+});
+
+describe('LearnPage — all assigned education and course-specific quizzes', () => {
+  it('shows all courses by default and filters in-progress and completed courses', async () => {
+    const completedPackage: PackageSummary = {
+      ...PKG,
+      id: 'p-completed',
+      title: 'آموزش تکمیل‌شده',
+      status: 'completed',
+      percent: 100,
+      completedSections: 3,
+    };
+    const newPackage: PackageSummary = {
+      ...PKG,
+      id: 'p-new',
+      title: 'آموزش تازه',
+      status: 'new',
+      percent: 0,
+      completedSections: 0,
+    };
+    mockApi({
+      'GET /v1/me/packages': () => ({ data: [PKG, newPackage, completedPackage] }),
+    });
+    renderLearn();
+
+    expect(await screen.findByText('آموزش شامپو دافی')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'آموزش‌ها' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^همه/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('آموزش تازه')).toBeInTheDocument();
+    expect(screen.getByText('آموزش تکمیل‌شده')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /در حال یادگیری/ }));
+    expect(screen.getByText('آموزش شامپو دافی')).toBeInTheDocument();
+    expect(screen.queryByText('آموزش تازه')).toBeNull();
+    expect(screen.queryByText('آموزش تکمیل‌شده')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /تکمیل‌شده/ }));
+    expect(screen.getByText('آموزش تکمیل‌شده')).toBeInTheDocument();
+    expect(screen.queryByText('آموزش شامپو دافی')).toBeNull();
+  });
+});
+
+describe('LearningPathPage — live course roadmap and all-education handoff', () => {
+  it('orders assigned packages by path order, reflects actual package status, and opens the course list', async () => {
+    const completedPackage: PackageSummary = {
+      ...PKG,
+      id: 'p-completed',
+      title: 'آموزش تکمیل‌شده',
+      status: 'completed',
+      percent: 100,
+      pathOrder: 1,
+    };
+    const inProgressPackage: PackageSummary = { ...PKG, pathOrder: 2 };
+    const newPackage: PackageSummary = {
+      ...PKG,
+      id: 'p-new',
+      title: 'آموزش تازه',
+      status: 'new',
+      percent: 0,
+      pathOrder: 3,
+    };
+    mockApi({
+      'GET /v1/me/packages': () => ({ data: [newPackage, inProgressPackage, completedPackage] }),
+    });
+    renderLearningPath();
+
+    expect(await screen.findByRole('heading', { name: 'مسیر یادگیری من' })).toBeInTheDocument();
+    const steps = await screen.findAllByTestId('learning-path-step');
+    expect(steps.map((step) => step.getAttribute('href'))).toEqual([
+      '/packages/p-completed',
+      '/packages/p1',
+      '/packages/p-new',
+    ]);
+    expect(screen.getByText('تکمیل‌شده')).toBeInTheDocument();
+    expect(screen.getByText(/در حال یادگیری/)).toBeInTheDocument();
+    expect(screen.getByText('شروع‌نشده')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'مشاهده تمام دوره‌ها' })).toHaveAttribute(
+      'href',
+      '/learn/all',
+    );
   });
 });
 

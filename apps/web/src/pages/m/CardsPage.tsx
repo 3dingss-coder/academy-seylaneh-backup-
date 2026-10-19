@@ -59,7 +59,10 @@ export function CardsPage() {
     <div className="flex flex-col gap-6 pb-2">
       <PageHeader title="امتیاز و نشان‌ها" />
 
-      <QueryState query={points} loading={<Skeleton className="h-44 w-full rounded-hero sm:h-48" />}>
+      <QueryState
+        query={points}
+        loading={<Skeleton className="h-44 w-full rounded-hero sm:h-48" />}
+      >
         {(p) => (
           <Card
             padded={false}

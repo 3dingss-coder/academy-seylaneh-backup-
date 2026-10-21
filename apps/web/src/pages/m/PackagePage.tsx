@@ -190,7 +190,10 @@ export function PackagePage() {
                 >
                   <div className="flex items-end justify-between gap-3 border-b border-[#ECE4D8] bg-[#FFFEFA] px-4 py-4 sm:px-5">
                     <div>
-                      <h2 id="sections-title" className="text-base font-black text-[#143F36] sm:text-lg">
+                      <h2
+                        id="sections-title"
+                        className="text-base font-black text-[#143F36] sm:text-lg"
+                      >
                         ویدیو و پادکست
                       </h2>
                       <p className="mt-1 text-xs text-[#596A65]">محتوای آموزشی این بسته</p>

@@ -134,9 +134,7 @@ export function PackagePage() {
                     <div className="mb-2 flex items-end justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-[#143F36]">پیشرفت شما</p>
-                        <p className="mt-0.5 text-xs text-[#6A7773]">
-                          پیشرفت بسته آموزشی
-                        </p>
+                        <p className="mt-0.5 text-xs text-[#6A7773]">پیشرفت بسته آموزشی</p>
                       </div>
                       <strong className="shrink-0 text-[24px] font-black text-[#064E3B]">
                         {faPercent(p.percent)}
@@ -180,9 +178,7 @@ export function PackagePage() {
                       </span>
                       <div>
                         <h2 className="text-sm font-black text-[#49361D]">پیام مدیر</h2>
-                        <p className="text-xs text-[#806D52]">
-                          راهنمای مرتبط با این آموزش
-                        </p>
+                        <p className="text-xs text-[#806D52]">راهنمای مرتبط با این آموزش</p>
                       </div>
                     </div>
                     <div className="divide-y divide-[#F0E1C7]">
@@ -235,9 +231,7 @@ export function PackagePage() {
                     <h2 id="sections-title" className="text-base font-black text-[#143F36]">
                       ویدیو و پادکست
                     </h2>
-                    <p className="mt-1 text-xs text-[#6A7773]">
-                      محتوای آموزشی این بسته
-                    </p>
+                    <p className="mt-1 text-xs text-[#6A7773]">محتوای آموزشی این بسته</p>
                   </div>
                   <span className="shrink-0 rounded-full bg-[#F2EFE8] px-3 py-1 text-xs font-bold text-[#53635E]">
                     {toPersianDigits(live.length)} قسمت
@@ -289,10 +283,7 @@ function SectionRow({ s }: { s: SectionView }) {
       )}
     >
       {inProgress && (
-        <span
-          aria-hidden
-          className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary"
-        />
+        <span aria-hidden className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary" />
       )}
 
       <span

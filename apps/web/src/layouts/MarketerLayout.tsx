@@ -101,87 +101,87 @@ export function MarketerLayout() {
       </aside>
 
       <div className="lg:pl-[176px]">
-      <header
-        className={cn(
-          'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',
-          // The home and immersive learning-path screens own their page-specific headers.
-          (pathname === '/' || isLearningPath || isProfile) && 'hidden',
-        )}
-      >
-        <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-2 px-4">
-          <Link to="/" aria-label="خانه" className="lg:hidden">
-            <AppLogo />
-          </Link>
-          <div className="hidden text-sm font-black text-[#315A52] lg:block">آکادمی سیلانه</div>
-          <div className="flex items-center">
-            <Link
-              to="/messages"
-              aria-label={
-                unread
-                  ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
-                  : 'پیام‌ها و اعلان‌ها'
-              }
-              className="relative flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
-            >
-              <Bell className="size-6" aria-hidden />
-              <CountBadge count={unread} className="end-2 top-2" />
-            </Link>
-            <Link
-              to="/profile"
-              aria-label="پروفایل"
-              className="flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
-            >
-              <UserRound className="size-6" aria-hidden />
-            </Link>
-          </div>
-        </div>
-      </header>
-      {!online && (
-        <div
-          role="status"
-          className="mx-auto mt-2 flex max-w-[920px] items-center justify-center gap-2 rounded-[18px] border border-warning/20 bg-warning-light px-4 py-2.5 text-sm font-bold text-text shadow-xs"
+        <header
+          className={cn(
+            'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',
+            // The home and immersive learning-path screens own their page-specific headers.
+            (pathname === '/' || isLearningPath || isProfile) && 'hidden',
+          )}
         >
-          <WifiOff className="size-4 text-warning" aria-hidden />
-          اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
-        </div>
-      )}
-      <main
-        className={
-          isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[1240px] px-4 py-4 lg:px-6'
-        }
-      >
-        <PageTransition>
-          <Suspense
-            fallback={
-              <div
-                className="mx-auto flex w-full max-w-[920px] flex-col gap-3 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.35)]"
-                aria-busy
+          <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-2 px-4">
+            <Link to="/" aria-label="خانه" className="lg:hidden">
+              <AppLogo />
+            </Link>
+            <div className="hidden text-sm font-black text-[#315A52] lg:block">آکادمی سیلانه</div>
+            <div className="flex items-center">
+              <Link
+                to="/messages"
+                aria-label={
+                  unread
+                    ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
+                    : 'پیام‌ها و اعلان‌ها'
+                }
+                className="relative flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
               >
-                <Skeleton className="h-8 w-1/2 rounded-xl" />
-                <Skeleton className="h-40 w-full rounded-[20px]" />
-                <Skeleton className="h-14 w-full rounded-[18px]" />
-              </div>
-            }
+                <Bell className="size-6" aria-hidden />
+                <CountBadge count={unread} className="end-2 top-2" />
+              </Link>
+              <Link
+                to="/profile"
+                aria-label="پروفایل"
+                className="flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
+              >
+                <UserRound className="size-6" aria-hidden />
+              </Link>
+            </div>
+          </div>
+        </header>
+        {!online && (
+          <div
+            role="status"
+            className="mx-auto mt-2 flex max-w-[920px] items-center justify-center gap-2 rounded-[18px] border border-warning/20 bg-warning-light px-4 py-2.5 text-sm font-bold text-text shadow-xs"
           >
-            <Outlet />
-          </Suspense>
-        </PageTransition>
-      </main>
-      {!isLearningPath && (
-        <BottomNav
-          items={[
-            { to: '/', label: 'خانه', icon: Home },
-            {
-              to: '/learn',
-              label: 'آموزش‌ها',
-              icon: SquarePlay,
-              match: ['/packages', '/sections', '/quiz'],
-            },
-            { to: '/cards', label: 'مدال', icon: Award },
-            { to: '/profile', label: 'پروفایل', icon: UserRound },
-          ]}
-        />
-      )}
+            <WifiOff className="size-4 text-warning" aria-hidden />
+            اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
+          </div>
+        )}
+        <main
+          className={
+            isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[1240px] px-4 py-4 lg:px-6'
+          }
+        >
+          <PageTransition>
+            <Suspense
+              fallback={
+                <div
+                  className="mx-auto flex w-full max-w-[920px] flex-col gap-3 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.35)]"
+                  aria-busy
+                >
+                  <Skeleton className="h-8 w-1/2 rounded-xl" />
+                  <Skeleton className="h-40 w-full rounded-[20px]" />
+                  <Skeleton className="h-14 w-full rounded-[18px]" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </PageTransition>
+        </main>
+        {!isLearningPath && (
+          <BottomNav
+            items={[
+              { to: '/', label: 'خانه', icon: Home },
+              {
+                to: '/learn',
+                label: 'آموزش‌ها',
+                icon: SquarePlay,
+                match: ['/packages', '/sections', '/quiz'],
+              },
+              { to: '/cards', label: 'مدال', icon: Award },
+              { to: '/profile', label: 'پروفایل', icon: UserRound },
+            ]}
+          />
+        )}
       </div>
     </div>
   );

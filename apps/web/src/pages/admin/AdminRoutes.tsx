@@ -14,8 +14,9 @@ import {
   UserRound,
   Users,
   UsersRound,
+  Workflow,
 } from 'lucide-react';
-import { PanelLayout } from '@/layouts/PanelLayout';
+import { AdminPanelLayout } from '@/layouts/AdminPanelLayout';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ProfilePage } from '@/pages/m/ProfilePage';
 import { AdminDashboard } from './AdminDashboard';
@@ -57,6 +58,11 @@ const NAV = [
   { to: '/admin/archive', label: 'آرشیو', icon: Archive },
   { to: '/admin/notifications', label: 'اعلان‌ها', icon: Bell },
   { to: '/admin/push-campaigns', label: 'کمپین‌های Push', icon: Megaphone },
+  {
+    to: '/admin/push-campaigns/automations',
+    label: 'اتوماسیون',
+    icon: Workflow,
+  },
   { to: '/admin/policies', label: 'سیاست‌ها', icon: Settings2 },
   { to: '/admin/audit', label: 'لاگ تغییرات', icon: ScrollText },
   { to: '/admin/profile', label: 'پروفایل', icon: UserRound },
@@ -65,7 +71,7 @@ const NAV = [
 export default function AdminRoutes() {
   return (
     <Routes>
-      <Route element={<PanelLayout title="پنل ادمین" items={NAV} />}>
+      <Route element={<AdminPanelLayout title="پنل ادمین" items={NAV} />}>
         <Route index element={<AdminDashboard />} />
         <Route path="content" element={<ContentPage />} />
         <Route path="media" element={<MediaLibraryPage />} />

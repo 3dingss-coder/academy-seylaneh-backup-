@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
 import type { Me } from '@/lib/types';
@@ -62,7 +62,7 @@ const signIn = (user: Me, extra: Record<string, () => unknown>) => {
 };
 
 describe('admin shell + core — enterprise console contracts', () => {
-  it('renders the full 14-item admin navigation', async () => {
+  it('renders all admin navigation items and preserves the existing routes', async () => {
     mockApi(
       signIn(admin, {
         'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
@@ -82,12 +82,44 @@ describe('admin shell + core — enterprise console contracts', () => {
       'آرشیو',
       'اعلان‌ها',
       'کمپین‌های Push',
+      'اتوماسیون',
       'سیاست‌ها',
       'لاگ تغییرات',
       'پروفایل',
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
+  });
+
+  it('searches real brands, products and learning content', async () => {
+    mockApi(
+      signIn(admin, {
+        'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
+        'GET /v1/admin/brands': () => ({
+          data: [
+            {
+              id: 'brand-kaman',
+              name: 'کامان',
+              nameLatin: 'Comeon',
+              logoUrl: '',
+              logoIsFallback: false,
+              sortOrder: 1,
+              archived: false,
+            },
+          ],
+        }),
+        'GET /v1/admin/products': () => ({ data: [] }),
+        'GET /v1/admin/packages': () => ({ data: [] }),
+      }),
+    );
+    renderApp('/admin');
+    await screen.findByText('WAU / MAU');
+    const search = screen.getByRole('searchbox', {
+      name: 'جستجو در برندها، محصولات یا محتوای آموزشی',
+    });
+    fireEvent.change(search, { target: { value: 'کامان' } });
+    const result = await screen.findByRole('link', { name: /کامان/ });
+    expect(result).toHaveAttribute('href', '/admin/content/brands/brand-kaman');
   });
 
   it('keeps the manager navigation separate from admin (no merged menus)', async () => {
@@ -107,7 +139,7 @@ describe('admin shell + core — enterprise console contracts', () => {
     expect(screen.queryAllByText('محتوای آموزشی')).toHaveLength(0);
   });
 
-  it('admin core has no decorative mascot (formal console tone)', async () => {
+  it('uses the branded mascot shown in the admin reference', async () => {
     mockApi(
       signIn(admin, {
         'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
@@ -115,7 +147,9 @@ describe('admin shell + core — enterprise console contracts', () => {
     );
     const { container } = renderApp('/admin');
     await screen.findByText('WAU / MAU');
-    expect(container.querySelector('img[src="/brand/mascot.webp"]')).toBeNull();
+    const mascot = container.querySelector('img[src="/brand/mascot.webp"]');
+    expect(mascot).toBeInTheDocument();
+    expect(mascot).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('content status cards deep-link into the real content tabs', async () => {

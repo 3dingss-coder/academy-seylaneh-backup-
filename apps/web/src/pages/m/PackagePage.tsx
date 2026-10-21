@@ -17,7 +17,6 @@ import {
   Skeleton,
   StatusBadge,
 } from '@/components/ui';
-import { PageHeader } from '@/components/common/PageHeader';
 import { ProductImage } from '@/components/common/ProductImage';
 import { QueryState } from '@/components/common/QueryState';
 import { MentorLauncher } from '@/components/learning/MentorSheet';
@@ -70,17 +69,29 @@ export function PackagePage() {
             />
 
             <div className="mx-auto w-full max-w-[1180px]">
-              <PageHeader
-                title={p.title}
-                back="/learn/all"
-                subtitle={
-                  p.product
-                    ? `${p.brand?.name} • ${p.product.name}`
-                    : p.brand
-                      ? `آموزش برند ${p.brand.name}`
-                      : undefined
-                }
-              />
+              <nav
+                aria-label="مسیر صفحه"
+                className="mb-4 flex min-h-12 items-center gap-2 overflow-x-auto whitespace-nowrap text-xs font-bold text-[#61706B] sm:text-sm"
+              >
+                <Link
+                  to="/learn/all"
+                  className="pressable inline-flex min-h-12 items-center gap-1 rounded-full px-2 text-primary-fg hover:bg-[#FFFDF8]"
+                >
+                  آموزش‌ها
+                </Link>
+                {p.brand?.name && (
+                  <>
+                    <ChevronLeft className="size-4 shrink-0 text-[#8A9490]" aria-hidden />
+                    <span>{p.brand.name}</span>
+                  </>
+                )}
+                {p.product?.name && (
+                  <>
+                    <ChevronLeft className="size-4 shrink-0 text-[#8A9490]" aria-hidden />
+                    <span className="max-w-[15rem] truncate">{p.product.name}</span>
+                  </>
+                )}
+              </nav>
 
               <section
                 aria-label="معرفی بسته آموزشی"
@@ -88,34 +99,34 @@ export function PackagePage() {
               >
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute -start-20 -top-24 size-72 rounded-full bg-[#ECFDF5] blur-3xl"
+                  className="pointer-events-none absolute -start-16 -top-20 size-64 rounded-full bg-[#EAF6EE] blur-3xl"
                 />
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute -bottom-24 -end-16 size-72 rounded-full bg-[#F7EEDC] blur-3xl"
+                  className="pointer-events-none absolute -bottom-20 -end-16 size-64 rounded-full bg-[#F7EEDC] blur-3xl"
                 />
 
-                <div className="relative grid min-h-[260px] grid-cols-[42%_minmax(0,1fr)] items-stretch sm:min-h-[300px] lg:min-h-[340px] lg:grid-cols-[42%_58%]">
-                  <div className="relative order-1 overflow-hidden border-e border-[#ECE4D8] bg-[radial-gradient(circle_at_48%_42%,#FFFFFF_0%,#F5EFE3_72%)] p-3 sm:p-5 lg:p-7">
+                <div className="relative grid min-h-[250px] grid-cols-[42%_minmax(0,1fr)] items-stretch sm:min-h-[290px] lg:min-h-[330px] lg:grid-cols-[43%_57%]">
+                  <div className="relative order-1 overflow-hidden border-e border-[#ECE4D8] bg-[radial-gradient(circle_at_50%_46%,#FFFFFF_0%,#F2E9DC_74%)] p-2 sm:p-4 lg:p-6">
                     <ProductImage
                       src={p.product?.imageUrl ?? p.brand?.logoUrl}
                       alt={p.product?.name ?? p.brand?.name ?? p.title}
-                      className="h-full w-full !rounded-[24px] !border-0 !bg-transparent !p-0 !shadow-none"
+                      className="h-full w-full !rounded-[22px] !border-0 !bg-transparent !p-0 !shadow-none"
                     />
                   </div>
 
-                  <div className="order-2 flex min-w-0 flex-col justify-center p-4 sm:p-6 lg:p-8">
+                  <div className="order-2 flex min-w-0 flex-col justify-center p-4 sm:p-6 lg:p-8 lg:pe-10">
                     {p.brand?.name && (
-                      <span className="mb-3 w-fit rounded-full border border-[#CFE6D9] bg-[#EFF9F3] px-3 py-1.5 text-xs font-black text-[#176B55]">
+                      <span className="mb-3 w-fit rounded-full border border-[#CFE6D9] bg-[#EFF9F3] px-3 py-1.5 text-xs font-black text-[#176B55] shadow-xs">
                         {p.brand.name}
                       </span>
                     )}
 
-                    <h2 className="text-[20px] font-black leading-8 text-[#123D35] sm:text-[27px] sm:leading-10 lg:text-[34px] lg:leading-[1.5]">
+                    <h1 className="text-[21px] font-black leading-8 text-[#102F2A] sm:text-[28px] sm:leading-10 lg:text-[36px] lg:leading-[1.45]">
                       {p.title}
-                    </h2>
+                    </h1>
 
-                    <p className="mt-2 line-clamp-4 text-[12px] leading-6 text-[#63716D] sm:text-sm sm:leading-7 lg:line-clamp-none lg:text-[15px] lg:leading-8">
+                    <p className="mt-2 line-clamp-4 text-[12px] leading-6 text-[#63716D] sm:text-sm sm:leading-7 lg:line-clamp-none lg:max-w-[94%] lg:text-[15px] lg:leading-8">
                       {p.description}
                     </p>
 
@@ -136,8 +147,8 @@ export function PackagePage() {
                   </div>
                 </div>
 
-                <div className="relative grid gap-3 border-t border-[#ECE4D8] bg-[#FFFEFA]/95 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(250px,360px)] sm:items-stretch sm:p-5">
-                  <div className="rounded-[22px] border border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_28px_-24px_rgba(27,67,55,.35)]">
+                <div className="relative grid gap-3 border-t border-[#ECE4D8] bg-[#FFFEFA]/95 p-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(250px,340px)] sm:items-stretch sm:p-4 lg:px-5">
+                  <div className="rounded-[20px] border border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_28px_-24px_rgba(27,67,55,.35)]">
                     <div className="mb-3 flex items-end justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-[#143F36] sm:text-[15px]">
@@ -156,7 +167,7 @@ export function PackagePage() {
                     <Button
                       size="lg"
                       block
-                      className="!min-h-[82px] !rounded-[22px] shadow-[0_16px_34px_-20px_rgba(4,120,87,.62)]"
+                      className="!min-h-[82px] !rounded-[20px] shadow-[0_16px_34px_-20px_rgba(4,120,87,.62)]"
                       icon={<PlayCircle className="size-7" aria-hidden />}
                       onClick={() =>
                         nav(
@@ -183,20 +194,27 @@ export function PackagePage() {
                 </div>
               </section>
 
-              <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start">
+              <div className="mt-4 flex min-h-12 items-center justify-between rounded-[18px] border border-[#ECE4D8] bg-[#FFFDF8] px-4 shadow-xs">
+                <span className="font-black text-primary-fg">آموزش‌ها</span>
+                <span className="text-xs font-bold text-[#697772]">
+                  {toPersianDigits(live.length)} قسمت آموزشی
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
                 <section
                   aria-labelledby="sections-title"
-                  className="min-w-0 overflow-hidden rounded-[28px] border border-[#E9E1D5] bg-[#FFFDF8] shadow-[0_20px_48px_-40px_rgba(27,67,55,.5)]"
+                  className="min-w-0 overflow-hidden rounded-[24px] border border-[#E9E1D5] bg-[#FFFDF8] shadow-[0_18px_42px_-36px_rgba(27,67,55,.48)]"
                 >
-                  <div className="flex items-end justify-between gap-3 border-b border-[#ECE4D8] bg-[#FFFEFA] px-4 py-4 sm:px-5">
+                  <div className="flex items-end justify-between gap-3 border-b border-[#ECE4D8] bg-[#FFFEFA] px-4 py-3.5 sm:px-5">
                     <div>
                       <h2
                         id="sections-title"
                         className="text-base font-black text-[#143F36] sm:text-lg"
                       >
-                        ویدیو و پادکست
+                        قسمت‌های آموزشی
                       </h2>
-                      <p className="mt-1 text-xs text-[#596A65]">محتوای آموزشی این بسته</p>
+                      <p className="mt-1 text-xs text-[#596A65]">ویدیو و پادکست‌های این محصول</p>
                     </div>
                     <span className="shrink-0 rounded-full bg-[#F2EFE8] px-3 py-1 text-xs font-bold text-[#53635E]">
                       {toPersianDigits(live.length)} قسمت
@@ -219,12 +237,12 @@ export function PackagePage() {
                   )}
                 </section>
 
-                <aside className="flex min-w-0 flex-col gap-4">
+                <aside className="flex min-w-0 flex-col gap-3">
                   {notes.length > 0 && (
                     <section
                       aria-label="پیام مدیر"
                       role="note"
-                      className="overflow-hidden rounded-[24px] border border-[#F0DFC0] bg-[#FFF9ED] shadow-[0_14px_32px_-28px_rgba(115,77,20,.35)]"
+                      className="overflow-hidden rounded-[22px] border border-[#F0DFC0] bg-[#FFF9ED] shadow-[0_14px_32px_-28px_rgba(115,77,20,.35)]"
                     >
                       <div className="flex items-center gap-2 border-b border-[#F0E1C7] px-4 py-3">
                         <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-[#FFF1CF] text-[#A95800]">
@@ -246,7 +264,7 @@ export function PackagePage() {
                     <Link
                       to={`/quiz/${quizSection.id}`}
                       data-testid="package-quiz"
-                      className="pressable flex min-h-[116px] items-center gap-3 rounded-[24px] border border-[#CFE9DD] bg-[#F3FBF7] px-4 py-4 shadow-[0_14px_32px_-28px_rgba(20,95,70,.4)] hover:border-primary/40 hover:bg-primary-light"
+                      className="pressable flex min-h-[118px] items-center gap-3 rounded-[22px] border border-[#CFE9DD] bg-[#F3FBF7] px-4 py-4 shadow-[0_14px_32px_-28px_rgba(20,95,70,.4)] hover:border-primary/40 hover:bg-primary-light"
                     >
                       <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-[#DDF6E9] text-primary-fg">
                         <ClipboardCheck className="size-6" aria-hidden />
@@ -290,7 +308,7 @@ function SectionRow({ s }: { s: SectionView }) {
   const body = (
     <div
       className={cn(
-        'pressable relative flex min-h-[96px] items-start gap-3 px-4 py-3.5 transition-colors sm:px-5',
+        'pressable relative flex min-h-[88px] items-center gap-3 px-4 py-3 transition-colors sm:px-5',
         locked
           ? 'bg-[#F8F7F3] text-muted-fg'
           : inProgress
@@ -309,7 +327,7 @@ function SectionRow({ s }: { s: SectionView }) {
 
       <span
         className={cn(
-          'mt-0.5 grid size-11 shrink-0 place-items-center rounded-[15px] border',
+          'grid size-10 shrink-0 place-items-center rounded-[14px] border',
           locked
             ? 'border-[#DFDDD7] bg-[#ECEAE5] text-muted-fg'
             : completed
@@ -337,7 +355,7 @@ function SectionRow({ s }: { s: SectionView }) {
           </p>
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#596A65]">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#596A65]">
           <span>{s.mediaType === 'audio' ? 'صوتی' : 'ویدیو'}</span>
           <span aria-hidden>•</span>
           <span>{faDuration(s.durationSec)}</span>

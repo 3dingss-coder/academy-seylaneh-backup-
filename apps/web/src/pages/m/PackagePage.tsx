@@ -319,10 +319,7 @@ function SectionRow({ s }: { s: SectionView }) {
       )}
     >
       {inProgress && (
-        <span
-          aria-hidden
-          className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary"
-        />
+        <span aria-hidden className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary" />
       )}
 
       <span

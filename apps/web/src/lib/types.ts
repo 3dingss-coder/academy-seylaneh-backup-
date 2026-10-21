@@ -618,6 +618,8 @@ export interface AdminBrand {
   logoIsFallback: boolean;
   sortOrder: number;
   archived: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 export interface AdminProduct {
   id: string;

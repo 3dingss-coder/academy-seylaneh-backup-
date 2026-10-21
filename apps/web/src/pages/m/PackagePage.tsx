@@ -94,6 +94,7 @@ export function PackagePage() {
               </nav>
 
               <section
+                id="package-about"
                 aria-label="معرفی بسته آموزشی"
                 className="relative overflow-hidden rounded-[30px] border border-[#E7DFD3] bg-[#FFFDF8] shadow-[0_24px_60px_-44px_rgba(24,69,55,.55)]"
               >
@@ -106,8 +107,14 @@ export function PackagePage() {
                   className="pointer-events-none absolute -bottom-20 -end-16 size-64 rounded-full bg-[#F7EEDC] blur-3xl"
                 />
 
-                <div className="relative grid min-h-[250px] grid-cols-[42%_minmax(0,1fr)] items-stretch sm:min-h-[290px] lg:min-h-[330px] lg:grid-cols-[43%_57%]">
-                  <div className="relative order-1 overflow-hidden border-e border-[#ECE4D8] bg-[radial-gradient(circle_at_50%_46%,#FFFFFF_0%,#F2E9DC_74%)] p-2 sm:p-4 lg:p-6">
+                <div
+                  className="relative grid grid-cols-1 items-stretch lg:min-h-[350px] lg:grid-cols-[44%_56%]"
+                  style={{ direction: 'ltr' }}
+                >
+                  <div
+                    dir="rtl"
+                    className="relative min-h-[250px] overflow-hidden border-b border-[#ECE4D8] bg-[radial-gradient(circle_at_50%_46%,#FFFFFF_0%,#F2E9DC_74%)] p-2 sm:min-h-[300px] sm:p-4 lg:min-h-0 lg:border-b-0 lg:border-r lg:p-5"
+                  >
                     <ProductImage
                       src={p.product?.imageUrl ?? p.brand?.logoUrl}
                       alt={p.product?.name ?? p.brand?.name ?? p.title}
@@ -115,7 +122,7 @@ export function PackagePage() {
                     />
                   </div>
 
-                  <div className="order-2 flex min-w-0 flex-col justify-center p-4 sm:p-6 lg:p-8 lg:pe-10">
+                  <div dir="rtl" className="flex min-w-0 flex-col justify-center p-5 sm:p-6 lg:p-8 lg:pe-10">
                     {p.brand?.name && (
                       <span className="mb-3 w-fit rounded-full border border-[#CFE6D9] bg-[#EFF9F3] px-3 py-1.5 text-xs font-black text-[#176B55] shadow-xs">
                         {p.brand.name}
@@ -147,8 +154,14 @@ export function PackagePage() {
                   </div>
                 </div>
 
-                <div className="relative grid gap-3 border-t border-[#ECE4D8] bg-[#FFFEFA]/95 p-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(250px,340px)] sm:items-stretch sm:p-4 lg:px-5">
-                  <div className="rounded-[20px] border border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_28px_-24px_rgba(27,67,55,.35)]">
+                <div
+                  className="relative grid gap-3 border-t border-[#ECE4D8] bg-[#FFFEFA]/95 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-stretch lg:px-5"
+                  style={{ direction: 'ltr' }}
+                >
+                  <div
+                    dir="rtl"
+                    className="rounded-[20px] border border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_28px_-24px_rgba(27,67,55,.35)]"
+                  >
                     <div className="mb-3 flex items-end justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-[#143F36] sm:text-[15px]">
@@ -165,6 +178,7 @@ export function PackagePage() {
 
                   {current && (
                     <Button
+                      dir="rtl"
                       size="lg"
                       block
                       className="!min-h-[82px] !rounded-[20px] shadow-[0_16px_34px_-20px_rgba(4,120,87,.62)]"
@@ -194,15 +208,27 @@ export function PackagePage() {
                 </div>
               </section>
 
-              <div className="mt-4 flex min-h-12 items-center justify-between rounded-[18px] border border-[#ECE4D8] bg-[#FFFDF8] px-4 shadow-xs">
-                <span className="font-black text-primary-fg">آموزش‌ها</span>
-                <span className="text-xs font-bold text-[#697772]">
-                  {toPersianDigits(live.length)} قسمت آموزشی
-                </span>
-              </div>
+              <nav
+                aria-label="بخش‌های صفحه محصول"
+                className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#ECE4D8] bg-[#FFFDF8] p-1 shadow-xs"
+              >
+                <a
+                  href="#package-sections"
+                  className="pressable flex min-h-11 items-center justify-center rounded-[14px] border-b-2 border-primary bg-[#F3F9F5] px-3 text-sm font-black text-primary-fg"
+                >
+                  آموزش‌ها
+                </a>
+                <a
+                  href="#package-about"
+                  className="pressable flex min-h-11 items-center justify-center rounded-[14px] px-3 text-sm font-bold text-[#65736F] hover:bg-[#F8F5EE]"
+                >
+                  درباره محصول
+                </a>
+              </nav>
 
               <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
                 <section
+                  id="package-sections"
                   aria-labelledby="sections-title"
                   className="min-w-0 overflow-hidden rounded-[24px] border border-[#E9E1D5] bg-[#FFFDF8] shadow-[0_18px_42px_-36px_rgba(27,67,55,.48)]"
                 >
@@ -229,7 +255,7 @@ export function PackagePage() {
                       />
                     </div>
                   ) : (
-                    <ol className="divide-y divide-[#EEE7DD]">
+                    <ol className="space-y-2 p-3 sm:p-4">
                       {live.map((s) => (
                         <SectionRow key={s.id} s={s} />
                       ))}
@@ -261,22 +287,27 @@ export function PackagePage() {
                   )}
 
                   {quizSection && !quizSection.quizPassed && (
-                    <Link
-                      to={`/quiz/${quizSection.id}`}
-                      data-testid="package-quiz"
-                      className="pressable flex min-h-[118px] items-center gap-3 rounded-[22px] border border-[#CFE9DD] bg-[#F3FBF7] px-4 py-4 shadow-[0_14px_32px_-28px_rgba(20,95,70,.4)] hover:border-primary/40 hover:bg-primary-light"
-                    >
-                      <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-[#DDF6E9] text-primary-fg">
-                        <ClipboardCheck className="size-6" aria-hidden />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-black text-[#143F36]">آزمون این محصول</p>
-                        <p className="mt-1 text-xs leading-6 text-[#667570]">
-                          پس از مشاهده آموزش‌ها، آزمون را از همین بخش شروع کنید.
-                        </p>
+                    <section className="rounded-[22px] border border-[#CFE9DD] bg-[#F3FBF7] p-4 shadow-[0_14px_32px_-28px_rgba(20,95,70,.4)]">
+                      <div className="flex items-start gap-3">
+                        <span className="grid size-12 shrink-0 place-items-center rounded-[16px] bg-[#DDF6E9] text-primary-fg">
+                          <ClipboardCheck className="size-6" aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black text-[#143F36]">آزمون این محصول</p>
+                          <p className="mt-1 text-xs leading-6 text-[#667570]">
+                            پس از مشاهده آموزش‌ها، آزمون را از همین بخش شروع کنید.
+                          </p>
+                        </div>
                       </div>
-                      <ChevronLeft className="size-5 shrink-0 text-primary-fg" aria-hidden />
-                    </Link>
+                      <Link
+                        to={`/quiz/${quizSection.id}`}
+                        data-testid="package-quiz"
+                        className="pressable mt-3 flex min-h-12 items-center justify-center gap-2 rounded-[16px] bg-cta px-4 text-sm font-black text-on-cta shadow-sm hover:bg-cta-hover"
+                      >
+                        <ClipboardCheck className="size-5" aria-hidden />
+                        شروع آزمون
+                      </Link>
+                    </section>
                   )}
 
                   {quizSection?.quizPassed && (
@@ -308,20 +339,16 @@ function SectionRow({ s }: { s: SectionView }) {
   const body = (
     <div
       className={cn(
-        'pressable relative flex min-h-[88px] items-center gap-3 px-4 py-3 transition-colors sm:px-5',
+        'pressable relative flex min-h-[88px] items-center gap-3 rounded-[18px] border px-3 py-3 shadow-xs transition-colors sm:px-4',
         locked
-          ? 'bg-[#F8F7F3] text-muted-fg'
+          ? 'border-[#E2DED7] bg-[#F6F4EF] text-muted-fg'
           : inProgress
-            ? 'bg-[#F1FBF5] hover:bg-[#EAF7F0]'
+            ? 'border-[#CFE8D9] bg-[#F1FBF5] hover:bg-[#EAF7F0]'
             : completed
-              ? 'bg-[#FBFEFC] hover:bg-[#F5FBF7]'
-              : 'bg-[#FFFDF8] hover:bg-[#FAF8F2]',
+              ? 'border-[#DCE9E1] bg-[#FBFEFC] hover:bg-[#F5FBF7]'
+              : 'border-[#E8E1D7] bg-[#FFFDF8] hover:bg-[#FAF8F2]',
       )}
     >
-      {inProgress && (
-        <span aria-hidden className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary" />
-      )}
-
       <span
         className={cn(
           'grid size-10 shrink-0 place-items-center rounded-[14px] border',

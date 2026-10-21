@@ -134,7 +134,7 @@ export function PackagePage() {
                     <div className="mb-2 flex items-end justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-[#143F36]">پیشرفت شما</p>
-                        <p className="mt-0.5 text-xs text-[#6A7773]">پیشرفت بسته آموزشی</p>
+                        <p className="mt-0.5 text-xs text-[#596A65]">پیشرفت بسته آموزشی</p>
                       </div>
                       <strong className="shrink-0 text-[24px] font-black text-[#064E3B]">
                         {faPercent(p.percent)}
@@ -231,7 +231,7 @@ export function PackagePage() {
                     <h2 id="sections-title" className="text-base font-black text-[#143F36]">
                       ویدیو و پادکست
                     </h2>
-                    <p className="mt-1 text-xs text-[#6A7773]">محتوای آموزشی این بسته</p>
+                    <p className="mt-1 text-xs text-[#596A65]">محتوای آموزشی این بسته</p>
                   </div>
                   <span className="shrink-0 rounded-full bg-[#F2EFE8] px-3 py-1 text-xs font-bold text-[#53635E]">
                     {toPersianDigits(live.length)} قسمت
@@ -303,7 +303,7 @@ function SectionRow({ s }: { s: SectionView }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-start gap-2">
-          <span className="shrink-0 pt-0.5 text-xs font-black text-[#7A8782]">
+          <span className="shrink-0 pt-0.5 text-xs font-black text-[#53635E]">
             {toPersianDigits(s.order)}.
           </span>
           <p
@@ -316,7 +316,7 @@ function SectionRow({ s }: { s: SectionView }) {
           </p>
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6A7773]">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#596A65]">
           <span>{s.mediaType === 'audio' ? 'صوتی' : 'ویدیو'}</span>
           <span aria-hidden>•</span>
           <span>{faDuration(s.durationSec)}</span>

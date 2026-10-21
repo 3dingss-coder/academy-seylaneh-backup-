@@ -73,7 +73,12 @@ export function MarketerLayout() {
       }
       style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
     >
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[176px] flex-col border-e border-[#EAE2D7] bg-[#FFFDF8] px-3 py-5 shadow-[10px_0_30px_-30px_rgba(32,60,52,.28)] lg:flex">
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 hidden w-[176px] flex-col border-e border-[#EAE2D7] bg-[#FFFDF8] px-3 py-5 shadow-[10px_0_30px_-30px_rgba(32,60,52,.28)]',
+          !isLearningPath && 'lg:flex',
+        )}
+      >
         <Link to="/" aria-label="خانه" className="mb-6 flex min-h-12 items-center justify-center">
           <AppLogo />
         </Link>
@@ -100,7 +105,7 @@ export function MarketerLayout() {
         </nav>
       </aside>
 
-      <div className="lg:pl-[176px]">
+      <div className={cn(!isLearningPath && 'lg:pl-[176px]')}>
         <header
           className={cn(
             'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',

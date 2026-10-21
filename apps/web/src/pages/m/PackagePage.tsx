@@ -134,7 +134,9 @@ export function PackagePage() {
                   <div className="relative border-t border-[#ECE4D8] bg-white/76 px-4 py-4 sm:px-5">
                     <div className="mb-2.5 flex items-end justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-[#143F36] sm:text-[15px]">پیشرفت شما</p>
+                        <p className="text-sm font-black text-[#143F36] sm:text-[15px]">
+                          پیشرفت شما
+                        </p>
                         <p className="mt-0.5 text-[11px] text-[#667570] sm:text-xs">
                           پیشرفت بسته آموزشی
                         </p>
@@ -207,7 +209,9 @@ export function PackagePage() {
                     <span className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-[#DDF6E9] text-primary-fg">
                       <ClipboardCheck className="size-5" aria-hidden />
                     </span>
-                    <p className="min-w-0 flex-1 font-black text-[#143F36]">آزمون این محصول</p>
+                    <p className="min-w-0 flex-1 font-black text-[#143F36]">
+                      آزمون این محصول
+                    </p>
                     <ChevronLeft className="size-5 shrink-0 text-primary-fg" aria-hidden />
                   </Link>
                 )}
@@ -283,7 +287,10 @@ function SectionRow({ s }: { s: SectionView }) {
       )}
     >
       {inProgress && (
-        <span aria-hidden className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary" />
+        <span
+          aria-hidden
+          className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-primary"
+        />
       )}
 
       <span

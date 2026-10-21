@@ -134,7 +134,9 @@ export function PackagePage() {
                     <div className="mb-2 flex items-end justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-[#143F36]">پیشرفت شما</p>
-                        <p className="mt-0.5 text-xs text-[#6A7773]">پیشرفت بسته آموزشی</p>
+                        <p className="mt-0.5 text-xs text-[#6A7773]">
+                          پیشرفت بسته آموزشی
+                        </p>
                       </div>
                       <strong className="shrink-0 text-[24px] font-black text-[#064E3B]">
                         {faPercent(p.percent)}
@@ -178,7 +180,9 @@ export function PackagePage() {
                       </span>
                       <div>
                         <h2 className="text-sm font-black text-[#49361D]">پیام مدیر</h2>
-                        <p className="text-xs text-[#806D52]">راهنمای مرتبط با این آموزش</p>
+                        <p className="text-xs text-[#806D52]">
+                          راهنمای مرتبط با این آموزش
+                        </p>
                       </div>
                     </div>
                     <div className="divide-y divide-[#F0E1C7]">
@@ -202,7 +206,9 @@ export function PackagePage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="font-black text-[#143F36]">آزمون این محصول</p>
-                      <p className="mt-0.5 text-xs text-[#667570]">برای ورود به آزمون اینجا را بزنید</p>
+                      <p className="mt-0.5 text-xs text-[#667570]">
+                        برای ورود به آزمون اینجا را بزنید
+                      </p>
                     </div>
                     <span aria-hidden className="text-lg font-bold text-primary-fg">
                       ←
@@ -229,7 +235,9 @@ export function PackagePage() {
                     <h2 id="sections-title" className="text-base font-black text-[#143F36]">
                       ویدیو و پادکست
                     </h2>
-                    <p className="mt-1 text-xs text-[#6A7773]">محتوای آموزشی این بسته</p>
+                    <p className="mt-1 text-xs text-[#6A7773]">
+                      محتوای آموزشی این بسته
+                    </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-[#F2EFE8] px-3 py-1 text-xs font-bold text-[#53635E]">
                     {toPersianDigits(live.length)} قسمت

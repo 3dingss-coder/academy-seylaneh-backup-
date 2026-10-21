@@ -73,6 +73,34 @@ export function MarketerLayout() {
       }
       style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
     >
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[176px] flex-col border-e border-[#EAE2D7] bg-[#FFFDF8] px-3 py-5 shadow-[10px_0_30px_-30px_rgba(32,60,52,.28)] lg:flex">
+        <Link to="/" aria-label="خانه" className="mb-6 flex min-h-12 items-center justify-center">
+          <AppLogo />
+        </Link>
+
+        <nav aria-label="ناوبری اصلی" className="flex flex-1 flex-col gap-1.5">
+          {DESKTOP_NAV.map(({ to, label, icon: Icon, match }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'pressable flex min-h-12 items-center gap-2.5 rounded-[16px] px-3 text-sm font-bold transition-colors',
+                  isActive || match?.some((p) => pathname.startsWith(p))
+                    ? 'bg-primary-light text-primary-fg'
+                    : 'text-text-secondary hover:bg-[#F7F3EA] hover:text-text',
+                )
+              }
+            >
+              <Icon className="size-5 shrink-0" aria-hidden />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="lg:pl-[176px]">
       <header
         className={cn(
           'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',
@@ -80,30 +108,11 @@ export function MarketerLayout() {
           (pathname === '/' || isLearningPath || isProfile) && 'hidden',
         )}
       >
-        <div className="mx-auto flex h-16 max-w-[960px] items-center justify-between gap-2 px-4">
-          <Link to="/" aria-label="خانه">
+        <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-2 px-4">
+          <Link to="/" aria-label="خانه" className="lg:hidden">
             <AppLogo />
           </Link>
-          <nav aria-label="ناوبری اصلی" className="hidden items-center gap-1 lg:flex">
-            {DESKTOP_NAV.map(({ to, label, icon: Icon, match }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'pressable flex min-h-12 items-center gap-1.5 rounded-card px-3 text-sm font-bold transition-colors',
-                    isActive || match?.some((p) => pathname.startsWith(p))
-                      ? 'bg-primary-light text-primary-fg'
-                      : 'text-text-secondary hover:bg-[#F7F3EA]',
-                  )
-                }
-              >
-                <Icon className="size-4" aria-hidden />
-                {label}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="hidden text-sm font-black text-[#315A52] lg:block">آکادمی سیلانه</div>
           <div className="flex items-center">
             <Link
               to="/messages"
@@ -137,7 +146,9 @@ export function MarketerLayout() {
         </div>
       )}
       <main
-        className={isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[960px] px-4 py-4'}
+        className={
+          isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[1240px] px-4 py-4 lg:px-6'
+        }
       >
         <PageTransition>
           <Suspense
@@ -171,6 +182,7 @@ export function MarketerLayout() {
           ]}
         />
       )}
+      </div>
     </div>
   );
 }

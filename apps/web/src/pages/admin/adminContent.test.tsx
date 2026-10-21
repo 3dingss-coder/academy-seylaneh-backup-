@@ -59,9 +59,48 @@ describe('ContentPage — real content tabs (brands / unassigned / archive)', ()
     // brand card links into brand detail and shows real counts + the temporary-logo warning
     const card = await screen.findByTestId('brand-card');
     expect(within(card).getAllByText('آتل').length).toBeGreaterThan(0);
-    expect(within(card).getByText(/۲ محصول/)).toBeInTheDocument();
+    expect(within(card).getByText('۲')).toBeInTheDocument();
     expect(within(card).getByText('لوگوی موقت هلدینگ')).toBeInTheDocument();
   }, 20000);
+
+  it('searches brands locally, keeps their detail route, and offers a clear-search empty state', async () => {
+    mockApi(
+      contentMocks({
+        'GET /v1/admin/content/tree': () => ({
+          data: {
+            ...TREE,
+            brands: [
+              ...TREE.brands,
+              {
+                id: 'b2',
+                name: 'کاپوت',
+                logoUrl: '',
+                logoIsFallback: false,
+                productCount: 4,
+                brandLevelPackages: 1,
+                packageCount: 2,
+              },
+            ],
+          },
+        }),
+      }),
+    );
+    renderApp('/admin/content');
+    const search = await screen.findByRole('textbox', { name: 'جستجو در برندها' });
+    expect(await screen.findAllByTestId('brand-card')).toHaveLength(2);
+
+    fireEvent.change(search, { target: { value: 'کاپ' } });
+    expect(await screen.findAllByTestId('brand-card')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /کاپوت/ })).toHaveAttribute(
+      'href',
+      '/admin/content/brands/b2',
+    );
+
+    fireEvent.change(search, { target: { value: 'ناموجود' } });
+    expect(await screen.findByText('برندی با این نام پیدا نشد')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'پاک‌کردن جستجو' }));
+    expect(await screen.findAllByTestId('brand-card')).toHaveLength(2);
+  });
 
   it('honours the ?tab= deep link used by the dashboard cards', async () => {
     mockApi(contentMocks());

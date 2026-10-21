@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Button, Card, KpiCard, Skeleton } from '@/components/ui';
 import { PublishGuide } from '@/components/admin/PublishGuide';
-import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
 import { api } from '@/lib/api';
 import { toPersianDigits } from '@/lib/digits';
@@ -31,15 +30,20 @@ export function AdminDashboard() {
   const [newPkg, setNewPkg] = useState(false);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title="داشبورد"
-        subtitle="وضعیت کلی آموزش و محتوا"
-        actions={
-          <Button icon={<Rocket className="size-4" aria-hidden />} onClick={() => setNewPkg(true)}>
-            انتشار آموزش جدید
-          </Button>
-        }
-      />
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-[#718078]">پنل ادمین</p>
+          <h1 className="mt-1 text-2xl font-black text-[#172235] sm:text-[28px]">داشبورد</h1>
+          <p className="mt-1 text-sm text-[#526274]">وضعیت کلی آموزش و محتوا</p>
+        </div>
+        <Button
+          className="w-full shrink-0 sm:w-auto"
+          icon={<Rocket className="size-4" aria-hidden />}
+          onClick={() => setNewPkg(true)}
+        >
+          انتشار آموزش جدید
+        </Button>
+      </header>
       <PublishGuide onNewPackage={() => setNewPkg(true)} drafts={q.data?.content.drafts ?? 0} />
       {newPkg && <PackageFormDialog open onClose={() => setNewPkg(false)} />}
       <QueryState

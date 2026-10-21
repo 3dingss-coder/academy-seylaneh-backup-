@@ -27,7 +27,7 @@ import { ROLE_LABEL } from '@/lib/format';
 import type { AdminBrand, AdminPackage, AdminProduct } from '@/lib/types';
 import type { PanelNavItem } from '@/layouts/PanelLayout';
 
-/** Admin-only shell: the Drive handoff places the dark navigation rail on the left. */
+/** Admin shell: content routes use the Drive rail; `/admin` follows its desktop/mobile dashboard reference. */
 export function AdminPanelLayout({ title, items }: { title: string; items: PanelNavItem[] }) {
   const { pathname } = useLocation();
   const current = getActiveItem(pathname, items);
@@ -48,6 +48,8 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [mobileOpen]);
+
+  if (pathname === '/admin') return <DashboardShell title={title} items={items} />;
 
   return (
     <div className="min-h-dvh bg-[#f7f7f3]" dir="ltr">
@@ -73,6 +75,135 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
         <MobileMenu title={title} items={items} onClose={() => setMobileOpen(false)} />
       )}
     </div>
+  );
+}
+
+function DashboardShell({ title, items }: { title: string; items: PanelNavItem[] }) {
+  return (
+    <div data-testid="admin-dashboard-reference-shell" className="min-h-dvh bg-[#f7f8fb]" dir="rtl">
+      <DashboardDesktopHeader />
+      <DashboardMobileHeader title={title} items={items} />
+      <div className="flex min-h-[calc(100dvh-4rem)]" dir="rtl">
+        <DashboardSidebar title={title} items={items} />
+        <main className="min-w-0 flex-1 bg-[#f7f8fb]">
+          <div className="mx-auto w-full max-w-[1440px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function DashboardDesktopHeader() {
+  const { user, logout } = useAuth();
+  return (
+    <header
+      className="hidden h-16 items-center justify-between gap-5 border-b border-[#e4e8e5] bg-white px-5 xl:px-8 lg:flex"
+      dir="ltr"
+    >
+      <div className="flex shrink-0 items-center gap-3" dir="rtl">
+        <Link
+          to="/admin/profile"
+          aria-label="پروفایل"
+          className="flex min-h-12 items-center gap-2 rounded-xl px-2 hover:bg-[#f4f7f4]"
+        >
+          <span className="grid size-9 place-items-center rounded-full bg-[#e6f3ec] font-extrabold text-[#08704f]">
+            {user?.name.trim().charAt(0) || <UserRound className="size-4" aria-hidden="true" />}
+          </span>
+          <span className="text-right">
+            <span className="block max-w-36 truncate text-sm font-bold text-[#173e35]">
+              {user?.name ?? 'کاربر'}
+            </span>
+            <span className="block text-xs text-[#718078]">
+              {user ? ROLE_LABEL[user.role] : ''}
+            </span>
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => void logout()}
+          className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#53675f] hover:bg-[#f4f7f4] hover:text-[#075b44]"
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+          خروج
+        </button>
+      </div>
+      <Link to="/admin" aria-label="داشبورد سیلانه" className="shrink-0 rounded-lg" dir="rtl">
+        <AppLogo withTitle />
+      </Link>
+    </header>
+  );
+}
+
+function DashboardMobileHeader({ title, items }: { title: string; items: PanelNavItem[] }) {
+  const { logout } = useAuth();
+  const { pathname } = useLocation();
+  const active = getActiveItem(pathname, items);
+  return (
+    <header className="border-b border-[#e4e8e5] bg-white lg:hidden">
+      <div className="flex h-16 items-center justify-between gap-3 px-4" dir="ltr">
+        <button
+          type="button"
+          aria-label="خروج"
+          onClick={() => void logout()}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full text-[#4c5c56] hover:bg-[#f4f7f4]"
+        >
+          <LogOut className="size-5" aria-hidden="true" />
+        </button>
+        <Link to="/admin" aria-label="داشبورد سیلانه" className="shrink-0 rounded-lg" dir="rtl">
+          <AppLogo withTitle />
+        </Link>
+      </div>
+      <nav
+        aria-label={title}
+        className="scrollbar-none overflow-x-auto border-t border-[#edf0ed] px-3"
+      >
+        <ul className="flex min-w-max items-center gap-2 py-2" dir="rtl">
+          {items.map(({ to, label, icon: Icon }) => {
+            const selected = active?.to === to;
+            return (
+              <li key={to}>
+                <Link
+                  to={to}
+                  aria-current={selected ? 'page' : undefined}
+                  className={cn(
+                    'flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold transition-colors',
+                    selected
+                      ? 'bg-[#08704f] text-white shadow-sm'
+                      : 'text-[#40554c] hover:bg-[#f1f5f2] hover:text-[#075b44]',
+                  )}
+                  dir="ltr"
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span dir="rtl">{label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </header>
+  );
+}
+
+function DashboardSidebar({ title, items }: { title: string; items: PanelNavItem[] }) {
+  const { pathname } = useLocation();
+  return (
+    <aside
+      aria-label={title}
+      className="sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 flex-col border-s border-[#e4e8e5] bg-white lg:flex xl:w-72"
+      dir="ltr"
+    >
+      <div className="px-5 pb-2 pt-4" dir="rtl">
+        <p className="text-xs font-bold text-[#73827b]">{title}</p>
+      </div>
+      <nav aria-label="فهرست اصلی ادمین" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-1">
+        <NavList items={items} pathname={pathname} variant="light" />
+      </nav>
+    </aside>
   );
 }
 
@@ -116,14 +247,17 @@ function NavList({
   items,
   pathname,
   onNavigate,
+  variant = 'dark',
 }: {
   items: PanelNavItem[];
   pathname: string;
   onNavigate?: () => void;
+  variant?: 'dark' | 'light';
 }) {
   const active = getActiveItem(pathname, items);
+  const light = variant === 'light';
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {items.map(({ to, label, icon: Icon }) => {
         const selected = active?.to === to;
         return (
@@ -133,12 +267,17 @@ function NavList({
               onClick={onNavigate}
               aria-current={selected ? 'page' : undefined}
               className={cn(
-                'group flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150',
-                selected
-                  ? 'bg-white/15 font-bold text-white shadow-sm ring-1 ring-inset ring-white/10'
-                  : 'font-medium text-white/80 hover:bg-white/10 hover:text-white',
+                'group flex items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-150',
+                light ? 'min-h-12' : 'min-h-10 rounded-lg',
+                light
+                  ? selected
+                    ? 'bg-[#08704f] font-bold text-white shadow-sm'
+                    : 'font-medium text-[#43574f] hover:bg-[#f1f5f2] hover:text-[#075b44]'
+                  : selected
+                    ? 'bg-white/15 font-bold text-white shadow-sm ring-1 ring-inset ring-white/10'
+                    : 'font-medium text-white/80 hover:bg-white/10 hover:text-white',
               )}
-              dir="ltr"
+              dir={light ? 'rtl' : 'ltr'}
             >
               <Icon className="size-[18px] shrink-0" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate text-right" dir="rtl">

@@ -94,7 +94,24 @@ describe('admin shell + core — enterprise console contracts', () => {
   it('searches real brands, products and learning content', async () => {
     mockApi(
       signIn(admin, {
-        'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
+        'GET /v1/admin/content/tree': () => ({
+          data: {
+            brands: [
+              {
+                id: 'brand-kaman',
+                name: 'کامان',
+                logoUrl: '',
+                logoIsFallback: false,
+                productCount: 4,
+                brandLevelPackages: 0,
+                packageCount: 2,
+              },
+            ],
+            unassignedCount: 0,
+          },
+        }),
+        'GET /v1/admin/packages?unassigned=true': () => ({ data: [] }),
+        'GET /v1/admin/packages?status=archived': () => ({ data: [] }),
         'GET /v1/admin/brands': () => ({
           data: [
             {
@@ -112,13 +129,14 @@ describe('admin shell + core — enterprise console contracts', () => {
         'GET /v1/admin/packages': () => ({ data: [] }),
       }),
     );
-    renderApp('/admin');
-    await screen.findByText('WAU / MAU');
+    renderApp('/admin/content');
+    await screen.findByRole('tab', { name: /برندها/ });
     const search = screen.getByRole('searchbox', {
       name: 'جستجو در برندها، محصولات یا محتوای آموزشی',
     });
     fireEvent.change(search, { target: { value: 'کامان' } });
-    const result = await screen.findByRole('link', { name: /کامان/ });
+    await screen.findByText('برند', {}, { timeout: 5000 });
+    const result = screen.getByText('برند').closest('a');
     expect(result).toHaveAttribute('href', '/admin/content/brands/brand-kaman');
   });
 
@@ -139,17 +157,22 @@ describe('admin shell + core — enterprise console contracts', () => {
     expect(screen.queryAllByText('محتوای آموزشی')).toHaveLength(0);
   });
 
-  it('uses the branded mascot shown in the admin reference', async () => {
+  it('uses the desktop/mobile dashboard frame from the dashboard reference', async () => {
     mockApi(
       signIn(admin, {
         'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
       }),
     );
     const { container } = renderApp('/admin');
-    await screen.findByText('WAU / MAU');
-    const mascot = container.querySelector('img[src="/brand/mascot.webp"]');
-    expect(mascot).toBeInTheDocument();
-    expect(mascot).toHaveAttribute('aria-hidden', 'true');
+    expect(await screen.findByTestId('admin-dashboard-reference-shell')).toBeInTheDocument();
+    expect(screen.getAllByRole('navigation', { name: 'پنل ادمین' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('navigation', { name: 'فهرست اصلی ادمین' })).toBeInTheDocument();
+    expect(screen.getAllByText('پنل ادمین').length).toBeGreaterThan(0);
+    expect(
+      container.querySelector(
+        '[data-testid="admin-dashboard-reference-shell"] aside img[src="/brand/mascot.webp"]',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it('content status cards deep-link into the real content tabs', async () => {

@@ -71,7 +71,7 @@ export function StaffLoginPage({ panel }: { panel: 'admin' | 'manager' }) {
             aria-busy={busy}
           >
             <Input
-              label="نام کاربری"
+              label="نام کاربری یا شماره موبایل"
               ltr
               autoComplete="username"
               value={username}

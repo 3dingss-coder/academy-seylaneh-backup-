@@ -175,7 +175,7 @@ describe('StaffLoginPage (staff model preserved, formal tone)', () => {
         <StaffLoginPage panel="admin" />
       </MemoryRouter>,
     );
-    expect(screen.getByLabelText('نام کاربری')).toBeInTheDocument();
+    expect(screen.getByLabelText('نام کاربری یا شماره موبایل')).toBeInTheDocument();
     expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
     expect(screen.getByText('پنل ادمین')).toBeInTheDocument();
   });

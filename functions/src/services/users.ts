@@ -173,6 +173,9 @@ export const staffLoginSchema = z.object({
 
 /** Staff (admin/manager) usernames map to an internal, non-routable auth email. */
 export function staffAuthEmail(username: string): string {
+  const phone = normalizePhone(username);
+  if (phone) return phoneToAuthEmail(phone);
+
   const slug = username
     .trim()
     .toLowerCase()

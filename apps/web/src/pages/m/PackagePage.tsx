@@ -122,7 +122,10 @@ export function PackagePage() {
                     />
                   </div>
 
-                  <div dir="rtl" className="flex min-w-0 flex-col justify-center p-5 sm:p-6 lg:p-8 lg:pe-10">
+                  <div
+                    dir="rtl"
+                    className="flex min-w-0 flex-col justify-center p-5 sm:p-6 lg:p-8 lg:pe-10"
+                  >
                     {p.brand?.name && (
                       <span className="mb-3 w-fit rounded-full border border-[#CFE6D9] bg-[#EFF9F3] px-3 py-1.5 text-xs font-black text-[#176B55] shadow-xs">
                         {p.brand.name}

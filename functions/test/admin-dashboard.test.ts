@@ -67,8 +67,16 @@ describe('admin dashboard insights', () => {
       ],
       campaigns: { total: 2, scheduled: 1, sent: 1 },
       recentActivity: expect.arrayContaining([
-        expect.objectContaining({ source: 'admin', name: 'package.updated', actorName: 'مدیر سیستم' }),
-        expect.objectContaining({ source: 'app', name: 'package_completed', actorName: 'سارا احمدی' }),
+        expect.objectContaining({
+          source: 'admin',
+          name: 'package.updated',
+          actorName: 'مدیر سیستم',
+        }),
+        expect.objectContaining({
+          source: 'app',
+          name: 'package_completed',
+          actorName: 'سارا احمدی',
+        }),
       ]),
     });
     expect(response.body.data.insights.activityTrend).toContainEqual({

@@ -199,7 +199,8 @@ test('manager: team dashboard, completion report and CSV export', async ({ page 
   await expect(page).toHaveURL(/\/manager$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('تیم');
   await page.goto('/manager/reports');
-  await expect(page.getByText(/ردیف/)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('خلاصه مدیریتی');
+  await expect(page.getByRole('button', { name: 'خروجی CSV' })).toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'خروجی CSV' }).click();
   expect((await download).suggestedFilename()).toMatch(/^completion-report-.*\.csv$/);

@@ -38,7 +38,7 @@ export function PanelLayout({
             <span className="hidden h-8 w-px bg-[#e3e9e4] sm:block" aria-hidden />
             <div className="hidden min-w-0 sm:block">
               <p className="truncate text-sm font-extrabold text-[#183d30]">{title}</p>
-              <p className="truncate text-[11px] text-[#73847a]">فضای اختصاصی مدیریت تیم</p>
+              <p className="truncate text-[11px] text-[#59685f]">فضای اختصاصی مدیریت تیم</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -58,7 +58,7 @@ export function PanelLayout({
                 <span className="block truncate text-xs font-extrabold text-[#183d30]">
                   {user?.name}
                 </span>
-                <span className="block truncate text-[10px] text-[#74857b]">
+                <span className="block truncate text-[10px] text-[#59685f]">
                   {user ? ROLE_LABEL[user.role] : ''}
                 </span>
               </span>
@@ -109,7 +109,7 @@ export function PanelLayout({
                     isActive || isItemActive(pathname, { to, label, icon: Icon, match });
                   return cn(
                     'flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-bold transition-colors',
-                    active ? 'bg-[#eaf4ec] text-[#126c4b]' : 'text-[#708078] hover:bg-[#f4f7f4]',
+                    active ? 'bg-[#eaf4ec] text-[#126c4b]' : 'text-[#65756c] hover:bg-[#f4f7f4]',
                   );
                 }}
               >

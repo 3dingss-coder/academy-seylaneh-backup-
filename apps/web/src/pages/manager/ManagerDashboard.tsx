@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlarmClock, CheckCircle2, ClipboardList, Send, TrendingUp, Users } from 'lucide-react';
+import { AlarmClock, BarChart3, BellRing, CheckCircle2, ChevronLeft, ClipboardList, Send, TrendingUp, Users, UsersRound, type LucideIcon } from 'lucide-react';
 import { Button, EmptyState, KpiCard, ProgressBar, Skeleton, TableSkeleton } from '@/components/ui';
 import { DataTable } from '@/components/admin/DataTable';
 import { Mascot } from '@/components/brand/Mascot';
@@ -85,6 +85,11 @@ export function ManagerDashboard() {
                     tone={d.pendingRetakes ? 'warning' : 'primary'}
                   />
                 </div>
+                <section aria-label="دسترسی سریع" className="grid gap-3 sm:grid-cols-3">
+                  <QuickAction to="/manager/members" label="تیم من" description="جست‌وجو و پیگیری اعضا" icon={UsersRound} />
+                  <QuickAction to="/manager/reports" label="گزارش مدیریتی" description="فیلتر، مقایسه و خروجی گزارش" icon={BarChart3} />
+                  <QuickAction to="/manager/campaigns" label="کمپین‌های تیم" description="اعلان آموزشی برای اعضای تیم" icon={BellRing} />
+                </section>
                 {d.pendingRetakes > 0 && (
                   <Link
                     to="/manager/retakes"
@@ -207,5 +212,33 @@ export function ManagerDashboard() {
         />
       )}
     </div>
+  );
+}
+
+function QuickAction({
+  to,
+  label,
+  description,
+  icon: Icon,
+}: {
+  to: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Link
+      to={to}
+      className="group flex min-h-20 items-center gap-3 rounded-2xl border border-[#e1e9e2] bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#b9d5bf] hover:shadow-md"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eaf4ec] text-[#176e50] transition-colors group-hover:bg-[#dff0e3]">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-extrabold text-[#183d30]">{label}</span>
+        <span className="mt-1 block text-xs text-text-secondary">{description}</span>
+      </span>
+      <ChevronLeft className="size-4 shrink-0 text-[#91a199] transition-transform group-hover:-translate-x-1" aria-hidden />
+    </Link>
   );
 }

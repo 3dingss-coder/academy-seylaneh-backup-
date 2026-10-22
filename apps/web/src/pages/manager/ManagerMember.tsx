@@ -15,7 +15,7 @@ export function ManagerMember() {
   });
   return (
     <div>
-      <PageHeader title="جزئیات عضو" back="/manager/reports" />
+      <PageHeader title="پروندهٔ عضو" back="/manager/members" />
       <QueryState query={q} loading={<TableSkeleton rows={6} />}>
         {(d) => <MemberTimeline data={d} canMessage />}
       </QueryState>

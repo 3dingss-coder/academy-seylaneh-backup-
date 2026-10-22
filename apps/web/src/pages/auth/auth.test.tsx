@@ -168,8 +168,8 @@ describe('OnboardingPage (must-preserve three-slide flow)', () => {
   });
 });
 
-describe('StaffLoginPage (staff model preserved, formal tone)', () => {
-  it('keeps username + password sign-in for panels', () => {
+describe('StaffLoginPage (role-specific staff copy)', () => {
+  it('shows admin-only wording and keeps username + password sign-in', () => {
     render(
       <MemoryRouter>
         <StaffLoginPage panel="admin" />
@@ -178,5 +178,22 @@ describe('StaffLoginPage (staff model preserved, formal tone)', () => {
     expect(screen.getByLabelText('نام کاربری یا شماره موبایل')).toBeInTheDocument();
     expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
     expect(screen.getByText('پنل ادمین')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'ورود ادمین' })).toBeInTheDocument();
+    expect(screen.getByText('ورود ویژهٔ ادمین‌های آکادمی')).toBeInTheDocument();
+    expect(screen.queryByText(/منتور/)).not.toBeInTheDocument();
+  });
+
+  it('labels the manager sign-in for marketing managers, not admins or mentors', () => {
+    render(
+      <MemoryRouter>
+        <StaffLoginPage panel="manager" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('پنل مدیران بازاریابی')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'ورود مدیران بازاریابی' })).toBeInTheDocument();
+    expect(screen.getByText('ورود اختصاصی مدیران تیم‌های بازاریابی')).toBeInTheDocument();
+    expect(screen.queryByText(/ادمین|منتور/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('نام کاربری یا شماره موبایل')).toBeInTheDocument();
+    expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
   });
 });

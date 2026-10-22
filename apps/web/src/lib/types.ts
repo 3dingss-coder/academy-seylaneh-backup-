@@ -477,6 +477,35 @@ export interface ManagerDashboard {
   laggards: Laggard[];
   pendingRetakes: number;
 }
+export interface ManagerMemberPackage {
+  id: string;
+  title: string;
+  brandName: string | null;
+  productName: string | null;
+  status: PackageUserStatus;
+  percent: number;
+  overdue: boolean;
+  deadlineAt: string | null;
+  completedAt: string | null;
+}
+export interface ManagerMemberRow {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  phone: string | null;
+  province: string | null;
+  city: string | null;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  lastActiveAt: string | null;
+  stats: { assigned: number; completed: number; averageProgress: number; lagging: number };
+  packages: ManagerMemberPackage[];
+}
+export interface ManagerMembersResponse {
+  team: { id: string; name: string } | null;
+  totals: { members: number; active: number; inactive: number; lagging: number };
+  members: ManagerMemberRow[];
+}
 export interface CompletionRow {
   userId: string;
   userName: string;

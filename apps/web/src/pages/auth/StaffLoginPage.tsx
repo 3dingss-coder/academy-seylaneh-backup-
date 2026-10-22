@@ -4,11 +4,22 @@ import { Input } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-const TITLE = { admin: 'پنل ادمین', manager: 'پنل مدیر' } as const;
+const LOGIN_COPY = {
+  admin: {
+    panelTitle: 'پنل ادمین',
+    heading: 'ورود ادمین',
+    description: 'ورود ویژهٔ ادمین‌های آکادمی',
+  },
+  manager: {
+    panelTitle: 'پنل مدیران بازاریابی',
+    heading: 'ورود مدیران بازاریابی',
+    description: 'ورود اختصاصی مدیران تیم‌های بازاریابی',
+  },
+} as const;
 
-/** Username + password sign-in shown at /admin and /manager when nobody is signed in.
- *  Visual truth: «ورود ادمین / منتور» card of the auth reference board (same pill CTA + inputs). */
+/** Username + password sign-in shown at /admin and /manager when nobody is signed in. */
 export function StaffLoginPage({ panel }: { panel: 'admin' | 'manager' }) {
+  const copy = LOGIN_COPY[panel];
   const { staffLogin } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,16 +64,16 @@ export function StaffLoginPage({ panel }: { panel: 'admin' | 'manager' }) {
           </span>
         </div>
         <h1 className="mt-4 text-2xl font-extrabold text-white">آکادمی سیلانه</h1>
-        <p className="mt-1 text-sm text-white/80">{TITLE[panel]}</p>
+        <p className="mt-1 text-sm text-white/80">{copy.panelTitle}</p>
 
         <div className="mt-8 w-full rounded-[28px] bg-[#fefcf9] p-6 shadow-[0_22px_60px_-24px_rgba(0,0,0,0.55)]">
           <div className="flex items-center gap-2">
             <span aria-hidden className="grid size-9 place-items-center rounded-full bg-[#fba032]">
               <Lock className="size-4.5 text-[#061a13]" />
             </span>
-            <h2 className="text-[19px] font-extrabold text-[#061a13]">ورود ادمین / منتور</h2>
+            <h2 className="text-[19px] font-extrabold text-[#061a13]">{copy.heading}</h2>
           </div>
-          <p className="mt-1.5 text-xs leading-6 text-[#8a8578]">ورود مشترکان ادمین‌ها و منتورها</p>
+          <p className="mt-1.5 text-xs leading-6 text-[#8a8578]">{copy.description}</p>
 
           <form
             onSubmit={submit}

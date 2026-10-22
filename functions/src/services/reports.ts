@@ -156,6 +156,68 @@ export async function managerDashboard(d: Deps, manager: Doc<User>) {
   };
 }
 
+/** A team-scoped directory with product-training health, suitable for coaching workflows. */
+export async function managerMembers(d: Deps, manager: Doc<User>) {
+  const now = d.clock();
+  const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
+  const users = (await teamMembers(d, manager)).filter((user) => user.status !== 'blacklisted');
+  const members = await loadMembers(d, users);
+  const items = members.map(({ user, packages }) => {
+    const reportable = packages.filter(
+      (pkg) => pkg.packageStatus === 'published' || pkg.status === 'completed',
+    );
+    const completed = reportable.filter((pkg) => pkg.status === 'completed');
+    const lagging = reportable.filter((pkg) => isLagging(pkg, now));
+    const latestPackageActivity = packages
+      .map((pkg) => pkg.lastActivityAt)
+      .filter((at): at is string => Boolean(at))
+      .sort((a, b) => b.localeCompare(a))[0];
+    return {
+      id: user.id,
+      name: user.name,
+      avatarUrl: user.avatarUrl ?? null,
+      phone: user.phone,
+      province: user.province,
+      city: user.city,
+      status: user.status,
+      createdAt: user.createdAt,
+      lastActiveAt: [user.lastActiveAt, latestPackageActivity]
+        .filter((at): at is string => Boolean(at))
+        .sort((a, b) => b.localeCompare(a))[0] ?? null,
+      stats: {
+        assigned: reportable.length,
+        completed: completed.length,
+        averageProgress: reportable.length
+          ? Math.round(reportable.reduce((sum, pkg) => sum + pkg.percent, 0) / reportable.length)
+          : 0,
+        lagging: lagging.length,
+      },
+      packages: reportable.map((pkg) => ({
+        id: pkg.id,
+        title: pkg.title,
+        brandName: pkg.brand?.name ?? null,
+        productName: pkg.product?.name ?? null,
+        status: pkg.status,
+        percent: pkg.percent,
+        overdue: pkg.overdue,
+        deadlineAt: pkg.deadlineAt,
+        completedAt: pkg.completedAt,
+      })),
+    };
+  });
+  await track(d, 'manager_members_viewed', manager.id, { count: items.length });
+  return {
+    team: team ? { id: team.id, name: team.name } : null,
+    totals: {
+      members: items.length,
+      active: items.filter((item) => item.status === 'active').length,
+      inactive: items.filter((item) => item.status === 'inactive').length,
+      lagging: items.filter((item) => item.stats.lagging > 0).length,
+    },
+    members: items.sort((a, b) => a.name.localeCompare(b.name, 'fa')),
+  };
+}
+
 export const reportQuery = z.object({
   from: z.string().max(40).optional(),
   to: z.string().max(40).optional(),

@@ -72,7 +72,7 @@ describe('routing', () => {
   });
 
   it('protects the admin panel', async () => {
-    // staff sign-in keeps its own «ورود» CTA (reference card «ورود ادمین / منتور»)
+    // staff sign-in keeps its own «ورود» CTA, separate from marketer sign-in
     localStorage.clear();
     renderAt('/admin');
     expect(await screen.findByRole('button', { name: 'ورود' })).toBeInTheDocument();

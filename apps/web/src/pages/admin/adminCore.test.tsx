@@ -150,7 +150,9 @@ describe('admin shell + core — enterprise console contracts', () => {
     );
     renderApp('/manager');
     expect(await screen.findByText('تیم شمال', {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getAllByText('گزارش تکمیل').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('گزارش مدیریتی').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('تیم من').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('کمپین‌های تیم').length).toBeGreaterThan(0);
     expect(screen.getAllByText('آزمون مجدد').length).toBeGreaterThan(0);
     // admin-only areas must not leak into the manager console
     expect(screen.queryAllByText('سیاست‌ها')).toHaveLength(0);

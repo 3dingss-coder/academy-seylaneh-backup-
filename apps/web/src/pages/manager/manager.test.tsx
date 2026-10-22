@@ -4,8 +4,9 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockApi } from '@/test/mockApi';
 import { ToastProvider } from '@/components/ui';
-import type { Laggard, ManagerDashboard as Data, RetakeItem } from '@/lib/types';
+import type { Laggard, ManagerDashboard as Data, ManagerMembersResponse, RetakeItem } from '@/lib/types';
 import { ManagerDashboard } from './ManagerDashboard';
+import { ManagerMembersPage } from './ManagerMembersPage';
 import { RetakeList } from '@/components/reports/RetakeList';
 
 const LAGGARD: Laggard = {
@@ -58,6 +59,20 @@ function renderDashboard() {
       <ToastProvider>
         <MemoryRouter initialEntries={['/manager']}>
           <ManagerDashboard />
+          <LocationProbe />
+        </MemoryRouter>
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function renderMembers() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/manager/members']}>
+          <ManagerMembersPage />
           <LocationProbe />
         </MemoryRouter>
       </ToastProvider>
@@ -118,6 +133,38 @@ describe('ManagerDashboard — team health first, people needing attention actio
     const { container } = renderDashboard();
     expect(await screen.findByText('همه اعضا طبق برنامه پیش می‌روند 👏')).toBeInTheDocument();
     expect(container.querySelector('img[src="/brand/mascot.webp"]')).toBeNull();
+  });
+});
+
+describe('ManagerMembersPage — team-scoped member workbench', () => {
+  const MEMBERS: ManagerMembersResponse = {
+    team: { id: 't1', name: 'فروش تهران' },
+    totals: { members: 1, active: 1, inactive: 0, lagging: 1 },
+    members: [{
+      id: 'u2', name: 'سارا احمدی', avatarUrl: null, phone: '09121234567', province: 'تهران', city: 'تهران',
+      status: 'active', createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-20T10:00:00.000Z',
+      stats: { assigned: 2, completed: 1, averageProgress: 50, lagging: 1 },
+      packages: [{ id: 'p1', title: 'آموزش شامپو دافی', brandName: 'دافی', productName: 'شامپو', status: 'in_progress', percent: 50, overdue: true, deadlineAt: null, completedAt: null }],
+    }],
+  };
+
+  it('shows actual team learning status, supports search and opens a direct follow-up', async () => {
+    mockApi({ 'GET /v1/manager/members': () => ({ data: MEMBERS }) });
+    renderMembers();
+    expect(await screen.findByText(/عملکرد و پیگیری اعضای فروش تهران/)).toBeInTheDocument();
+    expect(screen.getAllByText('آمادگی آموزشی').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('سارا احمدی').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('جست‌وجوی عضو'), { target: { value: 'تهران' } });
+    expect(screen.getAllByText('سارا احمدی').length).toBeGreaterThan(0);
+    fireEvent.click(first(screen.getAllByRole('button', { name: 'ارسال پیام به سارا احمدی' })));
+    expect(await screen.findByRole('dialog', { name: 'ارسال به سارا احمدی' })).toBeInTheDocument();
+    expect(screen.getByText('آموزش شامپو دافی')).toBeInTheDocument();
+  });
+
+  it('shows an explicit no-match state instead of presenting invented members', async () => {
+    mockApi({ 'GET /v1/manager/members': () => ({ data: { ...MEMBERS, members: [], totals: { members: 0, active: 0, inactive: 0, lagging: 0 } } }) });
+    renderMembers();
+    expect(await screen.findByText('هنوز عضوی در این تیم نیست')).toBeInTheDocument();
   });
 });
 

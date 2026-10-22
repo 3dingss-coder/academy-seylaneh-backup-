@@ -68,6 +68,22 @@ describe('manager scope (28.2 #5)', () => {
     expect(names).not.toContain('بازاریاب ب');
   });
 
+  it('team directory returns real learning health without exposing another team', async () => {
+    await watchSection(ctx, userA.token, fx.sections[0]?.id ?? '', 20);
+    const res = await ctx.api(mgrA.token).get('/v1/manager/members');
+    expect(res.status).toBe(200);
+    expect(res.body.data.team.name).toBe('تیم الف');
+    expect(res.body.data.totals.members).toBe(1);
+    expect(res.body.data.members[0]).toMatchObject({
+      id: userA.id,
+      name: 'بازاریاب الف',
+      stats: { assigned: 1, lagging: 1 },
+    });
+    expect(res.body.data.members[0].packages[0].percent).toBeGreaterThan(0);
+    expect(JSON.stringify(res.body.data)).not.toContain('بازاریاب ب');
+    expect((await ctx.api(userA.token).get('/v1/manager/members')).status).toBe(403);
+  });
+
   it('retake requests of another team cannot be approved', async () => {
     const s1 = fx.sections[0];
     await watchSection(ctx, userB.token, s1?.id ?? '', 60);

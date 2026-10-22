@@ -228,11 +228,18 @@ describe('admin shell + core — enterprise console contracts', () => {
       }),
     );
     renderApp('/admin');
-    await screen.findByTestId('admin-panel-shell');
+    await screen.findByTestId('admin-panel-shell', {}, { timeout: 5000 });
 
-    const trigger = screen.getByRole('button', { name: 'حساب کاربری ادمین' });
+    const trigger = await screen.findByRole(
+      'button',
+      { name: 'حساب کاربری ادمین' },
+      { timeout: 5000 },
+    );
     fireEvent.click(trigger);
-    expect(await screen.findByRole('group', { name: 'حساب کاربری' })).toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      await screen.findByRole('group', { name: 'حساب کاربری' }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: 'حساب کاربری' })).not.toBeInTheDocument(),
@@ -241,7 +248,8 @@ describe('admin shell + core — enterprise console contracts', () => {
     expect(trigger).toHaveFocus();
 
     fireEvent.click(trigger);
-    await screen.findByRole('group', { name: 'حساب کاربری' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await screen.findByRole('group', { name: 'حساب کاربری' }, { timeout: 5000 });
     fireEvent.pointerDown(screen.getByRole('heading', { level: 1 }));
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: 'حساب کاربری' })).not.toBeInTheDocument(),

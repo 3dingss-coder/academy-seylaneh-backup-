@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
 import type { Me } from '@/lib/types';
@@ -172,6 +172,78 @@ describe('admin shell + core — enterprise console contracts', () => {
     expect(rail).toBeInTheDocument();
     expect(rail.querySelector('img[src="/brand/mascot.webp"]')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'داشبورد سیلانه' })).toBeInTheDocument();
+  });
+
+  it('makes the mobile admin menu keyboard-accessible and restores focus on close', async () => {
+    mockApi(
+      signIn(admin, {
+        'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
+      }),
+    );
+    renderApp('/admin');
+    await screen.findByTestId('admin-panel-shell');
+
+    const trigger = screen.getByRole('button', { name: 'باز کردن فهرست' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = await screen.findByRole('dialog', { name: 'پنل ادمین' });
+    const close = within(dialog).getByRole('button', { name: 'بستن فهرست' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(document.body.style.overflow).toBe('hidden');
+    await waitFor(() => expect(close).toHaveFocus());
+
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    const logout = within(dialog).getByRole('button', { name: 'خروج' });
+    expect(logout).toHaveFocus();
+
+    fireEvent.keyDown(logout, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'پنل ادمین' })).toBeNull());
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(document.body.style.overflow).toBe('');
+    expect(trigger).toHaveFocus();
+
+    const previousWidth = window.innerWidth;
+    try {
+      window.innerWidth = 1280;
+      fireEvent.click(trigger);
+      await screen.findByRole('dialog', { name: 'پنل ادمین' });
+      fireEvent.resize(window);
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'پنل ادمین' })).toBeNull());
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(document.body.style.overflow).toBe('');
+      expect(trigger).toHaveFocus();
+    } finally {
+      window.innerWidth = previousWidth;
+    }
+  });
+
+  it('closes the desktop account popover on Escape and outside interaction', async () => {
+    mockApi(
+      signIn(admin, {
+        'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
+      }),
+    );
+    renderApp('/admin');
+    await screen.findByTestId('admin-panel-shell');
+
+    const trigger = screen.getByRole('button', { name: 'حساب کاربری ادمین' });
+    fireEvent.click(trigger);
+    expect(await screen.findByRole('group', { name: 'حساب کاربری' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'حساب کاربری' })).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    await screen.findByRole('group', { name: 'حساب کاربری' });
+    fireEvent.pointerDown(screen.getByRole('heading', { level: 1 }));
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'حساب کاربری' })).not.toBeInTheDocument(),
+    );
   });
 
   it('uses the admin profile header and keeps notification links inside the admin console', async () => {

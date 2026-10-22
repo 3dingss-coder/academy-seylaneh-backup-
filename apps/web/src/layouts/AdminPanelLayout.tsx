@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -45,8 +45,15 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setMobileOpen(false);
     };
+    const closeOnDesktopResize = () => {
+      if (window.innerWidth >= 1024) setMobileOpen(false);
+    };
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    window.addEventListener('resize', closeOnDesktopResize);
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('resize', closeOnDesktopResize);
+    };
   }, [mobileOpen]);
 
   return (
@@ -60,6 +67,8 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
             isDetail={isDetail}
             backTo={backTo}
             onOpenMenu={() => setMobileOpen(true)}
+            menuOpen={mobileOpen}
+            menuId="admin-mobile-nav"
           />
           <main className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
             <Breadcrumb title={title} items={items} />
@@ -70,7 +79,12 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
         </div>
       </div>
       {mobileOpen && (
-        <MobileMenu title={title} items={items} onClose={() => setMobileOpen(false)} />
+        <MobileMenu
+          id="admin-mobile-nav"
+          title={title}
+          items={items}
+          onClose={() => setMobileOpen(false)}
+        />
       )}
     </div>
   );
@@ -171,7 +185,26 @@ function DesktopHeader() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setAccountOpen(false), [pathname]);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setAccountOpen(false);
+      accountTriggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [accountOpen]);
 
   return (
     <header className="sticky top-0 z-30 hidden h-[72px] items-center justify-between gap-5 border-b border-[#ece9df] bg-[#fffdf8]/95 px-5 backdrop-blur-sm lg:flex xl:px-8">
@@ -185,10 +218,11 @@ function DesktopHeader() {
         <HeaderLink to="/admin/notifications" label="اعلان‌ها">
           <Bell className="size-5" aria-hidden="true" />
         </HeaderLink>
-        <div className="relative ms-2">
+        <div ref={accountRef} className="relative ms-2">
           <button
+            ref={accountTriggerRef}
             type="button"
-            aria-haspopup="menu"
+            aria-controls="admin-account-popover"
             aria-expanded={accountOpen}
             aria-label={`حساب کاربری ${user?.name ?? ''}`}
             onClick={() => setAccountOpen((open) => !open)}
@@ -208,12 +242,12 @@ function DesktopHeader() {
           </button>
           {accountOpen && (
             <div
-              role="menu"
-              aria-label="منوی حساب کاربری"
+              id="admin-account-popover"
+              role="group"
+              aria-label="حساب کاربری"
               className="absolute end-0 top-full z-40 mt-2 w-48 rounded-xl border border-border bg-white p-1.5 shadow-lg"
             >
               <Link
-                role="menuitem"
                 to="/admin/profile"
                 onClick={() => setAccountOpen(false)}
                 className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-text hover:bg-background"
@@ -223,7 +257,6 @@ function DesktopHeader() {
               </Link>
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => {
                   setAccountOpen(false);
                   void logout();
@@ -431,11 +464,15 @@ function MobileHeader({
   isDetail,
   backTo,
   onOpenMenu,
+  menuOpen,
+  menuId,
 }: {
   pageTitle: string;
   isDetail: boolean;
   backTo: string;
   onOpenMenu: () => void;
+  menuOpen: boolean;
+  menuId: string;
 }) {
   return (
     <header className="sticky top-0 z-30 grid h-14 grid-cols-[48px_minmax(0,1fr)_48px] items-center border-b border-[#ece9df] bg-[#fffdf8] px-2 lg:hidden">
@@ -452,6 +489,8 @@ function MobileHeader({
           type="button"
           onClick={onOpenMenu}
           aria-label="باز کردن فهرست"
+          aria-controls={menuId}
+          aria-expanded={menuOpen}
           className="flex size-11 items-center justify-center rounded-full text-[#3e584f] hover:bg-[#f4f5f1]"
         >
           <Menu className="size-5" aria-hidden="true" />
@@ -476,16 +515,66 @@ function MobileHeader({
 }
 
 function MobileMenu({
+  id,
   title,
   items,
   onClose,
 }: {
+  id: string;
   title: string;
   items: PanelNavItem[];
   onClose: () => void;
 }) {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const returnFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusableElements = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+
+    const initialFocus =
+      dialog?.querySelector<HTMLElement>('[data-autofocus="true"]') ?? focusableElements()[0];
+    initialFocus?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = focusableElements();
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialog?.focus();
+      } else if (
+        event.shiftKey &&
+        (document.activeElement === first || !dialog?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !dialog?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trapFocus);
+    return () => {
+      document.removeEventListener('keydown', trapFocus);
+      document.body.style.overflow = previousBodyOverflow;
+      if (returnFocus?.isConnected) returnFocus.focus();
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
       <button
@@ -495,9 +584,12 @@ function MobileMenu({
         className="absolute inset-0 bg-scrim"
       />
       <aside
+        ref={dialogRef}
+        id={id}
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
         className="absolute inset-y-0 right-0 flex w-[min(86vw,22rem)] flex-col bg-[#fffdf5] text-[#25362f] shadow-xl"
         dir="rtl"
       >
@@ -509,6 +601,7 @@ function MobileMenu({
           <button
             type="button"
             aria-label="بستن فهرست"
+            data-autofocus="true"
             onClick={onClose}
             className="flex size-11 items-center justify-center rounded-full text-[#47574f] hover:bg-[#f1f4ea]"
           >

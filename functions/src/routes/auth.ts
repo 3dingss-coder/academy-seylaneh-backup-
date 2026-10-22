@@ -239,10 +239,7 @@ export function authRouter(d: Deps, limiter: RateLimiter): LightRouter {
     '/auth/manager-access/sign-in',
     perIp('manager-access-sign-in', 10),
     h(async (req) =>
-      managerAccess.managerAccessSignIn(
-        d,
-        parse(managerAccess.managerAccessLoginSchema, req.body),
-      ),
+      managerAccess.managerAccessSignIn(d, parse(managerAccess.managerAccessLoginSchema, req.body)),
     ),
   );
   r.post(

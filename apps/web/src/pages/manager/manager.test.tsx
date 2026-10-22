@@ -4,7 +4,12 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockApi } from '@/test/mockApi';
 import { ToastProvider } from '@/components/ui';
-import type { Laggard, ManagerDashboard as Data, ManagerMembersResponse, RetakeItem } from '@/lib/types';
+import type {
+  Laggard,
+  ManagerDashboard as Data,
+  ManagerMembersResponse,
+  RetakeItem,
+} from '@/lib/types';
 import { ManagerDashboard } from './ManagerDashboard';
 import { ManagerMembersPage } from './ManagerMembersPage';
 import { RetakeList } from '@/components/reports/RetakeList';
@@ -140,12 +145,33 @@ describe('ManagerMembersPage — team-scoped member workbench', () => {
   const MEMBERS: ManagerMembersResponse = {
     team: { id: 't1', name: 'فروش تهران' },
     totals: { members: 1, active: 1, inactive: 0, lagging: 1 },
-    members: [{
-      id: 'u2', name: 'سارا احمدی', avatarUrl: null, phone: '09121234567', province: 'تهران', city: 'تهران',
-      status: 'active', createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-20T10:00:00.000Z',
-      stats: { assigned: 2, completed: 1, averageProgress: 50, lagging: 1 },
-      packages: [{ id: 'p1', title: 'آموزش شامپو دافی', brandName: 'دافی', productName: 'شامپو', status: 'in_progress', percent: 50, overdue: true, deadlineAt: null, completedAt: null }],
-    }],
+    members: [
+      {
+        id: 'u2',
+        name: 'سارا احمدی',
+        avatarUrl: null,
+        phone: '09121234567',
+        province: 'تهران',
+        city: 'تهران',
+        status: 'active',
+        createdAt: '2026-10-01T00:00:00.000Z',
+        lastActiveAt: '2026-10-20T10:00:00.000Z',
+        stats: { assigned: 2, completed: 1, averageProgress: 50, lagging: 1 },
+        packages: [
+          {
+            id: 'p1',
+            title: 'آموزش شامپو دافی',
+            brandName: 'دافی',
+            productName: 'شامپو',
+            status: 'in_progress',
+            percent: 50,
+            overdue: true,
+            deadlineAt: null,
+            completedAt: null,
+          },
+        ],
+      },
+    ],
   };
 
   it('shows actual team learning status, supports search and opens a direct follow-up', async () => {
@@ -162,7 +188,15 @@ describe('ManagerMembersPage — team-scoped member workbench', () => {
   });
 
   it('shows an explicit no-match state instead of presenting invented members', async () => {
-    mockApi({ 'GET /v1/manager/members': () => ({ data: { ...MEMBERS, members: [], totals: { members: 0, active: 0, inactive: 0, lagging: 0 } } }) });
+    mockApi({
+      'GET /v1/manager/members': () => ({
+        data: {
+          ...MEMBERS,
+          members: [],
+          totals: { members: 0, active: 0, inactive: 0, lagging: 0 },
+        },
+      }),
+    });
     renderMembers();
     expect(await screen.findByText('هنوز عضوی در این تیم نیست')).toBeInTheDocument();
   });

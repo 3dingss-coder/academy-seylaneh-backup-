@@ -351,15 +351,15 @@ export async function audiencePreview(d: Deps, audience: PushCampaignAudience) {
 
 function managerTeamId(manager: Doc<User>): string {
   if (manager.role !== 'manager' || !manager.teamId)
-    throw new ApiError('FORBIDDEN', 'برای استفاده از ابزارهای تیمی باید به یک تیم فعال متصل باشید.');
+    throw new ApiError(
+      'FORBIDDEN',
+      'برای استفاده از ابزارهای تیمی باید به یک تیم فعال متصل باشید.',
+    );
   return manager.teamId;
 }
 
 function isManagerTeamCampaign(campaign: Doc<PushCampaign>, manager: Doc<User>): boolean {
-  return (
-    campaign.audience.type === 'team' &&
-    campaign.audience.targetId === managerTeamId(manager)
-  );
+  return campaign.audience.type === 'team' && campaign.audience.targetId === managerTeamId(manager);
 }
 
 async function getManagerCampaignOrThrow(
@@ -368,8 +368,7 @@ async function getManagerCampaignOrThrow(
   id: string,
 ): Promise<Doc<PushCampaign>> {
   const campaign = await getCampaignOrThrow(d, id);
-  if (!isManagerTeamCampaign(campaign, manager))
-    throw new ApiError('NOT_FOUND', 'کمپین پیدا نشد.');
+  if (!isManagerTeamCampaign(campaign, manager)) throw new ApiError('NOT_FOUND', 'کمپین پیدا نشد.');
   return campaign;
 }
 
@@ -385,11 +384,7 @@ function assertManagerAudience(audience: PushCampaignAudience, manager: Doc<User
 }
 
 /** Manager campaigns are isolated to one team; admin/global audiences never enter this read model. */
-export async function managerCampaignList(
-  d: Deps,
-  manager: Doc<User>,
-  q: CampaignListQuery,
-) {
+export async function managerCampaignList(d: Deps, manager: Doc<User>, q: CampaignListQuery) {
   const teamId = managerTeamId(manager);
   const rows = await d.store.query<PushCampaign>({
     collection: CAMPAIGNS,
@@ -593,11 +588,7 @@ export async function archiveCampaign(d: Deps, actor: Actor, id: string) {
 }
 
 /** Create/edit/send permissions for managers are deliberately limited to campaigns for their team. */
-export async function createManagerCampaign(
-  d: Deps,
-  manager: Doc<User>,
-  input: CampaignInput,
-) {
+export async function createManagerCampaign(d: Deps, manager: Doc<User>, input: CampaignInput) {
   assertManagerAudience(input.audience, manager);
   const result = await createCampaign(d, manager, input);
   await track(d, 'manager_campaign_created', manager.id, { campaignId: result.campaign.id });

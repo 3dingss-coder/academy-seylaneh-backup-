@@ -9,27 +9,81 @@ import { ManagerReports } from './ManagerReports';
 
 const now = Date.now();
 const COMPLETION: CompletionReport = {
-  rows: [{
-    userId: 'user-a', userName: 'عضو نمونه', teamId: 'team-a', province: 'تهران', city: 'تهران', phone: '09120000001',
-    packageId: 'package-a', packageTitle: 'آموزش محصول واقعی', brandId: 'brand-a', brandName: 'برند الف',
-    productId: 'product-a', productName: 'محصول الف', percent: 100, status: 'completed', overdue: false, lagging: false,
-    deadlineAt: null, completedAt: new Date(now - 8 * 86_400_000).toISOString(), onTime: true,
-    lastActivityAt: new Date(now - 8 * 86_400_000).toISOString(), stuckAt: null,
-  }],
+  rows: [
+    {
+      userId: 'user-a',
+      userName: 'عضو نمونه',
+      teamId: 'team-a',
+      province: 'تهران',
+      city: 'تهران',
+      phone: '09120000001',
+      packageId: 'package-a',
+      packageTitle: 'آموزش محصول واقعی',
+      brandId: 'brand-a',
+      brandName: 'برند الف',
+      productId: 'product-a',
+      productName: 'محصول الف',
+      percent: 100,
+      status: 'completed',
+      overdue: false,
+      lagging: false,
+      deadlineAt: null,
+      completedAt: new Date(now - 8 * 86_400_000).toISOString(),
+      onTime: true,
+      lastActivityAt: new Date(now - 8 * 86_400_000).toISOString(),
+      stuckAt: null,
+    },
+  ],
 };
 const QUIZZES: QuizReport = {
-  attempts: [{
-    attemptId: 'attempt-a', userId: 'user-a', userName: 'عضو نمونه', teamId: 'team-a', province: 'تهران', city: 'تهران',
-    packageId: 'package-a', packageTitle: 'آموزش محصول واقعی', brandName: 'برند الف', productName: 'محصول الف',
-    sectionId: 'section-a', sectionTitle: 'بخش یک', quizId: 'quiz-a', attemptNumber: 1, total: 4, correct: 4, wrong: 0,
-    unanswered: 0, score: 100, passScore: 70, passed: true, startedAt: new Date(now - 8 * 86_400_000).toISOString(),
-    submittedAt: new Date(now - 8 * 86_400_000).toISOString(), durationSec: 60,
-  }],
+  attempts: [
+    {
+      attemptId: 'attempt-a',
+      userId: 'user-a',
+      userName: 'عضو نمونه',
+      teamId: 'team-a',
+      province: 'تهران',
+      city: 'تهران',
+      packageId: 'package-a',
+      packageTitle: 'آموزش محصول واقعی',
+      brandName: 'برند الف',
+      productName: 'محصول الف',
+      sectionId: 'section-a',
+      sectionTitle: 'بخش یک',
+      quizId: 'quiz-a',
+      attemptNumber: 1,
+      total: 4,
+      correct: 4,
+      wrong: 0,
+      unanswered: 0,
+      score: 100,
+      passScore: 70,
+      passed: true,
+      startedAt: new Date(now - 8 * 86_400_000).toISOString(),
+      submittedAt: new Date(now - 8 * 86_400_000).toISOString(),
+      durationSec: 60,
+    },
+  ],
   summary: [],
 };
 const MEMBERS: ManagerMembersResponse = {
-  team: { id: 'team-a', name: 'تیم نمونه' }, totals: { members: 1, active: 1, inactive: 0, lagging: 0 },
-  members: [{ id: 'user-a', name: 'عضو نمونه', avatarUrl: null, phone: '09120000001', province: 'تهران', city: 'تهران', status: 'active', createdAt: new Date(now - 30 * 86_400_000).toISOString(), lastActiveAt: new Date(now - 8 * 86_400_000).toISOString(), stats: { assigned: 1, completed: 1, averageProgress: 100, lagging: 0 }, packages: [] }],
+  team: { id: 'team-a', name: 'تیم نمونه' },
+  totals: { members: 1, active: 1, inactive: 0, lagging: 0 },
+  members: [
+    {
+      id: 'user-a',
+      name: 'عضو نمونه',
+      avatarUrl: null,
+      phone: '09120000001',
+      province: 'تهران',
+      city: 'تهران',
+      status: 'active',
+      createdAt: new Date(now - 30 * 86_400_000).toISOString(),
+      lastActiveAt: new Date(now - 8 * 86_400_000).toISOString(),
+      stats: { assigned: 1, completed: 1, averageProgress: 100, lagging: 0 },
+      packages: [],
+    },
+  ],
 };
 
 function renderReports(initialEntry = '/manager/reports') {
@@ -86,7 +140,10 @@ describe('ManagerReports — executive report and existing report tabs', () => {
     });
     renderReports('/manager/reports?status=overdue');
     expect(await screen.findByLabelText('وضعیت')).toHaveValue('overdue');
-    expect(screen.getByRole('tab', { name: 'تکمیل آموزش' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'تکمیل آموزش' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.queryByText('نرخ تکمیل فعلی')).not.toBeInTheDocument();
   });
 });

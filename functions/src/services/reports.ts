@@ -194,9 +194,10 @@ export async function managerMembers(d: Deps, manager: Doc<User>) {
       city: user.city,
       status: user.status,
       createdAt: user.createdAt,
-      lastActiveAt: [user.lastActiveAt, latestPackageActivity]
-        .filter((at): at is string => Boolean(at))
-        .sort((a, b) => b.localeCompare(a))[0] ?? null,
+      lastActiveAt:
+        [user.lastActiveAt, latestPackageActivity]
+          .filter((at): at is string => Boolean(at))
+          .sort((a, b) => b.localeCompare(a))[0] ?? null,
       stats: {
         assigned: reportable.length,
         completed: completed.length,

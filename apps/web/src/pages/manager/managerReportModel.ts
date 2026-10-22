@@ -8,9 +8,28 @@ export interface ManagerReportFilters {
   province: string;
   city: string;
 }
-export interface TrendBucket { label: string; startAt: number; endAt: number; completed: number }
-export interface ProductPerformance { brand: string; product: string; assigned: number; completed: number; overdue: number; rate: number }
-export interface RegionPerformance { province: string; assigned: number; completed: number; overdue: number; members: number; rate: number }
+export interface TrendBucket {
+  label: string;
+  startAt: number;
+  endAt: number;
+  completed: number;
+}
+export interface ProductPerformance {
+  brand: string;
+  product: string;
+  assigned: number;
+  completed: number;
+  overdue: number;
+  rate: number;
+}
+export interface RegionPerformance {
+  province: string;
+  assigned: number;
+  completed: number;
+  overdue: number;
+  members: number;
+  rate: number;
+}
 export interface ManagerReportSnapshot {
   assignments: number;
   completed: number;
@@ -36,7 +55,12 @@ export interface ManagerReportSnapshot {
 }
 
 const matchesScope = (
-  row: { brandName: string | null; productName: string | null; province: string | null; city: string | null },
+  row: {
+    brandName: string | null;
+    productName: string | null;
+    province: string | null;
+    city: string | null;
+  },
   filters: ManagerReportFilters,
 ) =>
   (!filters.brand || row.brandName === filters.brand) &&
@@ -62,27 +86,38 @@ export function buildManagerReportSnapshot(
   const selectedAttempts = attempts.filter((attempt) => {
     if (!matchesScope(attempt, filters) || !attempt.submittedAt) return false;
     const timestamp = Date.parse(attempt.submittedAt);
-    return Number.isFinite(timestamp) && timestamp <= now && (filters.period === 'all' || timestamp >= periodStart);
+    return (
+      Number.isFinite(timestamp) &&
+      timestamp <= now &&
+      (filters.period === 'all' || timestamp >= periodStart)
+    );
   });
   const completedRows = rows.filter((row) => row.status === 'completed');
   const completedInPeriod = rows.filter((row) => {
     if (!row.completedAt) return false;
     const time = Date.parse(row.completedAt);
-    return Number.isFinite(time) && time <= now && (filters.period === 'all' || time >= periodStart);
+    return (
+      Number.isFinite(time) && time <= now && (filters.period === 'all' || time >= periodStart)
+    );
   }).length;
-  const previousPeriodCompleted = filters.period === 'all' ? null : rows.filter((row) => {
-    if (!row.completedAt) return false;
-    const time = Date.parse(row.completedAt);
-    const { start, duration } = timeWindow(filters.period, now);
-    return time >= start - duration && time < start;
-  }).length;
+  const previousPeriodCompleted =
+    filters.period === 'all'
+      ? null
+      : rows.filter((row) => {
+          if (!row.completedAt) return false;
+          const time = Date.parse(row.completedAt);
+          const { start, duration } = timeWindow(filters.period, now);
+          return time >= start - duration && time < start;
+        }).length;
   const { start: trendStart, duration: trendDuration } = timeWindow(filters.period, now);
   const trendCount = 6;
   const trend = Array.from({ length: trendCount }, (_, index) => {
     const bucketStart = trendStart + (trendDuration / trendCount) * index;
     const bucketEnd = trendStart + (trendDuration / trendCount) * (index + 1);
     return {
-      label: new Intl.DateTimeFormat('fa-IR', { month: 'short', day: 'numeric' }).format(new Date(bucketStart)),
+      label: new Intl.DateTimeFormat('fa-IR', { month: 'short', day: 'numeric' }).format(
+        new Date(bucketStart),
+      ),
       startAt: bucketStart,
       endAt: bucketEnd,
       completed: 0,
@@ -92,12 +127,17 @@ export function buildManagerReportSnapshot(
     if (!row.completedAt) continue;
     const timestamp = Date.parse(row.completedAt);
     if (timestamp < trendStart || timestamp > now) continue;
-    const index = Math.min(trendCount - 1, Math.floor(((timestamp - trendStart) / trendDuration) * trendCount));
+    const index = Math.min(
+      trendCount - 1,
+      Math.floor(((timestamp - trendStart) / trendDuration) * trendCount),
+    );
     const bucket = trend[index];
     if (bucket) bucket.completed++;
   }
   const scoredAttempts = selectedAttempts.filter((attempt) => attempt.passed !== null);
-  const scores = selectedAttempts.map((attempt) => attempt.score).filter((score): score is number => score !== null);
+  const scores = selectedAttempts
+    .map((attempt) => attempt.score)
+    .filter((score): score is number => score !== null);
   const passedAttempts = scoredAttempts.filter((attempt) => attempt.passed === true).length;
   const assigned = rows.length;
   const completed = completedRows.length;
@@ -107,7 +147,14 @@ export function buildManagerReportSnapshot(
     const brand = row.brandName ?? 'برند ثبت‌نشده';
     const product = row.productName ?? row.packageTitle;
     const key = `${brand}\u0000${product}`;
-    const item = productMap.get(key) ?? { brand, product, assigned: 0, completed: 0, overdue: 0, rate: 0 };
+    const item = productMap.get(key) ?? {
+      brand,
+      product,
+      assigned: 0,
+      completed: 0,
+      overdue: 0,
+      rate: 0,
+    };
     item.assigned++;
     if (row.status === 'completed') item.completed++;
     if (row.overdue) item.overdue++;
@@ -117,7 +164,15 @@ export function buildManagerReportSnapshot(
   const regionMap = new Map<string, RegionPerformance & { memberIds: Set<string> }>();
   for (const row of rows) {
     const province = row.province ?? 'استان ثبت‌نشده';
-    const area = regionMap.get(province) ?? { province, assigned: 0, completed: 0, overdue: 0, members: 0, rate: 0, memberIds: new Set<string>() };
+    const area = regionMap.get(province) ?? {
+      province,
+      assigned: 0,
+      completed: 0,
+      overdue: 0,
+      members: 0,
+      rate: 0,
+      memberIds: new Set<string>(),
+    };
     area.assigned++;
     area.memberIds.add(row.userId);
     if (row.status === 'completed') area.completed++;
@@ -127,10 +182,11 @@ export function buildManagerReportSnapshot(
     regionMap.set(province, area);
   }
   const selectedMemberIds = new Set(rows.map((row) => row.userId));
-  const filteredMembers = members.filter((member) =>
-    (!filters.province || member.province === filters.province) &&
-    (!filters.city || member.city === filters.city) &&
-    ((!filters.brand && !filters.product) || selectedMemberIds.has(member.id)),
+  const filteredMembers = members.filter(
+    (member) =>
+      (!filters.province || member.province === filters.province) &&
+      (!filters.city || member.city === filters.city) &&
+      ((!filters.brand && !filters.product) || selectedMemberIds.has(member.id)),
   );
 
   return {
@@ -141,18 +197,33 @@ export function buildManagerReportSnapshot(
     overdue: rows.filter((row) => row.overdue).length,
     lagging: rows.filter((row) => row.lagging).length,
     completionRate: assigned ? Math.round((completed / assigned) * 100) : null,
-    onTimeRate: onTime.length ? Math.round((onTime.filter((row) => row.onTime === true).length / onTime.length) * 100) : null,
-    averageProgress: assigned ? Math.round(rows.reduce((sum, row) => sum + row.percent, 0) / assigned) : null,
+    onTimeRate: onTime.length
+      ? Math.round((onTime.filter((row) => row.onTime === true).length / onTime.length) * 100)
+      : null,
+    averageProgress: assigned
+      ? Math.round(rows.reduce((sum, row) => sum + row.percent, 0) / assigned)
+      : null,
     completedInPeriod,
     previousPeriodCompleted,
     trend,
     quizAttempts: selectedAttempts.length,
     quizScoredAttempts: scoredAttempts.length,
     quizPassed: passedAttempts,
-    quizPassRate: scoredAttempts.length ? Math.round((passedAttempts / scoredAttempts.length) * 100) : null,
-    averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
-    products: [...productMap.values()].sort((a, b) => b.assigned - a.assigned || a.product.localeCompare(b.product, 'fa')),
-    regions: [...regionMap.values()].map(({ memberIds: _memberIds, ...area }) => { void _memberIds; return area; }).sort((a, b) => b.assigned - a.assigned || a.province.localeCompare(b.province, 'fa')),
+    quizPassRate: scoredAttempts.length
+      ? Math.round((passedAttempts / scoredAttempts.length) * 100)
+      : null,
+    averageScore: scores.length
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : null,
+    products: [...productMap.values()].sort(
+      (a, b) => b.assigned - a.assigned || a.product.localeCompare(b.product, 'fa'),
+    ),
+    regions: [...regionMap.values()]
+      .map(({ memberIds: _memberIds, ...area }) => {
+        void _memberIds;
+        return area;
+      })
+      .sort((a, b) => b.assigned - a.assigned || a.province.localeCompare(b.province, 'fa')),
     activeMembers: filteredMembers.filter((member) => member.status === 'active').length,
     teamMembers: filteredMembers.length,
   };
@@ -160,9 +231,21 @@ export function buildManagerReportSnapshot(
 
 export function listReportOptions(rows: CompletionRow[]) {
   return {
-    brands: [...new Set(rows.map((row) => row.brandName).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, 'fa')),
-    products: [...new Set(rows.map((row) => row.productName).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, 'fa')),
-    provinces: [...new Set(rows.map((row) => row.province).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, 'fa')),
+    brands: [
+      ...new Set(
+        rows.map((row) => row.brandName).filter((value): value is string => Boolean(value)),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'fa')),
+    products: [
+      ...new Set(
+        rows.map((row) => row.productName).filter((value): value is string => Boolean(value)),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'fa')),
+    provinces: [
+      ...new Set(
+        rows.map((row) => row.province).filter((value): value is string => Boolean(value)),
+      ),
+    ].sort((a, b) => a.localeCompare(b, 'fa')),
     citiesByProvince: rows.reduce<Record<string, string[]>>((out, row) => {
       if (!row.province || !row.city) return out;
       const cities = new Set(out[row.province] ?? []);

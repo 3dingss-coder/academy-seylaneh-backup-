@@ -41,15 +41,15 @@ const campaign = (teamId: string, over: Record<string, unknown> = {}) => ({
 });
 
 async function addDevice(token: string, device: string) {
-  const response = await ctx.api(token).post('/v1/me/devices', { token: device, platform: 'android' });
+  const response = await ctx
+    .api(token)
+    .post('/v1/me/devices', { token: device, platform: 'android' });
   expect(response.status).toBe(200);
 }
 
 describe('manager campaign studio — hard team boundaries', () => {
   it('creates team-only campaigns and never exposes another team’s campaign', async () => {
-    const created = await ctx
-      .api(managerA.token)
-      .post('/v1/manager/campaigns', campaign('team-a'));
+    const created = await ctx.api(managerA.token).post('/v1/manager/campaigns', campaign('team-a'));
     expect(created.status).toBe(201);
     expect(created.body.data.campaign.audience).toEqual({
       type: 'team',
@@ -65,11 +65,8 @@ describe('manager campaign studio — hard team boundaries', () => {
     const otherList = await ctx.api(managerB.token).get('/v1/manager/campaigns');
     expect(otherList.body.data.items).toHaveLength(0);
     expect(
-      (
-        await ctx
-          .api(managerB.token)
-          .get(`/v1/manager/campaigns/${created.body.data.campaign.id}`)
-      ).status,
+      (await ctx.api(managerB.token).get(`/v1/manager/campaigns/${created.body.data.campaign.id}`))
+        .status,
     ).toBe(404);
   });
 
@@ -85,9 +82,7 @@ describe('manager campaign studio — hard team boundaries', () => {
       expect(response.status).toBe(403);
     }
     const noTeam = await ctx.user('manager');
-    expect(
-      (await ctx.api(noTeam.token).get('/v1/manager/campaigns')).status,
-    ).toBe(403);
+    expect((await ctx.api(noTeam.token).get('/v1/manager/campaigns')).status).toBe(403);
   });
 
   it('previews only its own team and does not grant marketers manager campaign access', async () => {
@@ -107,9 +102,7 @@ describe('manager campaign studio — hard team boundaries', () => {
   it('lets a manager send an owned campaign to the team, but not edit an admin campaign', async () => {
     await addDevice(marketerA.token, 'team-a-send-token-0001');
     await addDevice(marketerB.token, 'team-b-send-token-0002');
-    const own = await ctx
-      .api(managerA.token)
-      .post('/v1/manager/campaigns', campaign('team-a'));
+    const own = await ctx.api(managerA.token).post('/v1/manager/campaigns', campaign('team-a'));
     const ownId = own.body.data.campaign.id as string;
     const started = await ctx
       .api(managerA.token)

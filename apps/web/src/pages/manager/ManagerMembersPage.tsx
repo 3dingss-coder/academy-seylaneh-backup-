@@ -1,11 +1,29 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertTriangle, CheckCircle2, Clock3, MessageCircle, Search, Users } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  MessageCircle,
+  Search,
+  Users,
+} from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
-import { Button, Card, EmptyState, Input, KpiCard, ProgressBar, Skeleton, StatusBadge, TableSkeleton } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  KpiCard,
+  ProgressBar,
+  Skeleton,
+  StatusBadge,
+  TableSkeleton,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { toPersianDigits } from '@/lib/digits';
 import { faPercent, faRelative } from '@/lib/format';
@@ -31,10 +49,15 @@ export function ManagerMembersPage() {
     return rows.filter((member) => {
       if (status !== 'all' && member.status !== status) return false;
       if (attention === 'lagging' && member.stats.lagging === 0) return false;
-      if (attention === 'ready' && (member.stats.assigned === 0 || member.stats.averageProgress < 80))
+      if (
+        attention === 'ready' &&
+        (member.stats.assigned === 0 || member.stats.averageProgress < 80)
+      )
         return false;
       if (!q) return true;
-      return normalize([member.name, member.phone, member.city, member.province].filter(Boolean).join(' ')).includes(q);
+      return normalize(
+        [member.name, member.phone, member.city, member.province].filter(Boolean).join(' '),
+      ).includes(q);
     });
   }, [attention, members.data?.members, search, status]);
 
@@ -42,9 +65,17 @@ export function ManagerMembersPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="تیم من"
-        subtitle={members.data?.team?.name ? `عملکرد و پیگیری اعضای ${members.data.team.name}` : 'مدیریت ارتباط با اعضای تیم'}
+        subtitle={
+          members.data?.team?.name
+            ? `عملکرد و پیگیری اعضای ${members.data.team.name}`
+            : 'مدیریت ارتباط با اعضای تیم'
+        }
         actions={
-          <Button variant="secondary" icon={<Activity className="size-4" aria-hidden />} onClick={() => navigate('/manager/reports')}>
+          <Button
+            variant="secondary"
+            icon={<Activity className="size-4" aria-hidden />}
+            onClick={() => navigate('/manager/reports')}
+          >
             گزارش عملکرد
           </Button>
         }
@@ -54,7 +85,9 @@ export function ManagerMembersPage() {
         loading={
           <>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-              {[0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-28" />)}
+              {[0, 1, 2, 3].map((n) => (
+                <Skeleton key={n} className="h-28" />
+              ))}
             </div>
             <TableSkeleton rows={6} />
           </>
@@ -63,7 +96,10 @@ export function ManagerMembersPage() {
         {(data) => {
           const assignedPackages = data.members.flatMap((member) => member.packages);
           const avgProgress = assignedPackages.length
-            ? Math.round(assignedPackages.reduce((sum, pkg) => sum + pkg.percent, 0) / assignedPackages.length)
+            ? Math.round(
+                assignedPackages.reduce((sum, pkg) => sum + pkg.percent, 0) /
+                  assignedPackages.length,
+              )
             : 0;
           const columns = [
             {
@@ -72,11 +108,17 @@ export function ManagerMembersPage() {
               cell: (member: ManagerMemberRow) => (
                 <div className="flex min-w-40 items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-primary/15 bg-primary-light text-sm font-black text-primary-fg">
-                    {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="size-full object-cover" /> : member.name.trim().charAt(0)}
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt="" className="size-full object-cover" />
+                    ) : (
+                      member.name.trim().charAt(0)
+                    )}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate font-bold">{member.name}</span>
-                    <span className="block text-xs text-text-secondary" dir="ltr">{toPersianDigits(member.phone ?? '—')}</span>
+                    <span className="block text-xs text-text-secondary" dir="ltr">
+                      {toPersianDigits(member.phone ?? '—')}
+                    </span>
                   </span>
                 </div>
               ),
@@ -85,7 +127,8 @@ export function ManagerMembersPage() {
             {
               key: 'location',
               header: 'محدوده فعالیت',
-              cell: (member: ManagerMemberRow) => [member.city, member.province].filter(Boolean).join('، ') || 'ثبت نشده',
+              cell: (member: ManagerMemberRow) =>
+                [member.city, member.province].filter(Boolean).join('، ') || 'ثبت نشده',
               hideOnMobile: true,
               sortValue: (member: ManagerMemberRow) => member.city ?? member.province,
             },
@@ -101,9 +144,15 @@ export function ManagerMembersPage() {
                 <div className="min-w-36">
                   <div className="mb-1 flex items-center justify-between gap-2 text-xs">
                     <span>{faPercent(member.stats.averageProgress)}</span>
-                    <span className="text-text-secondary">{toPersianDigits(member.stats.completed)} از {toPersianDigits(member.stats.assigned)} آموزش</span>
+                    <span className="text-text-secondary">
+                      {toPersianDigits(member.stats.completed)} از{' '}
+                      {toPersianDigits(member.stats.assigned)} آموزش
+                    </span>
                   </div>
-                  <ProgressBar value={member.stats.averageProgress} label={`پیشرفت آموزشی ${member.name}`} />
+                  <ProgressBar
+                    value={member.stats.averageProgress}
+                    label={`پیشرفت آموزشی ${member.name}`}
+                  />
                 </div>
               ),
               sortValue: (member: ManagerMemberRow) => member.stats.averageProgress,
@@ -111,15 +160,25 @@ export function ManagerMembersPage() {
             {
               key: 'attention',
               header: 'نیازمند پیگیری',
-              cell: (member: ManagerMemberRow) => member.stats.lagging > 0
-                ? <span className="inline-flex items-center gap-1 font-bold text-danger-fg"><AlertTriangle className="size-4" aria-hidden />{toPersianDigits(member.stats.lagging)} آموزش</span>
-                : <span className="inline-flex items-center gap-1 text-success-fg"><CheckCircle2 className="size-4" aria-hidden />بدون هشدار</span>,
+              cell: (member: ManagerMemberRow) =>
+                member.stats.lagging > 0 ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-danger-fg">
+                    <AlertTriangle className="size-4" aria-hidden />
+                    {toPersianDigits(member.stats.lagging)} آموزش
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-success-fg">
+                    <CheckCircle2 className="size-4" aria-hidden />
+                    بدون هشدار
+                  </span>
+                ),
               sortValue: (member: ManagerMemberRow) => member.stats.lagging,
             },
             {
               key: 'activity',
               header: 'آخرین فعالیت',
-              cell: (member: ManagerMemberRow) => member.lastActiveAt ? faRelative(member.lastActiveAt) : 'هنوز فعالیتی ثبت نشده',
+              cell: (member: ManagerMemberRow) =>
+                member.lastActiveAt ? faRelative(member.lastActiveAt) : 'هنوز فعالیتی ثبت نشده',
               hideOnMobile: true,
               sortValue: (member: ManagerMemberRow) => member.lastActiveAt,
             },
@@ -141,10 +200,30 @@ export function ManagerMembersPage() {
           return (
             <>
               <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                <KpiCard title="اعضای تیم" value={toPersianDigits(data.totals.members)} icon={Users} />
-                <KpiCard title="فعال" value={toPersianDigits(data.totals.active)} icon={Activity} tone="primary" />
-                <KpiCard title="میانگین پیشرفت آموزش" value={faPercent(avgProgress)} subtitle={`${toPersianDigits(assignedPackages.length)} آموزش تخصیص‌یافته`} icon={CheckCircle2} tone="info" />
-                <KpiCard title="نیازمند پیگیری" value={toPersianDigits(data.totals.lagging)} icon={AlertTriangle} tone={data.totals.lagging ? 'warning' : 'primary'} />
+                <KpiCard
+                  title="اعضای تیم"
+                  value={toPersianDigits(data.totals.members)}
+                  icon={Users}
+                />
+                <KpiCard
+                  title="فعال"
+                  value={toPersianDigits(data.totals.active)}
+                  icon={Activity}
+                  tone="primary"
+                />
+                <KpiCard
+                  title="میانگین پیشرفت آموزش"
+                  value={faPercent(avgProgress)}
+                  subtitle={`${toPersianDigits(assignedPackages.length)} آموزش تخصیص‌یافته`}
+                  icon={CheckCircle2}
+                  tone="info"
+                />
+                <KpiCard
+                  title="نیازمند پیگیری"
+                  value={toPersianDigits(data.totals.lagging)}
+                  icon={AlertTriangle}
+                  tone={data.totals.lagging ? 'warning' : 'primary'}
+                />
               </div>
 
               <Card className="grid gap-3 lg:grid-cols-[minmax(15rem,1.5fr)_repeat(3,minmax(0,1fr))]">
@@ -157,7 +236,11 @@ export function ManagerMembersPage() {
                 />
                 <label className="flex flex-col gap-1.5 text-sm font-semibold text-text">
                   وضعیت حساب
-                  <select className="min-h-12 rounded-input border border-border bg-surface px-3" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
+                  <select
+                    className="min-h-12 rounded-input border border-border bg-surface px-3"
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as typeof status)}
+                  >
                     <option value="all">همه اعضا</option>
                     <option value="active">فعال</option>
                     <option value="inactive">غیرفعال</option>
@@ -165,7 +248,11 @@ export function ManagerMembersPage() {
                 </label>
                 <label className="flex flex-col gap-1.5 text-sm font-semibold text-text">
                   اولویت پیگیری
-                  <select className="min-h-12 rounded-input border border-border bg-surface px-3" value={attention} onChange={(event) => setAttention(event.target.value as typeof attention)}>
+                  <select
+                    className="min-h-12 rounded-input border border-border bg-surface px-3"
+                    value={attention}
+                    onChange={(event) => setAttention(event.target.value as typeof attention)}
+                  >
                     <option value="all">همه</option>
                     <option value="lagging">دارای آموزش عقب‌مانده</option>
                     <option value="ready">پیشرفت حداقل ۸۰٪</option>
@@ -173,14 +260,19 @@ export function ManagerMembersPage() {
                 </label>
                 <div className="flex items-end text-sm text-text-secondary" aria-live="polite">
                   <Clock3 className="me-2 size-4 shrink-0" aria-hidden />
-                  {toPersianDigits(filtered.length)} نفر از {toPersianDigits(data.members.length)} عضو
+                  {toPersianDigits(filtered.length)} نفر از {toPersianDigits(data.members.length)}{' '}
+                  عضو
                 </div>
               </Card>
 
               {filtered.length === 0 ? (
                 <EmptyState
                   icon={<Users className="size-8" aria-hidden />}
-                  title={search || status !== 'all' || attention !== 'all' ? 'عضوی با این فیلترها پیدا نشد' : 'هنوز عضوی در این تیم نیست'}
+                  title={
+                    search || status !== 'all' || attention !== 'all'
+                      ? 'عضوی با این فیلترها پیدا نشد'
+                      : 'هنوز عضوی در این تیم نیست'
+                  }
                   description="فیلترها را تغییر دهید یا از مدیر سیستم بخواهید اعضا را به تیم شما اختصاص دهد."
                 />
               ) : (

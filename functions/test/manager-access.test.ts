@@ -72,7 +72,8 @@ async function adminRequest(
 
 describe('Manager access request and review', () => {
   it('looks up mobile numbers without exposing applicant data and keeps non-Manager accounts out of signup', async () => {
-    const marketer = await ctx.user('marketer');
+    const marketerName = 'بازاریاب محرمانه';
+    const marketer = await ctx.user('marketer', { name: marketerName });
     const unknown = await ctx
       .api()
       .post('/v1/auth/manager-access/lookup', { phone: '۰۹۱۲۵۵۵۰۱۰۰' });
@@ -84,7 +85,7 @@ describe('Manager access request and review', () => {
     expect(unknown.body.data).toMatchObject({ flow: 'apply', phone: '09125550100' });
     expect(existing.status).toBe(200);
     expect(existing.body.data).toMatchObject({ flow: 'unavailable' });
-    expect(JSON.stringify(existing.body)).not.toContain(marketer.name);
+    expect(JSON.stringify(existing.body)).not.toContain(marketerName);
   });
 
   it('creates an inactive Manager account, encrypts the national code, and notifies Admin', async () => {

@@ -190,7 +190,9 @@ describe('StaffLoginPage (role-specific staff copy)', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText('پنل مدیران بازاریابی')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'ورود مدیران بازاریابی' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'ورود مدیران بازاریابی' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('ورود اختصاصی مدیران تیم‌های بازاریابی')).toBeInTheDocument();
     expect(screen.queryByText(/ادمین|منتور/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('نام کاربری یا شماره موبایل')).toBeInTheDocument();

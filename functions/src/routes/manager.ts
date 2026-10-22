@@ -13,12 +13,18 @@ export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   const r = Router();
   r.use('/manager', requireRole('manager'));
   const uid = (req: Parameters<typeof me>[0]) => me(req).id;
-  r.get('/manager/profile', h(async (req) => reports.managerProfile(d, me(req))));
+  r.get(
+    '/manager/profile',
+    h(async (req) => reports.managerProfile(d, me(req))),
+  );
   r.get(
     '/manager/dashboard',
     h(async (req) => reports.managerDashboard(d, me(req))),
   );
-  r.get('/manager/members', h(async (req) => reports.managerMembers(d, me(req))));
+  r.get(
+    '/manager/members',
+    h(async (req) => reports.managerMembers(d, me(req))),
+  );
   r.get(
     '/manager/campaigns/dashboard',
     h(async (req) => pushCampaigns.managerCampaignDashboard(d, me(req))),
@@ -108,15 +114,11 @@ export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   );
   r.post(
     '/manager/campaigns/:id/cancel',
-    h(async (req) =>
-      pushCampaigns.cancelManagerCampaign(d, me(req), String(req.params.id)),
-    ),
+    h(async (req) => pushCampaigns.cancelManagerCampaign(d, me(req), String(req.params.id))),
   );
   r.delete(
     '/manager/campaigns/:id',
-    h(async (req) =>
-      pushCampaigns.archiveManagerCampaign(d, me(req), String(req.params.id)),
-    ),
+    h(async (req) => pushCampaigns.archiveManagerCampaign(d, me(req), String(req.params.id))),
   );
   r.get(
     '/manager/reports/completion',

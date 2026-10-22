@@ -1,7 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlarmClock, BarChart3, BellRing, CheckCircle2, ChevronLeft, ClipboardList, Send, TrendingUp, Users, UsersRound, type LucideIcon } from 'lucide-react';
+import {
+  AlarmClock,
+  BarChart3,
+  BellRing,
+  CheckCircle2,
+  ChevronLeft,
+  ClipboardList,
+  Send,
+  TrendingUp,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button, EmptyState, KpiCard, ProgressBar, Skeleton, TableSkeleton } from '@/components/ui';
 import { DataTable } from '@/components/admin/DataTable';
 import { Mascot } from '@/components/brand/Mascot';
@@ -86,9 +98,24 @@ export function ManagerDashboard() {
                   />
                 </div>
                 <section aria-label="دسترسی سریع" className="grid gap-3 sm:grid-cols-3">
-                  <QuickAction to="/manager/members" label="تیم من" description="جست‌وجو و پیگیری اعضا" icon={UsersRound} />
-                  <QuickAction to="/manager/reports" label="گزارش مدیریتی" description="فیلتر، مقایسه و خروجی گزارش" icon={BarChart3} />
-                  <QuickAction to="/manager/campaigns" label="کمپین‌های تیم" description="اعلان آموزشی برای اعضای تیم" icon={BellRing} />
+                  <QuickAction
+                    to="/manager/members"
+                    label="تیم من"
+                    description="جست‌وجو و پیگیری اعضا"
+                    icon={UsersRound}
+                  />
+                  <QuickAction
+                    to="/manager/reports"
+                    label="گزارش مدیریتی"
+                    description="فیلتر، مقایسه و خروجی گزارش"
+                    icon={BarChart3}
+                  />
+                  <QuickAction
+                    to="/manager/campaigns"
+                    label="کمپین‌های تیم"
+                    description="اعلان آموزشی برای اعضای تیم"
+                    icon={BellRing}
+                  />
                 </section>
                 {d.pendingRetakes > 0 && (
                   <Link
@@ -238,7 +265,10 @@ function QuickAction({
         <span className="block font-extrabold text-[#183d30]">{label}</span>
         <span className="mt-1 block text-xs text-text-secondary">{description}</span>
       </span>
-      <ChevronLeft className="size-4 shrink-0 text-[#91a199] transition-transform group-hover:-translate-x-1" aria-hidden />
+      <ChevronLeft
+        className="size-4 shrink-0 text-[#91a199] transition-transform group-hover:-translate-x-1"
+        aria-hidden
+      />
     </Link>
   );
 }

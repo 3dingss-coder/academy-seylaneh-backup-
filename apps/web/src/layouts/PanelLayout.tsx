@@ -55,8 +55,12 @@ export function PanelLayout({
                 )}
               </span>
               <span className="hidden max-w-40 sm:block">
-                <span className="block truncate text-xs font-extrabold text-[#183d30]">{user?.name}</span>
-                <span className="block truncate text-[10px] text-[#74857b]">{user ? ROLE_LABEL[user.role] : ''}</span>
+                <span className="block truncate text-xs font-extrabold text-[#183d30]">
+                  {user?.name}
+                </span>
+                <span className="block truncate text-[10px] text-[#74857b]">
+                  {user ? ROLE_LABEL[user.role] : ''}
+                </span>
               </span>
               <UserRound className="hidden size-4 text-[#74857b] sm:block" aria-hidden />
             </Link>
@@ -97,9 +101,12 @@ export function PanelLayout({
                 to={to}
                 end={to.split('/').length <= 2}
                 aria-label={label}
-                aria-current={isItemActive(pathname, { to, label, icon: Icon, match }) ? 'page' : undefined}
+                aria-current={
+                  isItemActive(pathname, { to, label, icon: Icon, match }) ? 'page' : undefined
+                }
                 className={({ isActive }) => {
-                  const active = isActive || isItemActive(pathname, { to, label, icon: Icon, match });
+                  const active =
+                    isActive || isItemActive(pathname, { to, label, icon: Icon, match });
                   return cn(
                     'flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-bold transition-colors',
                     active ? 'bg-[#eaf4ec] text-[#126c4b]' : 'text-[#708078] hover:bg-[#f4f7f4]',

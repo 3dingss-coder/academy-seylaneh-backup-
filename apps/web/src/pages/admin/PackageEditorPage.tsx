@@ -190,6 +190,7 @@ function Editor({ d }: { d: AdminPackageDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title={p.title}
         back={p.brandId ? `/admin/content/brands/${p.brandId}` : '/admin/content?tab=unassigned'}
         subtitle={

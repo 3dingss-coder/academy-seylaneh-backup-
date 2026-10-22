@@ -69,7 +69,8 @@ describe('admin shell + core — enterprise console contracts', () => {
       }),
     );
     renderApp('/admin');
-    expect(await screen.findByText('WAU / MAU', {}, { timeout: 5000 })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('tab', { name: 'مشارکت' }, { timeout: 5000 }));
+    expect(await screen.findByText('WAU / MAU')).toBeInTheDocument();
     for (const label of [
       'داشبورد',
       'محتوای آموزشی',
@@ -79,6 +80,7 @@ describe('admin shell + core — enterprise console contracts', () => {
       'کاربران',
       'تیم‌ها',
       'گزارش‌ها',
+      'آزمون‌های مجدد',
       'آرشیو',
       'اعلان‌ها',
       'کمپین‌های Push',
@@ -157,22 +159,44 @@ describe('admin shell + core — enterprise console contracts', () => {
     expect(screen.queryAllByText('محتوای آموزشی')).toHaveLength(0);
   });
 
-  it('uses the desktop/mobile dashboard frame from the dashboard reference', async () => {
+  it('uses one shared right-rail admin shell and preserves the mascot and navigation', async () => {
     mockApi(
       signIn(admin, {
         'GET /v1/admin/dashboard': () => ({ data: ADMIN_DASHBOARD }),
       }),
     );
-    const { container } = renderApp('/admin');
-    expect(await screen.findByTestId('admin-dashboard-reference-shell')).toBeInTheDocument();
-    expect(screen.getAllByRole('navigation', { name: 'پنل ادمین' }).length).toBeGreaterThan(0);
+    renderApp('/admin');
+    expect(await screen.findByTestId('admin-panel-shell')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'فهرست اصلی ادمین' })).toBeInTheDocument();
-    expect(screen.getAllByText('پنل ادمین').length).toBeGreaterThan(0);
-    expect(
-      container.querySelector(
-        '[data-testid="admin-dashboard-reference-shell"] aside img[src="/brand/mascot.webp"]',
-      ),
-    ).not.toBeInTheDocument();
+    const rail = screen.getByRole('complementary', { name: 'پنل ادمین' });
+    expect(rail).toBeInTheDocument();
+    expect(rail.querySelector('img[src="/brand/mascot.webp"]')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'داشبورد سیلانه' })).toBeInTheDocument();
+  });
+
+  it('uses the admin profile header and keeps notification links inside the admin console', async () => {
+    mockApi(
+      signIn(admin, {
+        'GET /v1/me/home': () => ({
+          data: {
+            nextItem: null,
+            totalProgress: 0,
+            counts: { inProgress: 0, new: 0, completed: 2, overdue: 0 },
+            pointsBalance: 100,
+            packages: [],
+          },
+        }),
+        'GET /v1/me/notifications': () => ({ data: { unread: 0, items: [] } }),
+        'GET /v1/me/messages': () => ({ data: [] }),
+        'GET /v1/me/badges': () => ({ data: [] }),
+        'GET /v1/admin/notification-templates': () => ({ data: [] }),
+      }),
+    );
+    renderApp('/admin/profile');
+    expect(await screen.findByRole('heading', { name: 'پروفایل من' })).toBeInTheDocument();
+    expect(screen.getAllByText('پنل مدیریت').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'اعلان‌ها و پیام‌ها' }));
+    expect(await screen.findByRole('tab', { name: /صندوق من/ })).toBeInTheDocument();
   });
 
   it('content status cards deep-link into the real content tabs', async () => {

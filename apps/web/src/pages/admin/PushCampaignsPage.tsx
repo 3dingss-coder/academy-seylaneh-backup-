@@ -266,6 +266,7 @@ export function PushCampaignsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="کمپین‌های اعلان (Push)"
         subtitle="ساخت، زمان‌بندی، ارسال و گزارش نتیجه اعلان‌های سیستمی"
         actions={

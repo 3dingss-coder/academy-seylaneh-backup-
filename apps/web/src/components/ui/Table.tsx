@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export interface Column<T> {
@@ -34,12 +34,15 @@ export function DataTable<T>({
   columns,
   rowKey,
   onRowClick,
+  rowActionLabel,
   caption,
 }: {
   rows: T[];
   columns: Column<T>[];
   rowKey: (r: T) => string;
   onRowClick?: (r: T) => void;
+  /** Accessible, row-specific name for the mobile details action. */
+  rowActionLabel?: (r: T) => string;
   caption: string;
 }) {
   const [sort, setSort] = useState<Sort>(null);
@@ -114,8 +117,24 @@ export function DataTable<T>({
                   'transition-colors duration-150',
                   onRowClick ? 'cursor-pointer hover:bg-primary-light/50' : 'hover:bg-surface-2/60',
                 )}
-                onClick={onRowClick ? () => onRowClick(r) : undefined}
-                onKeyDown={onRowClick ? (e) => e.key === 'Enter' && onRowClick(r) : undefined}
+                onClick={
+                  onRowClick
+                    ? (e) => {
+                        const target = e.target;
+                        if (
+                          target instanceof Element &&
+                          target.closest('button, a, input, select, textarea, [role="button"]')
+                        )
+                          return;
+                        onRowClick(r);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onRowClick
+                    ? (e) => e.target === e.currentTarget && e.key === 'Enter' && onRowClick(r)
+                    : undefined
+                }
                 tabIndex={onRowClick ? 0 : undefined}
               >
                 {columns.map((c) => (
@@ -167,19 +186,20 @@ export function DataTable<T>({
           );
           return (
             <li key={rowKey(r)}>
-              {onRowClick ? (
-                <button
-                  type="button"
-                  onClick={() => onRowClick(r)}
-                  className="pressable w-full rounded-card border border-border bg-surface p-3 text-start shadow-xs hover:border-primary/30 hover:shadow-sm"
-                >
-                  {inner}
-                </button>
-              ) : (
-                <div className="rounded-card border border-border bg-surface p-3 shadow-xs">
-                  {inner}
-                </div>
-              )}
+              <div className="rounded-card border border-border bg-surface p-3 shadow-xs">
+                {inner}
+                {onRowClick && (
+                  <button
+                    type="button"
+                    onClick={() => onRowClick(r)}
+                    aria-label={rowActionLabel?.(r) ?? `نمایش ${caption}`}
+                    className="pressable mt-3 flex min-h-12 w-full items-center justify-between border-t border-border pt-2 text-sm font-bold text-primary-fg"
+                  >
+                    <span>نمایش جزئیات</span>
+                    <ArrowLeft className="size-4" aria-hidden />
+                  </button>
+                )}
+              </div>
             </li>
           );
         })}

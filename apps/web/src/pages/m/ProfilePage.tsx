@@ -18,6 +18,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { Button, Card, Input, useToast } from '@/components/ui';
+import { PageHeader } from '@/components/common/PageHeader';
 import { PushOptIn } from '@/components/common/PushOptIn';
 import { NotificationPrefsCard } from '@/components/common/NotificationPrefsCard';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
@@ -52,11 +53,31 @@ function SectionHeader({
   title,
   onBack,
   actions,
+  adminMode = false,
 }: {
   title: string;
   onBack?: () => void;
   actions?: React.ReactNode;
+  adminMode?: boolean;
 }) {
+  if (adminMode) {
+    return (
+      <div className="flex flex-col gap-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="pressable inline-flex min-h-12 self-start items-center gap-2 rounded-xl px-2 text-sm font-bold text-primary-fg hover:bg-primary-light"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+            بازگشت به نمایه
+          </button>
+        )}
+        <PageHeader variant="admin" title={title} actions={actions} />
+      </div>
+    );
+  }
+
   if (onBack) {
     return (
       <div className="relative flex min-h-14 items-center justify-center">
@@ -83,7 +104,13 @@ function SectionHeader({
 }
 
 /** Marketer profile redesigned to the approved mobile reference. */
-export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
+export function ProfilePage({
+  embedded = false,
+  adminMode = false,
+}: {
+  embedded?: boolean;
+  adminMode?: boolean;
+}) {
   const { user, setUser, logout } = useAuth();
   const toast = useToast();
   const nav = useNavigate();
@@ -220,15 +247,25 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
     <UserRound className="size-10 text-[#526B66]" aria-hidden />
   );
 
-  const shellClass = embedded
-    ? 'stagger mx-auto flex w-full max-w-xl flex-col gap-4'
-    : '-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 pb-6 pt-4';
+  const shellClass = adminMode
+    ? 'stagger flex w-full flex-col gap-4'
+    : embedded
+      ? 'stagger mx-auto flex w-full max-w-xl flex-col gap-4'
+      : '-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 pb-6 pt-4';
+  const innerClass = cn(
+    'mx-auto flex w-full flex-col gap-4',
+    adminMode ? 'max-w-4xl' : 'max-w-[520px]',
+  );
 
   if (view === 'personal') {
     return (
       <div className={shellClass}>
-        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-5">
-          <SectionHeader title="اطلاعات شخصی" onBack={() => setView('overview')} />
+        <div className={cn(innerClass, 'gap-5')}>
+          <SectionHeader
+            title="اطلاعات شخصی"
+            onBack={() => setView('overview')}
+            adminMode={adminMode}
+          />
 
           <div className="relative overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_82%_20%,#E7F3EA_0%,transparent_35%),linear-gradient(180deg,#FFFDF5_0%,#F8F4E8_100%)] px-4 pb-5 pt-4">
             <img
@@ -350,8 +387,12 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
   if (view === 'notifications') {
     return (
       <div className={shellClass}>
-        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
-          <SectionHeader title="تنظیمات اعلان‌ها" onBack={() => setView('overview')} />
+        <div className={innerClass}>
+          <SectionHeader
+            title="تنظیمات اعلان‌ها"
+            onBack={() => setView('overview')}
+            adminMode={adminMode}
+          />
           <PushOptIn />
           <NotificationPrefsCard />
         </div>
@@ -362,8 +403,12 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
   if (view === 'security') {
     return (
       <div className={shellClass}>
-        <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
-          <SectionHeader title="تنظیمات حساب" onBack={() => setView('overview')} />
+        <div className={innerClass}>
+          <SectionHeader
+            title="تنظیمات حساب"
+            onBack={() => setView('overview')}
+            adminMode={adminMode}
+          />
           <Card className="!rounded-[24px] bg-[#FFFDF8] p-5">
             <form onSubmit={changePw} className="flex flex-col gap-3">
               <div className="mb-1 flex items-center gap-3">
@@ -433,9 +478,10 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={shellClass}>
-      <div className="mx-auto flex w-full max-w-[520px] flex-col gap-4">
+      <div className={innerClass}>
         <SectionHeader
           title="پروفایل من"
+          adminMode={adminMode}
           actions={
             <>
               <button
@@ -448,7 +494,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               </button>
               <button
                 type="button"
-                onClick={() => nav('/messages')}
+                onClick={() => nav(adminMode ? '/admin/notifications' : '/messages')}
                 aria-label="اعلان‌ها و پیام‌ها"
                 className="pressable relative grid size-12 place-items-center rounded-full border border-[#EEE6DA] bg-[#FFFDF8] text-[#596B67] shadow-sm"
               >

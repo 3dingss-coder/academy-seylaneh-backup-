@@ -77,6 +77,39 @@ describe('Table (ui primitive, promoted from admin/DataTable)', () => {
     expect(screen.getByText('نتایج تیم')).toBeInTheDocument();
     expect(screen.getAllByText('سارا').length).toBeGreaterThanOrEqual(1);
   });
+  it('keeps mobile row navigation separate from action buttons', () => {
+    const onRowClick = vi.fn();
+    const onCellAction = vi.fn();
+    const actionColumns = [
+      {
+        key: 'name',
+        header: 'نام',
+        cell: (r: (typeof rows)[number]) => (
+          <>
+            <span>{r.name}</span>
+            <button type="button" onClick={onCellAction}>
+              عملیات
+            </button>
+          </>
+        ),
+      },
+    ];
+    render(
+      <Table
+        rows={rows}
+        columns={actionColumns}
+        rowKey={(r) => r.id}
+        caption="اعضا"
+        onRowClick={onRowClick}
+        rowActionLabel={(r) => `نمایش جزئیات ${r.name}`}
+      />,
+    );
+    screen.getAllByRole('button', { name: 'عملیات' }).forEach((button) => fireEvent.click(button));
+    expect(onCellAction).toHaveBeenCalledTimes(2);
+    expect(onRowClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'نمایش جزئیات سارا' }));
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+  });
   it('legacy admin/DataTable import is the same component', () => {
     expect(LegacyDataTable).toBe(Table);
   });

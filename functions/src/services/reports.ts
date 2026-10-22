@@ -2,7 +2,15 @@ import { z } from 'zod';
 import { ApiError } from '../http/errors';
 import { DAY, HOUR, zonedOffsetMs } from '../lib/time';
 import type { Doc } from '../store/types';
-import type { Attempt, Message, RetakeRequest, Team, User } from '../domain/types';
+import type {
+  Attempt,
+  Message,
+  Package,
+  PushCampaign,
+  RetakeRequest,
+  Team,
+  User,
+} from '../domain/types';
 import { audit, track, type Actor, type Deps } from './context';
 import { loadLearningForUsers, loadUserLearning, type PackageView } from './learning-state';
 import { archivedReportKeys } from './archive';
@@ -752,15 +760,29 @@ export async function adminCompletion(d: Deps, f: z.infer<typeof reportQuery>) {
   return { rows: completionRows(members, f, d.clock()), ...summarize(members, d.clock()) };
 }
 
-export async function adminKpis(d: Deps) {
+type AdminDashboardEvent = {
+  name: string;
+  userId: string | null;
+  ts: string;
+  props?: Record<string, unknown>;
+};
+
+type AdminDashboardAudit = {
+  action: string;
+  entity: string;
+  entityId: string;
+  actorId: string;
+  createdAt: string;
+};
+
+async function loadAdminKpiSources(d: Deps) {
   const now = d.clock();
-  const since30 = new Date(now.getTime() - 30 * DAY).toISOString();
-  const since7 = new Date(now.getTime() - 7 * DAY).toISOString();
+  const since90 = new Date(now.getTime() - 90 * DAY).toISOString();
   const [users, events, completions, firstAttempts] = await Promise.all([
-    d.store.query<User>({ collection: 'users', where: [['role', '==', 'marketer']] }),
-    d.store.query<{ name: string; userId: string | null; ts: string }>({
+    d.store.query<User>({ collection: 'users' }),
+    d.store.query<AdminDashboardEvent>({
       collection: 'analytics_events',
-      where: [['ts', '>=', since30]],
+      where: [['ts', '>=', since90]],
     }),
     d.store.query<{ userId: string; completedAt: string; onTime: boolean; delayHours: number }>({
       collection: 'package_completions',
@@ -773,26 +795,45 @@ export async function adminKpis(d: Deps) {
       ],
     }),
   ]);
-  const played = events.filter(
+  return { now, users, events, completions, firstAttempts };
+}
+
+function calculateAdminKpis({
+  now,
+  users,
+  events,
+  completions,
+  firstAttempts,
+}: Awaited<ReturnType<typeof loadAdminKpiSources>>) {
+  const since30 = new Date(now.getTime() - 30 * DAY).toISOString();
+  const since7 = new Date(now.getTime() - 7 * DAY).toISOString();
+  const recentEvents = events.filter((e) => e.ts >= since30);
+  const played = recentEvents.filter(
     (e) => e.name === 'section_played' || e.name === 'playback_heartbeat',
   );
-  const mau = new Set(played.map((e) => e.userId)).size;
-  const wau = new Set(played.filter((e) => e.ts >= since7).map((e) => e.userId)).size;
+  const mau = new Set(played.map((e) => e.userId).filter((id): id is string => !!id)).size;
+  const wau = new Set(
+    played
+      .filter((e) => e.ts >= since7)
+      .map((e) => e.userId)
+      .filter((id): id is string => !!id),
+  ).size;
+  const marketers = users.filter((user) => user.role === 'marketer');
   const firstCompletion = new Map<string, string>();
   for (const c of completions)
     if (!firstCompletion.has(c.userId) || (firstCompletion.get(c.userId) ?? '') > c.completedAt)
       firstCompletion.set(c.userId, c.completedAt);
-  const activated = users.filter((u) => {
+  const activated = marketers.filter((u) => {
     const fc = firstCompletion.get(u.id);
     return fc && Date.parse(fc) - Date.parse(u.createdAt) <= 7 * DAY;
   }).length;
   const late = completions.filter((c) => !c.onTime);
-  const nudges = events.filter((e) => e.name === 'mentor_nudge_created').length;
-  const reengaged = events.filter((e) => e.name === 'reengaged_after_nudge').length;
+  const nudges = recentEvents.filter((e) => e.name === 'mentor_nudge_created').length;
+  const reengaged = recentEvents.filter((e) => e.name === 'reengaged_after_nudge').length;
   return {
-    marketers: users.length,
-    activeMarketers: users.filter((u) => u.status === 'active').length,
-    activationRate: users.length ? Math.round((activated / users.length) * 100) : 0,
+    marketers: marketers.length,
+    activeMarketers: marketers.filter((u) => u.status === 'active').length,
+    activationRate: marketers.length ? Math.round((activated / marketers.length) * 100) : 0,
     wau,
     mau,
     wauMau: mau ? Math.round((wau / mau) * 100) : 0,
@@ -810,15 +851,140 @@ export async function adminKpis(d: Deps) {
   };
 }
 
+export async function adminKpis(d: Deps) {
+  return calculateAdminKpis(await loadAdminKpiSources(d));
+}
+
+const DASHBOARD_EVENTS = new Set([
+  'signup_completed',
+  'package_completed',
+  'quiz_passed',
+  'quiz_failed',
+  'retake_requested',
+  'mentor_message_sent',
+]);
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.length ? value : null;
+}
+
 export async function adminDashboard(d: Deps) {
-  const [kpis, packages, pendingRetakes] = await Promise.all([
-    adminKpis(d),
-    d.store.query<{ status: string; brandId: string | null }>({ collection: 'packages' }),
+  const now = d.clock();
+  const since30 = new Date(now.getTime() - 30 * DAY).toISOString();
+  const [sources, packages, pendingRetakes, campaigns, auditRows] = await Promise.all([
+    loadAdminKpiSources(d),
+    d.store.query<Package>({ collection: 'packages' }),
     d.store.query<RetakeRequest>({
       collection: 'retake_requests',
       where: [['status', '==', 'pending']],
     }),
+    d.store.query<PushCampaign>({ collection: 'push_campaigns', orderBy: [['createdAt', 'desc']] }),
+    d.store.query<AdminDashboardAudit>({
+      collection: 'audit_logs',
+      orderBy: [['createdAt', 'desc']],
+      limit: 12,
+    }),
   ]);
+  const { users, events } = sources;
+  const kpis = calculateAdminKpis(sources);
+  const visibleUsers = users.filter((u) => u.status !== 'blacklisted');
+  const usersByRole = { marketer: 0, manager: 0, admin: 0, superadmin: 0 };
+  for (const user of visibleUsers) usersByRole[user.role] += 1;
+
+  const recentUsers = [...visibleUsers]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 5)
+    .map((user) => ({
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      province: user.province,
+      city: user.city,
+    }));
+
+  const recentPackages = [...packages]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 5)
+    .map((pkg) => ({
+      id: pkg.id,
+      title: pkg.title,
+      status: pkg.status,
+      createdAt: pkg.createdAt,
+      updatedAt: pkg.updatedAt,
+      brandId: pkg.brandId,
+    }));
+
+  const liveCampaigns = campaigns.filter((campaign) => !campaign.archivedAt);
+  const campaignsByStatus = {
+    total: liveCampaigns.length,
+    draft: liveCampaigns.filter((campaign) => campaign.status === 'draft').length,
+    scheduled: liveCampaigns.filter((campaign) => campaign.status === 'scheduled').length,
+    inProgress: liveCampaigns.filter((campaign) => ['queued', 'sending'].includes(campaign.status))
+      .length,
+    sent: liveCampaigns.filter((campaign) => ['sent', 'sent_with_errors'].includes(campaign.status))
+      .length,
+    failed: liveCampaigns.filter((campaign) => campaign.status === 'failed').length,
+    cancelled: liveCampaigns.filter((campaign) => campaign.status === 'cancelled').length,
+  };
+
+  const dayKeys = Array.from({ length: 90 }, (_, i) =>
+    new Date(now.getTime() - (89 - i) * DAY).toISOString().slice(0, 10),
+  );
+  const activeByDay = new Map(dayKeys.map((day) => [day, new Set<string>()]));
+  const signupsByDay = new Map(dayKeys.map((day) => [day, 0]));
+  const completionsByDay = new Map(dayKeys.map((day) => [day, 0]));
+  const quizzesByDay = new Map(dayKeys.map((day) => [day, 0]));
+  for (const event of events) {
+    const day = event.ts.slice(0, 10);
+    if (!activeByDay.has(day)) continue;
+    if ((event.name === 'section_played' || event.name === 'playback_heartbeat') && event.userId)
+      activeByDay.get(day)?.add(event.userId);
+    if (event.name === 'signup_completed') signupsByDay.set(day, (signupsByDay.get(day) ?? 0) + 1);
+    if (event.name === 'package_completed')
+      completionsByDay.set(day, (completionsByDay.get(day) ?? 0) + 1);
+    if (event.name === 'quiz_passed' || event.name === 'quiz_failed')
+      quizzesByDay.set(day, (quizzesByDay.get(day) ?? 0) + 1);
+  }
+  const activityTrend = dayKeys.map((date) => ({
+    date,
+    activeUsers: activeByDay.get(date)?.size ?? 0,
+    signups: signupsByDay.get(date) ?? 0,
+    completions: completionsByDay.get(date) ?? 0,
+    quizAttempts: quizzesByDay.get(date) ?? 0,
+  }));
+
+  const userNames = new Map(visibleUsers.map((user) => [user.id, user.name]));
+  const appActivity = events
+    .filter((event) => event.ts >= since30 && DASHBOARD_EVENTS.has(event.name))
+    .map((event) => ({
+      id: event.id,
+      source: 'app' as const,
+      name: event.name,
+      at: event.ts,
+      actorId: event.userId,
+      actorName: event.userId ? (userNames.get(event.userId) ?? 'کاربر حذف‌شده') : 'سیستم',
+      entity: null,
+      entityId:
+        asString(event.props?.packageId) ??
+        asString(event.props?.quizId) ??
+        asString(event.props?.userId),
+    }));
+  const adminActivity = auditRows.map((event) => ({
+    id: event.id,
+    source: 'admin' as const,
+    name: event.action,
+    at: event.createdAt,
+    actorId: event.actorId,
+    actorName: userNames.get(event.actorId) ?? 'مدیر سیستم',
+    entity: event.entity,
+    entityId: event.entityId,
+  }));
+  const recentActivity = [...appActivity, ...adminActivity]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 8);
+
   return {
     kpis,
     content: {
@@ -828,6 +994,18 @@ export async function adminDashboard(d: Deps) {
       archived: packages.filter((p) => p.status === 'archived').length,
     },
     pendingRetakes: pendingRetakes.length,
+    insights: {
+      users: {
+        total: visibleUsers.length,
+        active: visibleUsers.filter((user) => user.status === 'active').length,
+        byRole: usersByRole,
+        recent: recentUsers,
+      },
+      activityTrend,
+      recentPackages,
+      recentActivity,
+      campaigns: campaignsByStatus,
+    },
   };
 }
 

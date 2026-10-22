@@ -262,6 +262,7 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title={det.name}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
@@ -1374,6 +1375,7 @@ function NewAutomationPage({ meta, loading }: { meta: CatalogMeta | null; loadin
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="اتوماسیون دست‌ساز"
         subtitle="اگر سناریویی در کاتالوگ نیست، همین‌جا ساخته می‌شود — و خاموش می‌ماند"
         back="/admin/push-campaigns/automations"

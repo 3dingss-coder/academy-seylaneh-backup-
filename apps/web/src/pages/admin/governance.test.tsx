@@ -216,16 +216,23 @@ describe('AuditPage — A10 append-only log with real actors and details', () =>
     expect(pres.some((t) => t.includes('parked'))).toBe(true);
   }, 20000);
 
-  it('filters by action or entity and shows the real empty state', async () => {
+  it('filters by action, entity or actor and shows the real empty state', async () => {
     mockApi(signIn({ 'GET /v1/admin/audit-logs': () => ({ data: AUDIT }) }));
     renderApp('/admin/audit');
-    const filter = await screen.findByLabelText('فیلتر عملیات یا موجودیت', {}, { timeout: 15000 });
+    const filter = await screen.findByLabelText(
+      'جست‌وجو در عملیات، موجودیت یا انجام‌دهنده',
+      {},
+      { timeout: 15000 },
+    );
     await screen.findAllByText('deadline.parked', {}, { timeout: 15000 });
     fireEvent.change(filter, { target: { value: 'package.published' } });
     await waitFor(() => expect(screen.queryByText('deadline.parked')).not.toBeInTheDocument());
     expect(screen.getAllByText('package.published').length).toBeGreaterThan(0);
+    fireEvent.change(filter, { target: { value: 'نگار نگاری' } });
+    await waitFor(() => expect(screen.queryByText('deadline.parked')).not.toBeInTheDocument());
+    expect(screen.getAllByText('package.published').length).toBeGreaterThan(0);
     fireEvent.change(filter, { target: { value: 'zzz' } });
-    await screen.findByText('موردی نیست', {}, { timeout: 15000 });
+    await screen.findByText('با این جست‌وجو نتیجه‌ای نیست', {}, { timeout: 15000 });
   }, 20000);
 });
 

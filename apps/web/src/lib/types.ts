@@ -607,6 +607,9 @@ export interface RetakeItem {
   escalated: boolean;
   scores: number[];
   createdAt: string;
+  /** Present on requests that have already been reviewed; optional for older cached responses. */
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
 }
 
 // ─── Admin ──────────────────────────────────────────────────────────────────
@@ -806,10 +809,64 @@ export interface AdminKpis {
   completions: number;
   nudgeReengagementRate: number;
 }
+export interface AdminDashboardUserSummary {
+  id: string;
+  name: string;
+  role: Role;
+  status: 'active' | 'inactive' | 'blacklisted';
+  createdAt: string;
+  province: string | null;
+  city: string | null;
+}
+export interface AdminDashboardPackageSummary {
+  id: string;
+  title: string;
+  status: 'draft' | 'published' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+  brandId: string | null;
+}
+export interface AdminDashboardActivity {
+  id: string;
+  source: 'app' | 'admin';
+  name: string;
+  at: string;
+  actorId: string | null;
+  actorName: string;
+  entity: string | null;
+  entityId: string | null;
+}
+export interface AdminDashboardInsights {
+  users: {
+    total: number;
+    active: number;
+    byRole: Record<Role, number>;
+    recent: AdminDashboardUserSummary[];
+  };
+  activityTrend: Array<{
+    date: string;
+    activeUsers: number;
+    signups: number;
+    completions: number;
+    quizAttempts: number;
+  }>;
+  recentPackages: AdminDashboardPackageSummary[];
+  recentActivity: AdminDashboardActivity[];
+  campaigns: {
+    total: number;
+    draft: number;
+    scheduled: number;
+    inProgress: number;
+    sent: number;
+    failed: number;
+    cancelled: number;
+  };
+}
 export interface AdminDashboard {
   kpis: AdminKpis;
   content: { published: number; drafts: number; unassigned: number; archived: number };
   pendingRetakes: number;
+  insights?: AdminDashboardInsights;
 }
 export interface NotificationTemplate {
   key: string;

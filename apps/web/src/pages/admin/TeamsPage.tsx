@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus } from 'lucide-react';
-import { Button, EmptyState, Input, Modal, TableSkeleton, useToast } from '@/components/ui';
+import { Pencil, Plus, UserRound, UserX, UsersRound } from 'lucide-react';
+import {
+  Button,
+  EmptyState,
+  Input,
+  KpiCard,
+  Modal,
+  TableSkeleton,
+  useToast,
+} from '@/components/ui';
 import { Select } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
@@ -16,9 +24,12 @@ import { useTeams, useUsers } from './adminQueries';
 export function TeamsPage() {
   const teams = useTeams();
   const [edit, setEdit] = useState<AdminTeam | 'new' | null>(null);
+  const memberCount = teams.data?.reduce((total, team) => total + team.memberCount, 0);
+  const teamsWithoutManager = teams.data?.filter((team) => !team.managerId).length;
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="تیم‌ها"
         actions={
           <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setEdit('new')}>
@@ -26,6 +37,27 @@ export function TeamsPage() {
           </Button>
         }
       />
+      <section aria-label="خلاصهٔ تیم‌ها" className="stagger grid grid-cols-2 gap-3 xl:grid-cols-3">
+        <KpiCard
+          title="تیم‌های ثبت‌شده"
+          value={teams.data ? toPersianDigits(teams.data.length) : '—'}
+          icon={UsersRound}
+        />
+        <KpiCard
+          title="اعضای تیم‌ها"
+          value={memberCount !== undefined ? toPersianDigits(memberCount) : '—'}
+          subtitle="مجموع اعضای منتسب‌شده"
+          icon={UserRound}
+          tone="info"
+        />
+        <KpiCard
+          title="بدون مدیر"
+          value={teamsWithoutManager !== undefined ? toPersianDigits(teamsWithoutManager) : '—'}
+          subtitle="تیم‌هایی که مدیر فروش ندارند"
+          icon={UserX}
+          tone="warning"
+        />
+      </section>
       <QueryState
         query={teams}
         loading={<TableSkeleton rows={4} />}

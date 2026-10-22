@@ -65,6 +65,7 @@ export function PushAutomationTracePage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="ردیابی اعلان یک کاربر"
         subtitle="چه انتخابی کرده، چقدر از سقفش را مصرف کرده و موتور در ساعات اخیر چه چیزهایی را رد کرد"
         back="/admin/push-campaigns/automations"

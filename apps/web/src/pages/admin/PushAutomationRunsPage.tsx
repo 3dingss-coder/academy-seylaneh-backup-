@@ -125,6 +125,7 @@ export function PushAutomationRunsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="تاریخچه اجرای اتوماسیون"
         subtitle="هر باری که موتور قوانین را بررسی کرد، با تعداد مشمولان، ارسال‌ها و دلایل ردّ"
         back="/admin/push-campaigns/automations"

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   Bot,
+  ClipboardList,
   FolderTree,
   Library,
   LayoutDashboard,
@@ -20,6 +21,7 @@ import { AdminPanelLayout } from '@/layouts/AdminPanelLayout';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ProfilePage } from '@/pages/m/ProfilePage';
 import { AdminDashboard } from './AdminDashboard';
+import { AdminRetakeRequestsPage } from './AdminRetakeRequestsPage';
 import { AssignmentsPage } from './AssignmentsPage';
 import { AuditPage } from './AuditPage';
 import { BrandDetailPage } from './BrandDetailPage';
@@ -55,6 +57,7 @@ const NAV = [
   { to: '/admin/users', label: 'کاربران', icon: Users },
   { to: '/admin/teams', label: 'تیم‌ها', icon: UsersRound },
   { to: '/admin/reports', label: 'گزارش‌ها', icon: BarChart3 },
+  { to: '/admin/retake-requests', label: 'آزمون‌های مجدد', icon: ClipboardList },
   { to: '/admin/archive', label: 'آرشیو', icon: Archive },
   { to: '/admin/notifications', label: 'اعلان‌ها', icon: Bell },
   { to: '/admin/push-campaigns', label: 'کمپین‌های Push', icon: Megaphone },
@@ -84,6 +87,7 @@ export default function AdminRoutes() {
         <Route path="users/:id" element={<AdminUserDetail />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="retake-requests" element={<AdminRetakeRequestsPage />} />
         <Route path="archive" element={<ArchivePage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="push-campaigns" element={<PushCampaignsPage />} />
@@ -102,7 +106,7 @@ export default function AdminRoutes() {
         <Route path="push-campaigns/:id" element={<PushCampaignEditorPage />} />
         <Route path="policies" element={<PoliciesPage />} />
         <Route path="audit" element={<AuditPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile" element={<ProfilePage adminMode />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

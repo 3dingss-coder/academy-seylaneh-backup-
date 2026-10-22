@@ -27,7 +27,7 @@ import { ROLE_LABEL } from '@/lib/format';
 import type { AdminBrand, AdminPackage, AdminProduct } from '@/lib/types';
 import type { PanelNavItem } from '@/layouts/PanelLayout';
 
-/** Admin shell: content routes use the Drive rail; `/admin` follows its desktop/mobile dashboard reference. */
+/** Admin shell shared by every admin route: RTL content, a persistent right rail, and responsive navigation. */
 export function AdminPanelLayout({ title, items }: { title: string; items: PanelNavItem[] }) {
   const { pathname } = useLocation();
   const current = getActiveItem(pathname, items);
@@ -49,13 +49,11 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [mobileOpen]);
 
-  if (pathname === '/admin') return <DashboardShell title={title} items={items} />;
-
   return (
-    <div className="min-h-dvh bg-[#f7f7f3]" dir="ltr">
-      <div className="flex min-h-dvh">
+    <div data-testid="admin-panel-shell" className="min-h-dvh bg-[#f8f7f2]" dir="rtl">
+      <div className="flex min-h-dvh" dir="rtl">
         <DesktopSidebar title={title} items={items} />
-        <div className="min-w-0 flex-1 bg-[#f7f7f3]" dir="rtl">
+        <div className="min-w-0 flex-1 bg-[#f8f7f2]">
           <DesktopHeader />
           <MobileHeader
             pageTitle={pageTitle}
@@ -63,7 +61,7 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
             backTo={backTo}
             onOpenMenu={() => setMobileOpen(true)}
           />
-          <main className="mx-auto w-full max-w-[1440px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
+          <main className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
             <Breadcrumb title={title} items={items} />
             <PageTransition>
               <Outlet />
@@ -78,166 +76,35 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
   );
 }
 
-function DashboardShell({ title, items }: { title: string; items: PanelNavItem[] }) {
-  return (
-    <div data-testid="admin-dashboard-reference-shell" className="min-h-dvh bg-[#f7f8fb]" dir="rtl">
-      <DashboardDesktopHeader />
-      <DashboardMobileHeader title={title} items={items} />
-      <div className="flex min-h-[calc(100dvh-4rem)]" dir="rtl">
-        <DashboardSidebar title={title} items={items} />
-        <main className="min-w-0 flex-1 bg-[#f7f8fb]">
-          <div className="mx-auto w-full max-w-[1440px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
-            <PageTransition>
-              <Outlet />
-            </PageTransition>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function DashboardDesktopHeader() {
-  const { user, logout } = useAuth();
-  return (
-    <header
-      className="hidden h-16 items-center justify-between gap-5 border-b border-[#e4e8e5] bg-white px-5 xl:px-8 lg:flex"
-      dir="ltr"
-    >
-      <div className="flex shrink-0 items-center gap-3" dir="rtl">
-        <Link
-          to="/admin/profile"
-          aria-label="پروفایل"
-          className="flex min-h-12 items-center gap-2 rounded-xl px-2 hover:bg-[#f4f7f4]"
-        >
-          <span className="grid size-9 place-items-center rounded-full bg-[#e6f3ec] font-extrabold text-[#08704f]">
-            {user?.name.trim().charAt(0) || <UserRound className="size-4" aria-hidden="true" />}
-          </span>
-          <span className="text-right">
-            <span className="block max-w-36 truncate text-sm font-bold text-[#173e35]">
-              {user?.name ?? 'کاربر'}
-            </span>
-            <span className="block text-xs text-[#718078]">
-              {user ? ROLE_LABEL[user.role] : ''}
-            </span>
-          </span>
-        </Link>
-        <button
-          type="button"
-          onClick={() => void logout()}
-          className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#53675f] hover:bg-[#f4f7f4] hover:text-[#075b44]"
-        >
-          <LogOut className="size-4" aria-hidden="true" />
-          خروج
-        </button>
-      </div>
-      <Link to="/admin" aria-label="داشبورد سیلانه" className="shrink-0 rounded-lg" dir="rtl">
-        <AppLogo withTitle />
-      </Link>
-    </header>
-  );
-}
-
-function DashboardMobileHeader({ title, items }: { title: string; items: PanelNavItem[] }) {
-  const { logout } = useAuth();
-  const { pathname } = useLocation();
-  const active = getActiveItem(pathname, items);
-  return (
-    <header className="border-b border-[#e4e8e5] bg-white lg:hidden">
-      <div className="flex h-16 items-center justify-between gap-3 px-4" dir="ltr">
-        <button
-          type="button"
-          aria-label="خروج"
-          onClick={() => void logout()}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full text-[#4c5c56] hover:bg-[#f4f7f4]"
-        >
-          <LogOut className="size-5" aria-hidden="true" />
-        </button>
-        <Link to="/admin" aria-label="داشبورد سیلانه" className="shrink-0 rounded-lg" dir="rtl">
-          <AppLogo withTitle />
-        </Link>
-      </div>
-      <nav
-        aria-label={title}
-        className="scrollbar-none overflow-x-auto border-t border-[#edf0ed] px-3"
-      >
-        <ul className="flex min-w-max items-center gap-2 py-2" dir="rtl">
-          {items.map(({ to, label, icon: Icon }) => {
-            const selected = active?.to === to;
-            return (
-              <li key={to}>
-                <Link
-                  to={to}
-                  aria-current={selected ? 'page' : undefined}
-                  className={cn(
-                    'flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold transition-colors',
-                    selected
-                      ? 'bg-[#08704f] text-white shadow-sm'
-                      : 'text-[#40554c] hover:bg-[#f1f5f2] hover:text-[#075b44]',
-                  )}
-                  dir="ltr"
-                >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span dir="rtl">{label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    </header>
-  );
-}
-
-function DashboardSidebar({ title, items }: { title: string; items: PanelNavItem[] }) {
-  const { pathname } = useLocation();
-  return (
-    <aside
-      aria-label={title}
-      className="sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 flex-col border-s border-[#e4e8e5] bg-white lg:flex xl:w-72"
-      dir="ltr"
-    >
-      <div className="px-5 pb-2 pt-4" dir="rtl">
-        <p className="text-xs font-bold text-[#73827b]">{title}</p>
-      </div>
-      <nav aria-label="فهرست اصلی ادمین" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-1">
-        <NavList items={items} pathname={pathname} variant="light" />
-      </nav>
-    </aside>
-  );
-}
-
 function DesktopSidebar({ title, items }: { title: string; items: PanelNavItem[] }) {
   const { pathname } = useLocation();
   return (
     <aside
       aria-label={title}
-      className="sticky top-0 hidden h-dvh w-[196px] shrink-0 flex-col bg-[#075b44] text-white lg:flex"
-      dir="ltr"
+      className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-e border-[#e7e3d8] bg-[#fffdf5] text-[#25362f] xl:w-[248px] lg:flex"
+      dir="rtl"
     >
       <Link
         to="/admin"
         aria-label="داشبورد سیلانه"
         className="flex h-[76px] shrink-0 items-center px-5"
       >
-        <AppLogo
-          withTitle={false}
-          className="[&_img]:h-9 [&_img]:w-auto [&_img]:brightness-0 [&_img]:invert"
-        />
+        <AppLogo withTitle className="[&_img]:h-8 [&_img]:w-auto" />
       </Link>
-      <nav aria-label={title} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        <p className="mb-2 px-3 text-[11px] font-bold text-white/60" dir="rtl">
-          {title}
-        </p>
-        <NavList items={items} pathname={pathname} />
+      <nav aria-label="فهرست اصلی ادمین" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <p className="mb-2 px-3 text-[11px] font-bold text-[#7a8279]">مدیریت آکادمی</p>
+        <NavList items={items} pathname={pathname} variant="rail" />
       </nav>
-      <div className="mt-auto shrink-0 overflow-hidden px-2 pt-2">
+      <div className="mx-3 mb-3 flex h-28 shrink-0 items-end overflow-hidden rounded-2xl bg-gradient-to-br from-[#e7f6ed] to-[#f4f0df] px-2 pt-2">
         <img
           src="/brand/mascot.webp"
           alt=""
           aria-hidden="true"
-          className="mx-auto max-h-[174px] w-full object-contain object-bottom"
+          className="h-full w-24 object-contain object-bottom"
         />
+        <p className="mb-4 ms-2 text-xs font-bold leading-5 text-[#32624c]">
+          همه‌چیز برای مدیریت آموزش‌ها آماده است
+        </p>
       </div>
     </aside>
   );
@@ -252,12 +119,13 @@ function NavList({
   items: PanelNavItem[];
   pathname: string;
   onNavigate?: () => void;
-  variant?: 'dark' | 'light';
+  variant?: 'dark' | 'light' | 'rail';
 }) {
   const active = getActiveItem(pathname, items);
-  const light = variant === 'light';
+  const rail = variant === 'rail';
+  const light = variant === 'light' || rail;
   return (
-    <ul className="space-y-1.5">
+    <ul className="space-y-1">
       {items.map(({ to, label, icon: Icon }) => {
         const selected = active?.to === to;
         return (
@@ -267,24 +135,29 @@ function NavList({
               onClick={onNavigate}
               aria-current={selected ? 'page' : undefined}
               className={cn(
-                'group flex items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-150',
-                light ? 'min-h-12' : 'min-h-10 rounded-lg',
+                'group relative flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-sm transition-colors duration-150',
+                rail &&
+                  selected &&
+                  'after:absolute after:inset-y-2 after:start-0 after:w-1 after:rounded-e-full after:bg-[#059669]',
                 light
                   ? selected
-                    ? 'bg-[#08704f] font-bold text-white shadow-sm'
-                    : 'font-medium text-[#43574f] hover:bg-[#f1f5f2] hover:text-[#075b44]'
+                    ? rail
+                      ? 'bg-[#e4f5e9] font-bold text-[#075b44]'
+                      : 'bg-[#08704f] font-bold text-white shadow-sm'
+                    : 'font-medium text-[#46564e] hover:bg-[#eff5ee] hover:text-[#075b44]'
                   : selected
                     ? 'bg-white/15 font-bold text-white shadow-sm ring-1 ring-inset ring-white/10'
                     : 'font-medium text-white/80 hover:bg-white/10 hover:text-white',
               )}
-              dir={light ? 'rtl' : 'ltr'}
+              dir="rtl"
             >
-              <Icon className="size-[18px] shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-right" dir="rtl">
-                {label}
-              </span>
+              <Icon
+                className={cn('size-[18px] shrink-0', rail && selected && 'text-[#047857]')}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1 truncate text-right">{label}</span>
               {selected && (
-                <ChevronLeft className="size-4 shrink-0 opacity-80" aria-hidden="true" />
+                <ChevronLeft className="size-4 shrink-0 opacity-70" aria-hidden="true" />
               )}
             </Link>
           </li>
@@ -301,7 +174,7 @@ function DesktopHeader() {
   useEffect(() => setAccountOpen(false), [pathname]);
 
   return (
-    <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-5 border-b border-[#e9e8e1] bg-white/95 px-5 backdrop-blur-sm lg:flex xl:px-7">
+    <header className="sticky top-0 z-30 hidden h-[72px] items-center justify-between gap-5 border-b border-[#ece9df] bg-[#fffdf8]/95 px-5 backdrop-blur-sm lg:flex xl:px-8">
       <div className="min-w-0 flex-1">
         <QuickSearch />
       </div>
@@ -565,7 +438,7 @@ function MobileHeader({
   onOpenMenu: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 grid h-14 grid-cols-[48px_minmax(0,1fr)_48px] items-center border-b border-[#e9e8e1] bg-white px-2 lg:hidden">
+    <header className="sticky top-0 z-30 grid h-14 grid-cols-[48px_minmax(0,1fr)_48px] items-center border-b border-[#ece9df] bg-[#fffdf8] px-2 lg:hidden">
       {isDetail ? (
         <Link
           to={backTo}
@@ -625,34 +498,31 @@ function MobileMenu({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-y-0 right-0 flex w-[min(86vw,22rem)] flex-col bg-[#075b44] text-white shadow-xl"
+        className="absolute inset-y-0 right-0 flex w-[min(86vw,22rem)] flex-col bg-[#fffdf5] text-[#25362f] shadow-xl"
         dir="rtl"
       >
         <div
-          className="flex h-16 shrink-0 items-center justify-between border-b border-white/15 px-4"
+          className="flex h-16 shrink-0 items-center justify-between border-b border-[#e7e3d8] px-4"
           dir="ltr"
         >
-          <AppLogo
-            withTitle={false}
-            className="[&_img]:h-9 [&_img]:w-auto [&_img]:brightness-0 [&_img]:invert"
-          />
+          <AppLogo withTitle={false} className="[&_img]:h-8 [&_img]:w-auto" />
           <button
             type="button"
             aria-label="بستن فهرست"
             onClick={onClose}
-            className="flex size-11 items-center justify-center rounded-full text-white hover:bg-white/10"
+            className="flex size-11 items-center justify-center rounded-full text-[#47574f] hover:bg-[#f1f4ea]"
           >
             <X className="size-5" aria-hidden="true" />
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3">
-          <p className="mb-2 px-3 text-[11px] font-bold text-white/60">{title}</p>
-          <NavList items={items} pathname={pathname} onNavigate={onClose} />
-          <div className="mt-auto border-t border-white/15 pt-3">
+          <p className="mb-2 px-3 text-[11px] font-bold text-[#7a8279]">{title}</p>
+          <NavList items={items} pathname={pathname} onNavigate={onClose} variant="rail" />
+          <div className="mt-auto border-t border-[#e7e3d8] pt-3">
             <Link
               to="/admin/profile"
               onClick={onClose}
-              className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/90 hover:bg-white/10"
+              className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium text-[#43574f] hover:bg-[#eff5ee]"
             >
               <UserRound className="size-5" aria-hidden="true" />
               <span className="flex-1">{user?.name ?? 'پروفایل'}</span>
@@ -663,7 +533,7 @@ function MobileMenu({
                 onClose();
                 void logout();
               }}
-              className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/90 hover:bg-white/10"
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-[#43574f] hover:bg-[#eff5ee]"
             >
               <LogOut className="size-5" aria-hidden="true" />
               خروج

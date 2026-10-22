@@ -189,13 +189,13 @@ describe('QuizBuilderPage — four-option MCQ contract preserved', () => {
     });
     renderApp('/admin/quizzes/q1');
     expect(
-      await screen.findByText(/مزیت اصلی این محصول چیست/, {}, { timeout: 15000 }),
-    ).toBeInTheDocument();
+      (await screen.findAllByText(/مزیت اصلی این محصول چیست/, {}, { timeout: 15000 })).length,
+    ).toBeGreaterThanOrEqual(2);
     // four options, only the correct one is marked
     for (const t of ['الف) گزینه اول', 'ب) گزینه دوم', 'ج) گزینه سوم', 'د) گزینه چهارم'])
       expect(screen.getByText(t)).toBeInTheDocument();
     expect(screen.getByLabelText('پاسخ صحیح')).toBeInTheDocument();
-    expect(screen.getByText(/توضیح: چون ویژگی اصلی همین است\./)).toBeInTheDocument();
+    expect(screen.getByText('چون ویژگی اصلی همین است.')).toBeInTheDocument();
     // question controls (reorder / edit / delete)
     for (const name of ['بالا', 'پایین', 'ویرایش سؤال', 'حذف سؤال'])
       expect(screen.getByRole('button', { name })).toBeInTheDocument();

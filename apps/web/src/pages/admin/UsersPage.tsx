@@ -1,17 +1,34 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, KeyRound, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  BookOpen,
+  CheckCircle2,
+  Clock3,
+  FileQuestion,
+  KeyRound,
+  Mail,
+  MessageSquareText,
+  Pencil,
+  Phone,
+  Search,
+  Trash2,
+  UserRound,
+} from 'lucide-react';
 import {
   Button,
+  Card,
   EmptyState,
   Input,
+  KpiCard,
   Modal,
+  ProgressBar,
   StatusBadge,
   TableSkeleton,
   useToast,
 } from '@/components/ui';
-import { Select } from '@/components/common/Field';
+import { Select, Tabs } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
 import { QueryState } from '@/components/common/QueryState';
@@ -23,7 +40,7 @@ import { useAuth } from '@/lib/auth';
 import { groupByPerson, type PersonGroup } from '@/lib/people';
 import { toPersianDigits } from '@/lib/digits';
 import { errMsg } from '@/lib/errors';
-import { ROLE_LABEL, faNumber, faRelative } from '@/lib/format';
+import { ROLE_LABEL, faDateTime, faNumber, faPercent, faRelative } from '@/lib/format';
 import type { Me, Role, Timeline } from '@/lib/types';
 import { useBrands, useTeams, useUsers } from './adminQueries';
 
@@ -60,7 +77,7 @@ export function UsersPage() {
   }, [users.data]);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="کاربران" subtitle="نقش، تیم و وضعیت کاربران" />
+      <PageHeader variant="admin" title="کاربران" subtitle="نقش، تیم و وضعیت کاربران" />
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         <Input
           label="جستجو"
@@ -554,11 +571,287 @@ export function AdminUserDetail() {
     queryFn: ({ signal }) => api.get<Timeline>(`/admin/users/${id}`, signal),
   });
   return (
-    <div>
-      <PageHeader title="جزئیات کاربر" back="/admin/users" />
+    <div className="flex flex-col gap-4">
+      <PageHeader variant="admin" title="جزئیات کاربر" back="/admin/users" />
       <QueryState query={q} loading={<TableSkeleton rows={6} />}>
-        {(d) => <MemberTimeline data={d} canMessage={false} />}
+        {(data) => <AdminUserWorkspace data={data} />}
       </QueryState>
     </div>
+  );
+}
+
+type UserDetailTab = 'overview' | 'learning' | 'messages';
+
+function AdminUserWorkspace({ data }: { data: Timeline }) {
+  const [tab, setTab] = useState<UserDetailTab>('overview');
+  const { user, packages, messages } = data;
+  const completed = packages.filter((pkg) => pkg.status === 'completed');
+  const inProgress = packages.filter((pkg) => pkg.status === 'in_progress');
+  const attemptCount = packages.reduce(
+    (sum, pkg) =>
+      sum + pkg.sections.reduce((sectionSum, section) => sectionSum + section.attempts.length, 0),
+    0,
+  );
+  const recentPackages = [...packages].sort(
+    (a, b) => Date.parse(b.lastActivityAt ?? '') - Date.parse(a.lastActivityAt ?? ''),
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card
+        tone="brand"
+        className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-primary/15 bg-white text-2xl font-black text-primary-fg sm:size-[76px]">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="size-full object-cover" />
+            ) : (
+              user.name.trim().charAt(0) || <UserRound className="size-8" aria-hidden />
+            )}
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-black text-[#143f36] sm:text-2xl">{user.name}</h2>
+              <StatusBadge status={user.status} />
+            </div>
+            <p className="mt-1 text-sm font-semibold text-text-secondary">
+              {ROLE_LABEL[user.role]}
+              {user.teamId ? ` · شناسهٔ تیم ${user.teamId}` : ''}
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">
+              {[user.city, user.province].filter(Boolean).join('، ') || 'محل فعالیت ثبت نشده'}
+              {' · '}عضویت از {faDateTime(user.createdAt)}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {user.phone && (
+            <a
+              href={`tel:${user.phone}`}
+              dir="ltr"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/20 bg-white px-3 text-sm font-bold text-primary-fg hover:bg-primary-light"
+            >
+              <Phone className="size-4" aria-hidden />
+              {toPersianDigits(user.phone)}
+            </a>
+          )}
+          {user.email && (
+            <a
+              href={`mailto:${user.email}`}
+              dir="ltr"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/20 bg-white px-3 text-sm font-bold text-primary-fg hover:bg-primary-light"
+            >
+              <Mail className="size-4" aria-hidden />
+              <span className="max-w-48 truncate">{user.email}</span>
+            </a>
+          )}
+        </div>
+      </Card>
+
+      <section
+        aria-label="آمار یادگیری کاربر"
+        className="stagger grid grid-cols-2 gap-3 xl:grid-cols-4"
+      >
+        <KpiCard
+          title="آموزش‌های تخصیص‌یافته"
+          value={faNumber(packages.length)}
+          subtitle="بسته‌های ثبت‌شده برای این کاربر"
+          icon={BookOpen}
+        />
+        <KpiCard
+          title="تکمیل‌شده"
+          value={faNumber(completed.length)}
+          subtitle="آموزش‌های به پایان رسیده"
+          icon={CheckCircle2}
+          tone="primary"
+        />
+        <KpiCard
+          title="در حال انجام"
+          value={faNumber(inProgress.length)}
+          subtitle="آموزش‌های فعال کاربر"
+          icon={Clock3}
+          tone="warning"
+        />
+        <KpiCard
+          title="تلاش‌های آزمون"
+          value={faNumber(attemptCount)}
+          subtitle="تلاش‌های ثبت‌شده در آموزش‌ها"
+          icon={FileQuestion}
+          tone="info"
+        />
+      </section>
+
+      <Tabs
+        label="بخش‌های پروندهٔ کاربر"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'overview', label: 'نمای کلی' },
+          { value: 'learning', label: 'پیشرفت آموزشی', count: packages.length },
+          { value: 'messages', label: 'پیام‌ها و یادداشت‌ها', count: messages.length },
+        ]}
+      />
+
+      {tab === 'overview' ? (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+          <Card className="flex flex-col gap-3">
+            <h3 className="flex items-center gap-2 font-extrabold text-[#143f36]">
+              <UserRound className="size-5 text-primary-fg" aria-hidden /> اطلاعات حساب
+            </h3>
+            <UserDetailLine label="نام و نام خانوادگی" value={user.name} />
+            <UserDetailLine
+              label="شماره تلفن"
+              value={user.phone ? toPersianDigits(user.phone) : 'ثبت نشده'}
+              ltr={!!user.phone}
+            />
+            <UserDetailLine label="ایمیل" value={user.email ?? 'ثبت نشده'} ltr={!!user.email} />
+            <UserDetailLine
+              label="استان و شهر"
+              value={[user.province, user.city].filter(Boolean).join('، ') || 'ثبت نشده'}
+            />
+            <UserDetailLine label="شناسهٔ کاربر" value={user.id} ltr />
+            <UserDetailLine
+              label="آخرین فعالیت"
+              value={user.lastActiveAt ? faRelative(user.lastActiveAt) : 'هنوز فعالیتی ثبت نشده'}
+            />
+            <UserDetailLine label="امتیاز فعلی" value={faNumber(user.pointsBalance)} />
+          </Card>
+
+          <Card className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-extrabold text-[#143f36]">آموزش‌های اخیر</h3>
+              <button
+                type="button"
+                onClick={() => setTab('learning')}
+                className="min-h-10 rounded-lg px-3 text-sm font-bold text-primary-fg hover:bg-primary-light"
+              >
+                مشاهدهٔ پیشرفت کامل
+              </button>
+            </div>
+            {recentPackages.length === 0 ? (
+              <EmptyState title="آموزشی به این کاربر تخصیص داده نشده" />
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {recentPackages.slice(0, 5).map((pkg) => (
+                  <li key={pkg.id} className="rounded-xl border border-border bg-surface-2/60 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-text">{pkg.title}</p>
+                        <p className="mt-0.5 text-xs text-text-secondary">
+                          {pkg.status === 'completed'
+                            ? 'تکمیل‌شده'
+                            : pkg.status === 'in_progress'
+                              ? 'در حال انجام'
+                              : 'شروع‌نشده'}
+                          {pkg.lastActivityAt ? ` · ${faRelative(pkg.lastActivityAt)}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-extrabold text-primary-fg">
+                        {faPercent(pkg.percent)}
+                      </span>
+                    </div>
+                    <ProgressBar
+                      value={pkg.percent}
+                      label={`پیشرفت ${pkg.title}`}
+                      className="mt-2"
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card className="xl:col-span-2">
+            <h3 className="flex items-center gap-2 font-extrabold text-[#143f36]">
+              <MessageSquareText className="size-5 text-primary-fg" aria-hidden /> آخرین پیام‌ها و
+              یادداشت‌ها
+            </h3>
+            {messages.length === 0 ? (
+              <p className="mt-3 text-sm text-text-secondary">
+                هنوز پیام یا یادداشتی ثبت نشده است.
+              </p>
+            ) : (
+              <ul className="mt-3 grid gap-2 md:grid-cols-2">
+                {[...messages]
+                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                  .slice(0, 4)
+                  .map((message) => (
+                    <li
+                      key={message.id}
+                      className="rounded-xl border border-border bg-surface-2/60 p-3"
+                    >
+                      <p className="whitespace-pre-line text-sm leading-6 text-text">
+                        {message.body}
+                      </p>
+                      <p className="mt-2 text-xs text-text-secondary">
+                        {message.type === 'note' ? 'یادداشت' : 'پیام'} ·{' '}
+                        {faDateTime(message.createdAt)} ·{' '}
+                        {message.readAt ? 'خوانده‌شده' : 'خوانده‌نشده'}
+                      </p>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      ) : tab === 'learning' ? (
+        <MemberTimeline data={data} canMessage={false} />
+      ) : (
+        <UserMessageHistory data={data} />
+      )}
+    </div>
+  );
+}
+
+function UserDetailLine({
+  label,
+  value,
+  ltr = false,
+}: {
+  label: string;
+  value: string;
+  ltr?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border py-2 text-sm last:border-0">
+      <span className="text-text-secondary">{label}</span>
+      <span
+        dir={ltr ? 'ltr' : undefined}
+        className="max-w-[70%] break-all text-end font-semibold text-text"
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function UserMessageHistory({ data }: { data: Timeline }) {
+  return data.messages.length === 0 ? (
+    <EmptyState
+      title="پیام یا یادداشتی ثبت نشده"
+      description="پیام‌ها و یادداشت‌های مرتبط با پرونده در این بخش نمایش داده می‌شوند."
+    />
+  ) : (
+    <ul className="grid gap-3 xl:grid-cols-2">
+      {[...data.messages]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((message) => (
+          <li key={message.id}>
+            <Card className="h-full">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 font-bold text-[#143f36]">
+                  <MessageSquareText className="size-4 text-primary-fg" aria-hidden />
+                  {message.type === 'note' ? 'یادداشت' : 'پیام'}
+                </h3>
+                <span className="text-xs text-text-secondary">{faDateTime(message.createdAt)}</span>
+              </div>
+              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-text">{message.body}</p>
+              <p className="mt-3 border-t border-border pt-2 text-xs text-text-secondary">
+                {message.readAt ? 'خوانده‌شده' : 'خوانده‌نشده'}
+              </p>
+            </Card>
+          </li>
+        ))}
+    </ul>
   );
 }

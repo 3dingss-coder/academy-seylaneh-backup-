@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
-import type { Me, NotificationTemplate } from '@/lib/types';
+import type { Me, NotificationItem, NotificationTemplate } from '@/lib/types';
 import { marketer } from '@/test/fixtures';
 import { mockApi } from '@/test/mockApi';
 import { renderApp } from '@/test/renderApp';
@@ -61,6 +61,65 @@ describe('NotificationsPage — three real tabs (inbox / templates / manual send
     expect(await screen.findByText('خوش‌آمد ثبت‌نام')).toBeInTheDocument();
     expect(screen.getByText('قبولی در آزمون')).toBeInTheDocument();
     expect(screen.getByText('(سفارشی)')).toBeInTheDocument();
+  });
+
+  it('filters the real inbox by type, read state, time window and search', async () => {
+    const now = Date.now();
+    const inbox: NotificationItem[] = [
+      {
+        id: 'n1',
+        type: 'manual',
+        title: 'یادآوری فردا',
+        body: 'جلسه فردا برگزار می‌شود.',
+        actionRef: null,
+        readAt: null,
+        createdAt: new Date(now - 60_000).toISOString(),
+      },
+      {
+        id: 'n2',
+        type: 'quiz_passed',
+        title: 'قبولی آزمون',
+        body: 'آزمون محصولات را با موفقیت گذراندی.',
+        actionRef: null,
+        readAt: new Date(now - 30_000).toISOString(),
+        createdAt: new Date(now - 2 * 60_000).toISOString(),
+      },
+      {
+        id: 'n3',
+        type: 'reminder',
+        title: 'یادآوری قدیمی',
+        body: 'دورهٔ آموزشی را ادامه بده.',
+        actionRef: null,
+        readAt: null,
+        createdAt: new Date(now - 60 * 24 * 60 * 60_000).toISOString(),
+      },
+    ];
+    mockApi(
+      signIn({
+        'GET /v1/me/notifications': () => ({ data: { unread: 2, items: inbox } }),
+      }),
+    );
+    renderApp('/admin/notifications');
+    expect(await screen.findByText('یادآوری فردا')).toBeInTheDocument();
+    expect(screen.getByText('قبولی آزمون')).toBeInTheDocument();
+    expect(screen.getByText('یادآوری قدیمی')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('نوع اعلان'), { target: { value: 'quiz_passed' } });
+    expect(screen.getByText('قبولی آزمون')).toBeInTheDocument();
+    expect(screen.queryByText('یادآوری فردا')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('نوع اعلان'), { target: { value: 'all' } });
+    fireEvent.click(screen.getByRole('tab', { name: /خوانده‌نشده/ }));
+    expect(screen.getByText('یادآوری فردا')).toBeInTheDocument();
+    expect(screen.getByText('یادآوری قدیمی')).toBeInTheDocument();
+    expect(screen.queryByText('قبولی آزمون')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('بازهٔ زمانی'), { target: { value: '7' } });
+    expect(screen.getByText('یادآوری فردا')).toBeInTheDocument();
+    expect(screen.queryByText('یادآوری قدیمی')).toBeNull();
+    fireEvent.change(screen.getByLabelText('جستجو در اعلان‌ها'), { target: { value: 'جلسه' } });
+    expect(screen.getByText('یادآوری فردا')).toBeInTheDocument();
+    expect(screen.queryByText('قبولی آزمون')).toBeNull();
   });
 
   it('keeps notification templates editable (PUT with the typed text)', async () => {

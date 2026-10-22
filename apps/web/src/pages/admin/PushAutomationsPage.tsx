@@ -12,6 +12,7 @@ export function PushAutomationsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="اتوماسیون اعلان (Push)"
         subtitle="قانون‌هایی که بر پایه رفتار کاربر اعلان می‌سازند؛ هر کدام روشن/خاموش، با سقف و پنجره زمانی خودشان"
         actions={

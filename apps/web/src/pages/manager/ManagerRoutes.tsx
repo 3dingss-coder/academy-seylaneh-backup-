@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { RetakeList } from '@/components/reports/RetakeList';
 import { PanelLayout } from '@/layouts/PanelLayout';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { ProfilePage } from '@/pages/m/ProfilePage';
+import { ManagerProfilePage } from './ManagerProfilePage';
 import { ManagerCampaignRoute, ManagerCampaignsPage } from './ManagerCampaigns';
 import { ManagerDashboard } from './ManagerDashboard';
 import { ManagerMember } from './ManagerMember';
@@ -46,7 +46,7 @@ export default function ManagerRoutes() {
             </>
           }
         />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile" element={<ManagerProfilePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -13,6 +13,7 @@ export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   const r = Router();
   r.use('/manager', requireRole('manager'));
   const uid = (req: Parameters<typeof me>[0]) => me(req).id;
+  r.get('/manager/profile', h(async (req) => reports.managerProfile(d, me(req))));
   r.get(
     '/manager/dashboard',
     h(async (req) => reports.managerDashboard(d, me(req))),

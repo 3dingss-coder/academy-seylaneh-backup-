@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
@@ -43,6 +43,7 @@ import { errMsg } from '@/lib/errors';
 import { ROLE_LABEL, faDateTime, faNumber, faPercent, faRelative } from '@/lib/format';
 import type { Me, Role, Timeline } from '@/lib/types';
 import { useBrands, useTeams, useUsers } from './adminQueries';
+import { ManagerAccessRequestsPanel } from './ManagerAccessRequestsPanel';
 
 /** The account an admin edits by default for a person: the one used most recently. */
 function primaryOf(g: PersonGroup<Me>): Me {
@@ -55,6 +56,14 @@ function primaryOf(g: PersonGroup<Me>): Me {
 
 /** A6 — کاربران: role, team, status, brand access, password reset, delete (→ archive). */
 export function UsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'manager-requests' ? 'requests' : 'accounts';
+  const selectTab = (tab: 'accounts' | 'requests') => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'requests') next.set('tab', 'manager-requests');
+    else next.delete('tab');
+    setSearchParams(next, { replace: true });
+  };
   const users = useUsers();
   const teams = useTeams();
   const [q, setQ] = useState('');
@@ -77,202 +86,223 @@ export function UsersPage() {
   }, [users.data]);
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader variant="admin" title="کاربران" subtitle="نقش، تیم و وضعیت کاربران" />
-      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-        <Input
-          label="جستجو"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          icon={<Search className="size-5" />}
-          placeholder="نام یا شماره"
-        />
-        <Select label="نقش" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="">همه</option>
-          {Object.entries(ROLE_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </Select>
-        <Select label="تیم" value={team} onChange={(e) => setTeam(e.target.value)}>
-          <option value="">همه</option>
-          <option value="none">بدون تیم</option>
-          {(teams.data ?? []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </Select>
-        <Select label="شهر" value={city} onChange={(e) => setCity(e.target.value)}>
-          <option value="">همه</option>
-          {cityOptions.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <QueryState query={users} loading={<TableSkeleton rows={8} />}>
-        {(list) => {
-          const needle = q.trim().replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
-          const rows = list.filter(
-            (u) =>
-              (!needle ||
-                u.name.includes(needle) ||
-                (u.phone ?? '').includes(needle) ||
-                (u.email ?? '').includes(needle) ||
-                (u.province ?? '').includes(needle) ||
-                (u.city ?? '').includes(needle)) &&
-              (!role || u.role === role) &&
-              (!team || (team === 'none' ? !u.teamId : u.teamId === team)) &&
-              (!city || u.city === city),
-          );
-          // One row per person: accounts that share a name are merged and their numbers are
-          // listed (small) under the name, so the number is what tells two people apart.
-          const people = groupByPerson(rows, (u) => ({
-            name: u.name,
-            phone: u.phone ?? u.email,
-          }));
-          const uniq = (l: Array<string | null | undefined>) => [
-            ...new Set(l.filter((x): x is string => !!x)),
-          ];
-          return people.length === 0 ? (
-            <EmptyState title="کاربری پیدا نشد" />
-          ) : (
-            <DataTable
-              caption="کاربران"
-              rows={people}
-              rowKey={(g) => g.key}
-              columns={[
-                {
-                  key: 'n',
-                  header: 'نام',
-                  sortValue: (g) => g.name,
-                  cell: (g) => (
-                    <div>
-                      <Link
-                        to={`/admin/users/${primaryOf(g).id}`}
-                        className="font-bold text-primary-fg"
-                      >
-                        {g.name}
-                      </Link>
-                      {g.phones.map((p) => (
-                        <span
-                          key={p}
-                          dir="ltr"
-                          className="block text-start text-[11px] leading-5 text-text-secondary"
-                        >
-                          {toPersianDigits(p)}
-                        </span>
-                      ))}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'loc',
-                  header: 'محل فعالیت',
-                  cell: (g) => {
-                    const l = uniq(
-                      g.rows.map((u) => (u.province ? `${u.province} • ${u.city ?? ''}` : null)),
-                    );
-                    return l.length ? (
-                      <div className="flex flex-col">
-                        {l.map((x) => (
-                          <span key={x}>{x}</span>
-                        ))}
-                      </div>
-                    ) : (
-                      '—'
-                    );
-                  },
-                  hideOnMobile: true,
-                },
-                {
-                  key: 'r',
-                  header: 'نقش',
-                  cell: (g) => uniq(g.rows.map((u) => ROLE_LABEL[u.role])).join('، '),
-                },
-                {
-                  key: 't',
-                  header: 'تیم',
-                  cell: (g) =>
-                    uniq(g.rows.map((u) => (u.teamId ? teamName.get(u.teamId) : null))).join(
-                      '، ',
-                    ) || '—',
-                },
-                {
-                  key: 's',
-                  header: 'وضعیت',
-                  cell: (g) => (
-                    <div className="flex flex-col items-start gap-1">
-                      {uniq(g.rows.map((u) => u.status)).map((st) => (
-                        <StatusBadge key={st} status={st as Me['status']} />
-                      ))}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'pt',
-                  header: 'امتیاز',
-                  sortValue: (g) => g.rows.reduce((n, u) => n + u.pointsBalance, 0),
-                  cell: (g) => faNumber(g.rows.reduce((n, u) => n + u.pointsBalance, 0)),
-                  hideOnMobile: true,
-                },
-                {
-                  key: 'a',
-                  header: 'آخرین فعالیت',
-                  sortValue: (g) =>
-                    Math.max(
-                      0,
-                      ...g.rows.map((u) => (u.lastActiveAt ? Date.parse(u.lastActiveAt) : 0)),
-                    ) || null,
-                  cell: (g) => {
-                    const last = g.rows
-                      .map((u) => u.lastActiveAt)
-                      .filter((x): x is string => !!x)
-                      .sort()
-                      .pop();
-                    return last ? faRelative(last) : 'هرگز';
-                  },
-                  hideOnMobile: true,
-                },
-                {
-                  key: 'e',
-                  header: '',
-                  cell: (g) => (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        className="px-2"
-                        aria-label={`ویرایش ${g.name}`}
-                        icon={<Pencil className="size-4" />}
-                        onClick={() => setEdit({ accounts: g.rows, id: primaryOf(g).id })}
-                      />
-                      <Button
-                        variant="ghost"
-                        className="px-2 text-danger"
-                        aria-label={`حذف ${g.name}`}
-                        icon={<Trash2 className="size-4" />}
-                        onClick={() => setDel(g)}
-                      />
-                    </div>
-                  ),
-                },
-              ]}
+      <PageHeader
+        variant="admin"
+        title="کاربران"
+        subtitle="مدیریت نقش‌ها، تیم‌ها و درخواست‌های دسترسی مدیران"
+      />
+      <Tabs
+        label="بخش‌های مدیریت کاربران"
+        value={activeTab}
+        onChange={selectTab}
+        items={[
+          { value: 'accounts', label: 'کاربران و نقش‌ها' },
+          { value: 'requests', label: 'درخواست‌های مدیران' },
+        ]}
+      />
+      {activeTab === 'requests' ? (
+        <ManagerAccessRequestsPanel />
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+            <Input
+              label="جستجو"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              icon={<Search className="size-5" />}
+              placeholder="نام یا شماره"
             />
-          );
-        }}
-      </QueryState>
-      {editUser && edit && (
-        <UserDialog
-          key={editUser.id}
-          user={editUser}
-          accounts={edit.accounts}
-          onSwitch={(id) => setEdit({ ...edit, id })}
-          onClose={() => setEdit(null)}
-        />
+            <Select label="نقش" value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="">همه</option>
+              {Object.entries(ROLE_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </Select>
+            <Select label="تیم" value={team} onChange={(e) => setTeam(e.target.value)}>
+              <option value="">همه</option>
+              <option value="none">بدون تیم</option>
+              {(teams.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+            <Select label="شهر" value={city} onChange={(e) => setCity(e.target.value)}>
+              <option value="">همه</option>
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <QueryState query={users} loading={<TableSkeleton rows={8} />}>
+            {(list) => {
+              const needle = q.trim().replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
+              const rows = list.filter(
+                (u) =>
+                  (!needle ||
+                    u.name.includes(needle) ||
+                    (u.phone ?? '').includes(needle) ||
+                    (u.email ?? '').includes(needle) ||
+                    (u.province ?? '').includes(needle) ||
+                    (u.city ?? '').includes(needle)) &&
+                  (!role || u.role === role) &&
+                  (!team || (team === 'none' ? !u.teamId : u.teamId === team)) &&
+                  (!city || u.city === city),
+              );
+              // One row per person: accounts that share a name are merged and their numbers are
+              // listed (small) under the name, so the number is what tells two people apart.
+              const people = groupByPerson(rows, (u) => ({
+                name: u.name,
+                phone: u.phone ?? u.email,
+              }));
+              const uniq = (l: Array<string | null | undefined>) => [
+                ...new Set(l.filter((x): x is string => !!x)),
+              ];
+              return people.length === 0 ? (
+                <EmptyState title="کاربری پیدا نشد" />
+              ) : (
+                <DataTable
+                  caption="کاربران"
+                  rows={people}
+                  rowKey={(g) => g.key}
+                  columns={[
+                    {
+                      key: 'n',
+                      header: 'نام',
+                      sortValue: (g) => g.name,
+                      cell: (g) => (
+                        <div>
+                          <Link
+                            to={`/admin/users/${primaryOf(g).id}`}
+                            className="font-bold text-primary-fg"
+                          >
+                            {g.name}
+                          </Link>
+                          {g.phones.map((p) => (
+                            <span
+                              key={p}
+                              dir="ltr"
+                              className="block text-start text-[11px] leading-5 text-text-secondary"
+                            >
+                              {toPersianDigits(p)}
+                            </span>
+                          ))}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'loc',
+                      header: 'محل فعالیت',
+                      cell: (g) => {
+                        const l = uniq(
+                          g.rows.map((u) =>
+                            u.province ? `${u.province} • ${u.city ?? ''}` : null,
+                          ),
+                        );
+                        return l.length ? (
+                          <div className="flex flex-col">
+                            {l.map((x) => (
+                              <span key={x}>{x}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          '—'
+                        );
+                      },
+                      hideOnMobile: true,
+                    },
+                    {
+                      key: 'r',
+                      header: 'نقش',
+                      cell: (g) => uniq(g.rows.map((u) => ROLE_LABEL[u.role])).join('، '),
+                    },
+                    {
+                      key: 't',
+                      header: 'تیم',
+                      cell: (g) =>
+                        uniq(g.rows.map((u) => (u.teamId ? teamName.get(u.teamId) : null))).join(
+                          '، ',
+                        ) || '—',
+                    },
+                    {
+                      key: 's',
+                      header: 'وضعیت',
+                      cell: (g) => (
+                        <div className="flex flex-col items-start gap-1">
+                          {uniq(g.rows.map((u) => u.status)).map((st) => (
+                            <StatusBadge key={st} status={st as Me['status']} />
+                          ))}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'pt',
+                      header: 'امتیاز',
+                      sortValue: (g) => g.rows.reduce((n, u) => n + u.pointsBalance, 0),
+                      cell: (g) => faNumber(g.rows.reduce((n, u) => n + u.pointsBalance, 0)),
+                      hideOnMobile: true,
+                    },
+                    {
+                      key: 'a',
+                      header: 'آخرین فعالیت',
+                      sortValue: (g) =>
+                        Math.max(
+                          0,
+                          ...g.rows.map((u) => (u.lastActiveAt ? Date.parse(u.lastActiveAt) : 0)),
+                        ) || null,
+                      cell: (g) => {
+                        const last = g.rows
+                          .map((u) => u.lastActiveAt)
+                          .filter((x): x is string => !!x)
+                          .sort()
+                          .pop();
+                        return last ? faRelative(last) : 'هرگز';
+                      },
+                      hideOnMobile: true,
+                    },
+                    {
+                      key: 'e',
+                      header: '',
+                      cell: (g) => (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            className="px-2"
+                            aria-label={`ویرایش ${g.name}`}
+                            icon={<Pencil className="size-4" />}
+                            onClick={() => setEdit({ accounts: g.rows, id: primaryOf(g).id })}
+                          />
+                          <Button
+                            variant="ghost"
+                            className="px-2 text-danger"
+                            aria-label={`حذف ${g.name}`}
+                            icon={<Trash2 className="size-4" />}
+                            onClick={() => setDel(g)}
+                          />
+                        </div>
+                      ),
+                    },
+                  ]}
+                />
+              );
+            }}
+          </QueryState>
+          {editUser && edit && (
+            <UserDialog
+              key={editUser.id}
+              user={editUser}
+              accounts={edit.accounts}
+              onSwitch={(id) => setEdit({ ...edit, id })}
+              onClose={() => setEdit(null)}
+            />
+          )}
+          {del && <DeleteUsersDialog group={del} onClose={() => setDel(null)} />}
+        </>
       )}
-      {del && <DeleteUsersDialog group={del} onClose={() => setDel(null)} />}
     </div>
   );
 }

@@ -133,6 +133,19 @@ export async function assertTeamMember(
   return u;
 }
 
+export async function managerProfile(d: Deps, manager: Doc<User>) {
+  // A Manager can only resolve their own assigned team; the client cannot supply a team/user id.
+  const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
+  return {
+    team: team && !team.archived ? { id: manager.teamId, name: team.name } : null,
+    managementArea: {
+      province: manager.province ?? null,
+      city: manager.city ?? null,
+    },
+    createdAt: manager.createdAt,
+  };
+}
+
 export async function managerDashboard(d: Deps, manager: Doc<User>) {
   const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
   const members = await loadMembers(

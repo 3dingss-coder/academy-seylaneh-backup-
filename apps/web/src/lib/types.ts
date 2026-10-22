@@ -32,6 +32,35 @@ export interface AuthResult {
   expiresIn: number;
 }
 
+export type ManagerAccessAuthResult =
+  | ({ state: 'active' } & AuthResult)
+  | { state: 'pending' | 'review_requested' | 'inactive'; message: string }
+  | { state: 'rejected'; message: string; reviewNote: string | null; appealCount: number };
+
+export interface ManagerProfileView {
+  team: { id: string; name: string } | null;
+  managementArea: { province: string | null; city: string | null };
+  createdAt: string;
+}
+
+export interface ManagerAccessRequestView {
+  id: string;
+  userId: string;
+  fullName: string;
+  phone: string;
+  nationalCode: string | null;
+  managementProvince: string;
+  managementCity: string;
+  avatarUrl: string;
+  status: 'pending' | 'review_requested' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  phoneReviewedExternally: boolean;
+  appeals: Array<{ message: string; submittedAt: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SectionState = 'locked' | 'open' | 'in_progress' | 'quiz' | 'completed';
 export type PackageUserStatus = 'new' | 'in_progress' | 'completed';
 

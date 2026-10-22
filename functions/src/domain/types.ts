@@ -36,6 +36,45 @@ export interface User {
   blacklistedBy?: string | null;
 }
 
+export type ManagerAccessStatus = 'pending' | 'review_requested' | 'approved' | 'rejected';
+
+export interface ManagerAccessAppeal {
+  message: string;
+  submittedAt: string;
+}
+
+/** A Manager application. National-code plaintext is encrypted at rest and only revealed to Admins. */
+export interface ManagerAccessRequest {
+  userId: string;
+  fullName: string;
+  phone: string;
+  nationalCodeCiphertext: string;
+  nationalCodeHash: string;
+  managementProvince: string;
+  managementCity: string;
+  avatarUrl: string;
+  avatarPath: string;
+  status: ManagerAccessStatus;
+  reviewNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  /** Admin attestation that the phone was checked outside this app; no SMS/OTP is implied. */
+  phoneReviewedExternallyBy: string | null;
+  phoneReviewedExternallyAt: string | null;
+  appeals: ManagerAccessAppeal[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One-time upload ticket metadata for a public Manager application photo. */
+export interface ManagerAccessUpload {
+  path: string;
+  mime: string;
+  consumedAt: string | null;
+  createdAt: string;
+  expireAt: Date;
+}
+
 /**
  * A report row (one marketer × one training package) an admin removed from the reports.
  * `purged` rows keep only ids (no names/phones): they exist solely so the row does not reappear.

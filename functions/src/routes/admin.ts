@@ -25,6 +25,7 @@ import * as policies from '../services/policies';
 import * as systemHealth from '../services/system-health';
 import * as reports from '../services/reports';
 import * as users from '../services/users';
+import * as managerAccess from '../services/manager-access';
 
 const id = (req: { params: Record<string, string | undefined> }, k = 'id') =>
   String(req.params[k] ?? '');
@@ -360,7 +361,38 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
     h(async (req) => assignments.revokeAssignment(d, actorOf(req), id(req))),
   );
 
-  // Users & teams
+  // Users, role management, and Manager access review.
+  r.get(
+    '/admin/manager-access-requests',
+    h(async (req) =>
+      managerAccess.listManagerAccessRequests(
+        d,
+        parse(managerAccess.managerAccessListSchema, req.query),
+      ),
+    ),
+  );
+  r.post(
+    '/admin/manager-access-requests/:id/approve',
+    h(async (req) =>
+      managerAccess.approveManagerAccess(
+        d,
+        actorOf(req),
+        id(req),
+        parse(managerAccess.approveManagerAccessSchema, req.body),
+      ),
+    ),
+  );
+  r.post(
+    '/admin/manager-access-requests/:id/reject',
+    h(async (req) =>
+      managerAccess.rejectManagerAccess(
+        d,
+        actorOf(req),
+        id(req),
+        parse(managerAccess.rejectManagerAccessSchema, req.body),
+      ),
+    ),
+  );
   r.get(
     '/admin/users',
     h(async (req) => users.listUsers(d, parse(users.adminUserQuery, req.query))),

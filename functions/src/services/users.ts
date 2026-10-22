@@ -550,6 +550,11 @@ export const changePasswordSchema = z.object({
 });
 
 export async function updateMe(d: Deps, user: Doc<User>, input: z.infer<typeof patchMeSchema>) {
+  if (user.role === 'manager' && (input.province !== undefined || input.city !== undefined))
+    throw new ApiError(
+      'FORBIDDEN',
+      'محدوده مدیریت مدیر از سوی ادمین تعیین می‌شود و از این بخش قابل تغییر نیست.',
+    );
   const patch: Partial<User> = { updatedAt: nowIso(d) };
   if (input.name !== undefined) patch.name = input.name;
   if (input.workplace !== undefined) patch.workplace = input.workplace;

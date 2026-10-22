@@ -267,7 +267,7 @@ describe('admin shell + core — enterprise console contracts', () => {
       }),
     );
     renderApp('/admin/profile');
-    expect(await screen.findByRole('heading', { name: 'پروفایل من' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'پروفایل ادمین' })).toBeInTheDocument();
     expect(screen.getAllByText('پنل مدیریت').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'اعلان‌ها و پیام‌ها' }));
     expect(await screen.findByRole('tab', { name: /صندوق من/ })).toBeInTheDocument();

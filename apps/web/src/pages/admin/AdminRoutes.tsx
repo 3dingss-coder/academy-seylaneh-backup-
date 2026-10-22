@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { AdminPanelLayout } from '@/layouts/AdminPanelLayout';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { ProfilePage } from '@/pages/m/ProfilePage';
+import { AdminProfilePage } from './AdminProfilePage';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminRetakeRequestsPage } from './AdminRetakeRequestsPage';
 import { AssignmentsPage } from './AssignmentsPage';
@@ -106,7 +106,7 @@ export default function AdminRoutes() {
         <Route path="push-campaigns/:id" element={<PushCampaignEditorPage />} />
         <Route path="policies" element={<PoliciesPage />} />
         <Route path="audit" element={<AuditPage />} />
-        <Route path="profile" element={<ProfilePage adminMode />} />
+        <Route path="profile" element={<AdminProfilePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

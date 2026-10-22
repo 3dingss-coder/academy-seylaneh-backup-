@@ -5,6 +5,7 @@ import { Button, Spinner } from '@/components/ui';
 import { homePathFor, useAuth } from '@/lib/auth';
 import { PANEL_LABEL, panelOf } from '@/lib/roles';
 import type { Role } from '@/lib/types';
+import { ManagerAccessPage } from '@/pages/auth/ManagerAccessPage';
 import { StaffLoginPage } from '@/pages/auth/StaffLoginPage';
 
 export function FullPageSpinner() {
@@ -41,7 +42,8 @@ export function RequireAuth({ roles, children }: { roles: Role[]; children: Reac
   if (status === 'anonymous' || !user) {
     // /admin and /manager show their own username + password sign-in at the same URL.
     const panel = panelOf(loc.pathname);
-    if (panel === 'admin' || panel === 'manager') return <StaffLoginPage panel={panel} />;
+    if (panel === 'manager') return <ManagerAccessPage />;
+    if (panel === 'admin') return <StaffLoginPage panel={panel} />;
     return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   }
   if (!roles.includes(user.role)) {

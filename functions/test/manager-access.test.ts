@@ -71,7 +71,7 @@ async function adminRequest(
 }
 
 describe('Manager access request and review', () => {
-  it('looks up mobile numbers without exposing applicant data and keeps non-Manager accounts out of signup', async () => {
+  it('sends unknown and existing marketer numbers into the application flow without revealing names', async () => {
     const marketerName = 'بازاریاب محرمانه';
     const marketer = await ctx.user('marketer', { name: marketerName });
     const unknown = await ctx
@@ -84,8 +84,86 @@ describe('Manager access request and review', () => {
     expect(unknown.status).toBe(200);
     expect(unknown.body.data).toMatchObject({ flow: 'apply', phone: '09125550100' });
     expect(existing.status).toBe(200);
-    expect(existing.body.data).toMatchObject({ flow: 'unavailable' });
+    expect(existing.body.data).toMatchObject({ flow: 'apply', phone: marketer.phone });
+    expect(existing.body.data).not.toHaveProperty('existingAccount');
     expect(JSON.stringify(existing.body)).not.toContain(marketerName);
+  });
+
+  it('preserves an existing marketer account through review, appeal, and Manager approval', async () => {
+    const marketer = await ctx.user('marketer', { name: 'بازاریاب موجود' });
+    const response = await submitApplication(marketer.phone);
+    expect(response.status).toBe(201);
+
+    let user = await ctx.deps.store.get<User>(`users/${marketer.id}`);
+    let request = await ctx.deps.store.get<ManagerAccessRequest>(
+      `manager_access_requests/${marketer.id}`,
+    );
+    expect(user).toMatchObject({ role: 'marketer', status: 'active', name: 'بازاریاب موجود' });
+    expect(request).toMatchObject({
+      userId: marketer.id,
+      existingAccount: true,
+      status: 'pending',
+    });
+    expect(request?.managerPasswordCiphertext).toMatch(/^v1\./);
+    expect(JSON.stringify(request)).not.toContain(PASSWORD);
+    expect((await ctx.api(marketer.token).get('/v1/me')).status).toBe(200);
+    const followUpLookup = await ctx.api().post('/v1/auth/manager-access/lookup', {
+      phone: marketer.phone,
+    });
+    expect(followUpLookup.body.data).toMatchObject({ flow: 'sign_in' });
+    expect(followUpLookup.body.data).not.toHaveProperty('existingAccount');
+
+    const pending = await ctx.api().post('/v1/auth/manager-access/sign-in', {
+      phone: marketer.phone,
+      password: PASSWORD,
+    });
+    expect(pending.body.data).toMatchObject({ state: 'pending' });
+    expect(pending.body.data.idToken).toBeUndefined();
+
+    const admin = await ctx.user('admin');
+    const adminList = await ctx.api(admin.token).get('/v1/admin/manager-access-requests');
+    expect(adminList.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: marketer.id, existingAccount: true })]),
+    );
+    expect(
+      (
+        await adminRequest(admin.token, marketer.id, 'reject', {
+          reason: 'مدارک هویتی نیاز به تطبیق دوباره دارد.',
+        })
+      ).status,
+    ).toBe(200);
+    const rejectedLogin = await ctx.api().post('/v1/auth/manager-access/sign-in', {
+      phone: marketer.phone,
+      password: PASSWORD,
+    });
+    expect(rejectedLogin.body.data).toMatchObject({ state: 'rejected' });
+    expect(rejectedLogin.body.data.idToken).toBeUndefined();
+
+    const appeal = await ctx.api().post('/v1/auth/manager-access/appeals', {
+      phone: marketer.phone,
+      password: PASSWORD,
+      message: 'لطفاً کد ملی و محدوده مدیریت ثبت‌شده را دوباره بررسی کنید.',
+    });
+    expect(appeal.status).toBe(200);
+    expect(appeal.body.data.status).toBe('review_requested');
+
+    const approved = await adminRequest(admin.token, marketer.id, 'approve', {
+      teamId: 'team-a',
+      phoneReviewedExternally: true,
+    });
+    expect(approved.status).toBe(200);
+    user = await ctx.deps.store.get<User>(`users/${marketer.id}`);
+    request = await ctx.deps.store.get<ManagerAccessRequest>(
+      `manager_access_requests/${marketer.id}`,
+    );
+    expect(user).toMatchObject({ role: 'manager', status: 'active', teamId: 'team-a' });
+    expect(request).toMatchObject({ status: 'approved', managerPasswordCiphertext: null });
+
+    const signIn = await ctx.api().post('/v1/auth/manager-access/sign-in', {
+      phone: marketer.phone,
+      password: PASSWORD,
+    });
+    expect(signIn.body.data).toMatchObject({ state: 'active', user: { role: 'manager' } });
   });
 
   it('creates an inactive Manager account, encrypts the national code, and notifies Admin', async () => {

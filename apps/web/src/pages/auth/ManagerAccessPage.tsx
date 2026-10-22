@@ -65,10 +65,10 @@ export function ManagerAccessPage() {
     setError('');
     setBusy('lookup');
     try {
-      const result = await api.post<{ flow: 'apply' | 'sign_in' | 'unavailable'; phone: string }>(
-        '/auth/manager-access/lookup',
-        { phone },
-      );
+      const result = await api.post<{
+        flow: 'apply' | 'sign_in' | 'unavailable';
+        phone: string;
+      }>('/auth/manager-access/lookup', { phone });
       setPhone(result.phone);
       setPassword('');
       setNotice(null);
@@ -287,7 +287,7 @@ export function ManagerAccessPage() {
               {screen === 'phone'
                 ? 'ورود یا درخواست دسترسی'
                 : screen === 'signin'
-                  ? 'ورود به پنل مدیر'
+                  ? 'ورود یا پیگیری دسترسی مدیر'
                   : screen === 'review'
                     ? 'بازبینی اطلاعات'
                     : 'تکمیل درخواست مدیریت'}
@@ -296,7 +296,7 @@ export function ManagerAccessPage() {
               {screen === 'phone'
                 ? 'شماره موبایل خود را وارد کنید تا مسیر ورود یا ثبت درخواست مدیر نمایش داده شود.'
                 : screen === 'signin'
-                  ? 'با همان شماره موبایل و رمز عبور حساب مدیر وارد شوید.'
+                  ? 'با شماره موبایل و رمز عبور ادامه دهید؛ اگر درخواست شما در حال بررسی باشد، وضعیت آن نمایش داده می‌شود.'
                   : screen === 'review'
                     ? 'اطلاعات را بررسی کنید؛ هر بخش را می‌توانید با آیکن مداد ویرایش کنید.'
                     : 'مشخصات، محدوده مدیریت، عکس و رمز ورود خود را ثبت کنید.'}
@@ -315,8 +315,8 @@ export function ManagerAccessPage() {
                     <ShieldCheck className="size-5" aria-hidden />
                     دسترسی فقط پس از بررسی ادمین فعال می‌شود
                   </div>
-                  اگر هنوز حساب مدیر ندارید، از همین‌جا درخواست دسترسی بفرستید. شماره موبایل در این
-                  سامانه با پیامک تأیید نمی‌شود و باید پیش از فعال‌سازی توسط ادمین بررسی شود.
+                  برای درخواست دسترسی مدیر، اطلاعات خود را ثبت کنید. حساب‌های موجود تا زمان بررسی
+                  ادمین نقش و دسترسی فعلی خود را حفظ می‌کنند؛ حساب جدید فقط پس از تأیید فعال می‌شود.
                 </div>
                 <Input
                   label="شماره موبایل"
@@ -347,7 +347,7 @@ export function ManagerAccessPage() {
               <form onSubmit={signIn} className="flex flex-col gap-4" aria-busy={busy === 'signin'}>
                 <div className="flex items-center justify-between rounded-2xl bg-[#f5f7f4] px-4 py-3">
                   <div>
-                    <p className="text-xs text-[#78837b]">شماره حساب مدیر</p>
+                    <p className="text-xs text-[#78837b]">شماره موبایل</p>
                     <p
                       dir="ltr"
                       className="mt-1 text-sm font-extrabold tracking-wide text-[#174d3b]"
@@ -375,7 +375,7 @@ export function ManagerAccessPage() {
                 />
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 <Button type="submit" loading={busy === 'signin'} size="lg" block>
-                  ورود به پنل مدیر
+                  ادامه
                   <ArrowLeft className="size-4" aria-hidden />
                 </Button>
               </form>
@@ -528,13 +528,12 @@ export function ManagerAccessPage() {
                   </div>
                 </section>
 
-                <div className="rounded-2xl border border-[#f0ddbd] bg-[#fff9ed] p-3 text-xs leading-6 text-[#765f3d]">
-                  <div className="flex items-center gap-2 font-extrabold">
-                    <CircleAlert className="size-4" aria-hidden /> تأیید شماره با پیامک انجام
-                    نمی‌شود
+                <div className="rounded-2xl border border-[#dbe8dc] bg-[#f5faf5] p-3 text-xs leading-6 text-[#546b5f]">
+                  <div className="flex items-center gap-2 font-extrabold text-[#174d3b]">
+                    <ShieldCheck className="size-4" aria-hidden /> بررسی درخواست
                   </div>
-                  تا زمان تصمیم ادمین، حساب شما غیرفعال است. ادمین باید اطلاعات و مالکیت شماره تماس
-                  را پیش از فعال‌سازی بررسی کند.
+                  تا زمان بررسی و تأیید ادمین، دسترسی مدیر فعال نمی‌شود. اگر شماره به حساب فعالی
+                  تعلق دارد، نقش و رمز فعلی آن حساب تغییر نمی‌کند.
                 </div>
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
@@ -591,8 +590,9 @@ export function ManagerAccessPage() {
                   <div className="flex items-center gap-2 font-extrabold text-[#174d3b]">
                     <ShieldCheck className="size-5" aria-hidden /> قبل از ارسال
                   </div>
-                  پس از تأیید ادمین، حساب فعال می‌شود و می‌توانید با همین شماره و رمز وارد پنل مدیر
-                  خود شوید. شماره موبایل در این مرحله با پیامک تأیید نشده است.
+                  پس از تأیید ادمین، دسترسی مدیر برای همین شماره فعال می‌شود. حساب‌های موجود تا آن
+                  زمان با نقش فعلی می‌مانند و رمز ثبت‌شده برای ورود مدیر فقط پس از تأیید فعال خواهد
+                  شد.
                 </div>
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
@@ -692,12 +692,11 @@ export function ManagerAccessPage() {
             <Check className="size-8" aria-hidden />
           </span>
           <p className="text-sm leading-7 text-text-secondary">
-            درخواست و اطلاعات شما برای بررسی ادمین ارسال شد. پس از تأیید، حساب فعال می‌شود و با همین
-            شماره موبایل و رمز می‌توانید وارد پنل مدیر خود شوید.
+            درخواست و اطلاعات شما برای بررسی ادمین ارسال شد. پس از تأیید، دسترسی مدیر برای همین
+            شماره فعال می‌شود و رمز ثبت‌شده برای ورود به پنل مدیر قابل استفاده خواهد بود.
           </p>
-          <p className="rounded-xl bg-[#fff8e9] px-3 py-2 text-xs leading-6 text-[#765f3d]">
-            شماره با پیامک تأیید نشده است؛ برای پیگیری وضعیت، دوباره به همین صفحه برگردید و با شماره
-            و رمز ثبت‌شده وارد شوید.
+          <p className="rounded-xl bg-[#f5faf5] px-3 py-2 text-xs leading-6 text-[#546b5f]">
+            برای پیگیری نتیجه، دوباره به همین صفحه برگردید و با شماره و رمز ثبت‌شده وارد شوید.
           </p>
         </div>
       </Modal>
@@ -801,8 +800,7 @@ function AccessStatus({ notice }: { notice: AccessNotice }) {
       </div>
       {isRejected && (
         <p className="border-t border-current/10 pt-2 text-xs leading-6">
-          می‌توانید درخواست بازبینی بفرستید یا برای اکنون از این صفحه خارج شوید. شماره با پیامک
-          تأیید نشده است.
+          می‌توانید درخواست بازبینی بفرستید یا برای اکنون از این صفحه خارج شوید.
         </p>
       )}
     </Card>

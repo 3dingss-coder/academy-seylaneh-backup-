@@ -10,6 +10,7 @@ const admin: Me = { ...marketer, id: 'admin-1', name: 'ادمین', role: 'admin
 const application: ManagerAccessRequestView = {
   id: 'request-1',
   userId: 'request-1',
+  existingAccount: true,
   fullName: 'مریم درخواست‌دهنده',
   phone: '09125550125',
   nationalCode: '1234567891',
@@ -62,10 +63,12 @@ describe('Admin Manager access review area', () => {
     expect(
       await screen.findByText('مریم درخواست‌دهنده', {}, { timeout: 10_000 }),
     ).toBeInTheDocument();
+    expect(screen.getByText('درخواست تغییر نقش حساب بازاریاب به مدیر')).toBeInTheDocument();
     expect(screen.getByText('۱۲۳۴۵۶۷۸۹۱')).toBeInTheDocument();
     expect(screen.getByText('تهران، تهران')).toBeInTheDocument();
-    expect(screen.getByText('با پیامک تأیید نشده')).toBeInTheDocument();
-    expect(screen.getByText(/سامانه پیامک یا OTP ندارد/)).toBeInTheDocument();
+    expect(screen.getByText('در انتظار بررسی دستی')).toBeInTheDocument();
+    expect(screen.getByText(/پیش از فعال‌سازی، شماره تماس را دستی بررسی/)).toBeInTheDocument();
+    expect(screen.queryByText(/OTP|سامانه پیامک/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'بررسی و فعال‌سازی' }));
     const dialog = await screen.findByRole('dialog', { name: 'تأیید و فعال‌سازی حساب مدیر' });
@@ -75,7 +78,7 @@ describe('Admin Manager access review area', () => {
     expect(confirm).toBeDisabled();
     fireEvent.click(
       screen.getByRole('checkbox', {
-        name: /شماره تماس را خارج از سامانه بررسی کرده‌ام/,
+        name: /با متقاضی تماس گرفته‌ام و شمارهٔ درج‌شده را بررسی کرده‌ام/,
       }),
     );
     expect(confirm).toBeEnabled();

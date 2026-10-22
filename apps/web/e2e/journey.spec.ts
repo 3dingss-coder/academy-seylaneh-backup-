@@ -194,6 +194,25 @@ test('fresh marketer can open later sections without finishing earlier ones', as
   expect([200, 201]).toContain(r.status());
 });
 
+test('manager access: non-Manager phone numbers open the complete application form', async ({
+  page,
+}) => {
+  await page.goto('/manager');
+  const phone = page.getByLabel('شماره موبایل');
+  await phone.fill('09129999888');
+  await page.getByRole('button', { name: 'بررسی شماره موبایل' }).click();
+  await expect(page.getByLabel('نام و نام خانوادگی')).toBeVisible();
+  await expect(page.getByLabel('کد ملی')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'بازبینی اطلاعات' })).toBeVisible();
+  await expect(page.getByText(/موردی که دنبالش هستید پیدا نشد|OTP|پیامک/)).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'تغییر شماره' }).click();
+  await page.getByLabel('شماره موبایل').fill('09120000005');
+  await page.getByRole('button', { name: 'بررسی شماره موبایل' }).click();
+  await expect(page.getByLabel('نام و نام خانوادگی')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'بازبینی اطلاعات' })).toBeVisible();
+});
+
 test('manager: team dashboard, completion report and CSV export', async ({ page }) => {
   await login(page, MANAGER);
   await expect(page).toHaveURL(/\/manager$/);

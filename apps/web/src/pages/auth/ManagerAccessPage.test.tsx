@@ -38,6 +38,46 @@ afterEach(() => {
 });
 
 describe('ManagerAccessPage', () => {
+  it('shows the Manager application and explains the treatment of existing accounts', async () => {
+    mockApi({
+      'POST /v1/auth/manager-access/lookup': () => ({
+        data: { flow: 'apply', phone: '09125550126' },
+      }),
+    });
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('شماره موبایل'), {
+      target: { value: '09125550126' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'بررسی شماره موبایل' }));
+
+    expect(await screen.findByLabelText('نام و نام خانوادگی')).toBeInTheDocument();
+    expect(screen.getByLabelText('رمز عبور برای ورود بعد از تأیید')).toBeInTheDocument();
+    expect(screen.queryByText(/OTP|پیامک/)).not.toBeInTheDocument();
+    expect(screen.getByText(/اگر شماره به حساب فعالی تعلق دارد/)).toBeInTheDocument();
+  });
+
+  it('uses one generic password step for Manager sign-in and request follow-up', async () => {
+    mockApi({
+      'POST /v1/auth/manager-access/lookup': () => ({
+        data: { flow: 'sign_in', phone: '09125550127' },
+      }),
+    });
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('شماره موبایل'), {
+      target: { value: '09125550127' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'بررسی شماره موبایل' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'ورود یا پیگیری دسترسی مدیر' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('شماره موبایل')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ادامه' })).toBeInTheDocument();
+    expect(screen.getByText(/اگر درخواست شما در حال بررسی باشد/)).toBeInTheDocument();
+  });
+
   it('checks a mobile number and shows the password form for an existing Manager account', async () => {
     mockApi({
       'POST /v1/auth/manager-access/lookup': () => ({
@@ -58,7 +98,7 @@ describe('ManagerAccessPage', () => {
     expect(screen.getByText('۰۹۱۲۵۵۵۰۱۲۳')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('رمز عبور'), { target: { value: 'manager-pass-123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'ورود به پنل مدیر' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     expect(await screen.findByText('در انتظار بررسی ادمین')).toBeInTheDocument();
     expect(mocks.managerAccessLogin).toHaveBeenCalledWith({
       phone: '09125550123',
@@ -93,7 +133,7 @@ describe('ManagerAccessPage', () => {
     fireEvent.change(await screen.findByLabelText('رمز عبور'), {
       target: { value: 'manager-pass-123' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'ورود به پنل مدیر' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     expect(await screen.findByText('درخواست دسترسی تأیید نشد')).toBeInTheDocument();
     expect(screen.getByText('محدوده مدیریت نیاز به بررسی بیشتر دارد.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'انصراف' }));
@@ -102,7 +142,7 @@ describe('ManagerAccessPage', () => {
     fireEvent.change(await screen.findByLabelText('رمز عبور'), {
       target: { value: 'manager-pass-123' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'ورود به پنل مدیر' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ادامه' }));
     expect(await screen.findByText('درخواست دسترسی تأیید نشد')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'درخواست بازبینی' }));
     fireEvent.change(screen.getByLabelText('پیام درخواست بازبینی'), {

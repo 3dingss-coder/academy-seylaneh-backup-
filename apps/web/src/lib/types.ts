@@ -46,6 +46,7 @@ export interface ManagerProfileView {
 export interface ManagerAccessRequestView {
   id: string;
   userId: string;
+  existingAccount: boolean;
   fullName: string;
   phone: string;
   nationalCode: string | null;

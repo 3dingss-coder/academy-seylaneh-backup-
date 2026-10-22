@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApiError } from '../http/errors';
 import { text } from '../http/validate';
-import { decryptPrivateText, encryptPrivateText } from '../lib/crypto';
+import { decryptPrivateText, encryptPrivateText, timingSafeEqualStr } from '../lib/crypto';
 import {
   ids,
   nationalCodeDigest,
@@ -121,9 +121,21 @@ export async function lookupManagerAccess(d: Deps, rawPhone: string) {
   const phone = normalizedPhone(rawPhone);
   const user = await userByPhone(d, phone);
   if (!user) return { flow: 'apply' as const, phone };
-  if (user.status === 'blacklisted' || user.role !== 'manager')
+  if (user.status === 'blacklisted' || user.role === 'admin' || user.role === 'superadmin')
     return { flow: 'unavailable' as const, phone };
-  return { flow: 'sign_in' as const, phone };
+  if (user.role === 'manager') return { flow: 'sign_in' as const, phone };
+  if (user.role !== 'marketer' || user.status !== 'active')
+    return { flow: 'unavailable' as const, phone };
+
+  const application = await d.store.get<ManagerAccessRequest>(`manager_access_requests/${user.id}`);
+  if (
+    application?.existingAccount &&
+    (application.status === 'pending' ||
+      application.status === 'review_requested' ||
+      application.status === 'rejected')
+  )
+    return { flow: 'sign_in' as const, phone };
+  return { flow: 'apply' as const, phone };
 }
 
 /** Create a short-lived, one-use image upload ticket for a public Manager application photo. */
@@ -177,10 +189,115 @@ function conflictMessage(kind: 'phone' | 'nationalCode') {
     : 'این کد ملی پیش‌تر در سامانه ثبت شده است. با ادمین تماس بگیرید.';
 }
 
+async function submitExistingMarketerRequest(
+  d: Deps,
+  input: z.infer<typeof managerAccessRequestSchema>,
+  user: Doc<User>,
+  details: {
+    phone: string;
+    fullName: string;
+    nationalCode: string;
+    nationalCodeHash: string;
+    province: string;
+    city: string;
+  },
+) {
+  const { phone, fullName, nationalCode, nationalCodeHash, province, city } = details;
+  if (user.status !== 'active' || user.role !== 'marketer')
+    throw new ApiError('CONFLICT', 'این حساب برای درخواست دسترسی مدیر در دسترس نیست.');
+  if (user.nationalCodeHash && user.nationalCodeHash !== nationalCodeHash)
+    throw new ApiError('CONFLICT', 'کد ملی واردشده با اطلاعات حساب فعلی مطابقت ندارد.');
+
+  const phoneKeyPath = `unique_keys/${ids.uniqueKey('phone', phone)}`;
+  const nationalKeyPath = `unique_keys/${ids.uniqueKey('nationalCode', nationalCodeHash)}`;
+  const { upload, avatarUrl } = await validateApplicantAvatar(d, input.avatarUploadId);
+  const now = nowIso(d);
+  const request: ManagerAccessRequest = {
+    userId: user.id,
+    existingAccount: true,
+    managerPasswordCiphertext: await encryptPrivateText(input.password, d.config.localSecret),
+    fullName,
+    phone,
+    nationalCodeCiphertext: await encryptPrivateText(nationalCode, d.config.localSecret),
+    nationalCodeHash,
+    managementProvince: province,
+    managementCity: city,
+    avatarUrl,
+    avatarPath: upload.path,
+    status: 'pending',
+    reviewNote: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    phoneReviewedExternallyBy: null,
+    phoneReviewedExternallyAt: null,
+    appeals: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await d.store.runTransaction(async (tx) => {
+      const [phoneKey, nationalKey, avatarTicket, currentUser, oldRequest] = await Promise.all([
+        tx.get<{ uid: string | null }>(phoneKeyPath),
+        tx.get<{ uid: string | null }>(nationalKeyPath),
+        tx.get<ManagerAccessUpload>(`manager_access_uploads/${input.avatarUploadId}`),
+        tx.get<User>(`users/${user.id}`),
+        tx.get<ManagerAccessRequest>(`manager_access_requests/${user.id}`),
+      ]);
+      if (
+        !currentUser ||
+        currentUser.role !== 'marketer' ||
+        currentUser.status !== 'active' ||
+        currentUser.phone !== phone
+      )
+        throw new ApiError('CONFLICT', 'وضعیت حساب تغییر کرده است؛ شماره را دوباره بررسی کنید.');
+      if (oldRequest)
+        throw new ApiError(
+          'CONFLICT',
+          'برای این حساب درخواست مدیر قبلی وجود دارد؛ وارد همان درخواست شوید.',
+        );
+      if (phoneKey?.uid && phoneKey.uid !== user.id)
+        throw new ApiError('CONFLICT', conflictMessage('phone'));
+      if (nationalKey?.uid && nationalKey.uid !== user.id)
+        throw new ApiError('CONFLICT', conflictMessage('nationalCode'));
+      if (currentUser.nationalCodeHash && currentUser.nationalCodeHash !== nationalCodeHash)
+        throw new ApiError('CONFLICT', 'کد ملی واردشده با اطلاعات حساب فعلی مطابقت ندارد.');
+      if (
+        !avatarTicket ||
+        avatarTicket.consumedAt ||
+        avatarTicket.expireAt.getTime() <= d.clock().getTime()
+      )
+        throw new ApiError('CONFLICT', 'عکس پروفایل قبلاً استفاده شده یا منقضی شده است.');
+
+      if (!phoneKey) tx.create(phoneKeyPath, { kind: 'phone', createdAt: now, uid: user.id });
+      else if (!phoneKey.uid) tx.update(phoneKeyPath, { uid: user.id });
+      if (!nationalKey)
+        tx.create(nationalKeyPath, { kind: 'nationalCode', createdAt: now, uid: user.id });
+      else if (!nationalKey.uid) tx.update(nationalKeyPath, { uid: user.id });
+      tx.create(`manager_access_requests/${user.id}`, request);
+      tx.update(`manager_access_uploads/${input.avatarUploadId}`, { consumedAt: now });
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof StoreConflictError)
+      throw new ApiError('CONFLICT', 'درخواست یا شناسه‌ای تکراری است. دوباره بررسی کنید.');
+    throw error;
+  }
+
+  await track(d, 'manager_access_requested', user.id, { existingAccount: true }).catch(() => {});
+  await notifyAdmins(d, {
+    title: 'درخواست جدید دسترسی مدیر',
+    body: `درخواست تبدیل حساب ${fullName} به مدیر برای بررسی ثبت شد.`,
+  });
+  return {
+    status: 'pending' as const,
+    message: 'درخواست شما برای بررسی ادمین ارسال شد.',
+  };
+}
+
 /**
  * Creates a Manager-role account in an inactive state, so no panel/API access is available before
- * review. Phone ownership is not asserted here: the admin UI explicitly requires an external check
- * because the app currently has no SMS/OTP provider.
+ * review. Existing active marketer accounts keep their current access until Admin approval.
  */
 export async function submitManagerAccessRequest(
   d: Deps,
@@ -195,8 +312,19 @@ export async function submitManagerAccessRequest(
     throw new ApiError('VALIDATION', 'اطلاعات هویتی و محدوده مدیریت را بررسی کنید.');
 
   const existing = await userByPhone(d, phone);
-  if (existing) throw new ApiError('CONFLICT', conflictMessage('phone'));
   const nationalCodeHash = nationalCodeDigest(nationalCode, d.config.localSecret);
+  if (existing) {
+    if (existing.role === 'marketer' && existing.status === 'active')
+      return submitExistingMarketerRequest(d, input, existing, {
+        phone,
+        fullName,
+        nationalCode,
+        nationalCodeHash,
+        province,
+        city,
+      });
+    throw new ApiError('CONFLICT', conflictMessage('phone'));
+  }
   const phoneKeyPath = `unique_keys/${ids.uniqueKey('phone', phone)}`;
   const nationalKeyPath = `unique_keys/${ids.uniqueKey('nationalCode', nationalCodeHash)}`;
   const { upload, avatarUrl } = await validateApplicantAvatar(d, input.avatarUploadId);
@@ -253,6 +381,8 @@ export async function submitManagerAccessRequest(
     };
     const request: ManagerAccessRequest = {
       userId,
+      existingAccount: false,
+      managerPasswordCiphertext: null,
       fullName,
       phone,
       nationalCodeCiphertext: await encryptPrivateText(nationalCode, d.config.localSecret),
@@ -343,17 +473,48 @@ async function notifyAdmins(d: Deps, content: { title: string; body: string }) {
   }
 }
 
+type ManagerCredentials = {
+  user: Doc<User>;
+  request: Doc<ManagerAccessRequest> | null;
+  tokens: { idToken: string; refreshToken: string; expiresIn: number } | null;
+};
+
+async function managerLoginFailure(
+  d: Deps,
+  guardKey: string,
+  guard: { fails: number; lockedUntil: string | null } | null,
+): Promise<never> {
+  const failures = (guard?.fails ?? 0) + 1;
+  const locked = failures >= 5;
+  await d.store.set(`login_guards/${guardKey}`, {
+    fails: locked ? 0 : failures,
+    lockedUntil: locked ? new Date(d.clock().getTime() + 15 * 60_000).toISOString() : null,
+  });
+  await track(d, 'login_failed', null, { reason: 'manager_access_credentials' }).catch(() => {});
+  if (locked)
+    throw new ApiError(
+      'RATE_LIMIT',
+      'به دلیل تلاش‌های ناموفق زیاد، ورود تا ۱۵ دقیقه بسته شد. بعداً دوباره تلاش کنید.',
+    );
+  throw unavailableCredential();
+}
+
 async function credentialsForManager(
   d: Deps,
   phone: string,
   password: string,
-): Promise<{
-  user: Doc<User>;
-  tokens: { idToken: string; refreshToken: string; expiresIn: number };
-}> {
+): Promise<ManagerCredentials> {
   const user = await userByPhone(d, phone);
-  if (!user || user.role !== 'manager' || user.status === 'blacklisted')
-    throw unavailableCredential();
+  if (!user || user.status === 'blacklisted') throw unavailableCredential();
+  const request = await d.store.get<ManagerAccessRequest>(`manager_access_requests/${user.id}`);
+  const existingApplicant =
+    user.role === 'marketer' &&
+    request?.existingAccount &&
+    Boolean(request.managerPasswordCiphertext) &&
+    (request.status === 'pending' ||
+      request.status === 'review_requested' ||
+      request.status === 'rejected');
+  if (user.role !== 'manager' && !existingApplicant) throw unavailableCredential();
 
   const authEmail = phoneToAuthEmail(phone);
   const guardKey = ids.hash(authEmail);
@@ -366,6 +527,22 @@ async function credentialsForManager(
       'به دلیل تلاش‌های ناموفق زیاد، ورود تا ۱۵ دقیقه بسته شد. بعداً دوباره تلاش کنید.',
     );
 
+  if (existingApplicant && request?.managerPasswordCiphertext) {
+    let expectedPassword: string;
+    try {
+      expectedPassword = await decryptPrivateText(
+        request.managerPasswordCiphertext,
+        d.config.localSecret,
+      );
+    } catch {
+      throw unavailableCredential();
+    }
+    if (!timingSafeEqualStr(password, expectedPassword))
+      return managerLoginFailure(d, guardKey, guard);
+    if (guard) await d.store.delete(`login_guards/${guardKey}`);
+    return { user, request, tokens: null };
+  }
+
   const result = await d.auth.signIn(authEmail, password);
   if (!result.ok) {
     if (result.reason === 'locked')
@@ -374,26 +551,14 @@ async function credentialsForManager(
         'به دلیل تلاش‌های ناموفق زیاد، ورود تا ۱۵ دقیقه بسته شد. بعداً دوباره تلاش کنید.',
       );
     if (result.reason === 'disabled') throw unavailableCredential();
-    const failures = (guard?.fails ?? 0) + 1;
-    const locked = failures >= 5;
-    await d.store.set(`login_guards/${guardKey}`, {
-      fails: locked ? 0 : failures,
-      lockedUntil: locked ? new Date(d.clock().getTime() + 15 * 60_000).toISOString() : null,
-    });
-    await track(d, 'login_failed', null, { reason: 'manager_access_credentials' }).catch(() => {});
-    if (locked)
-      throw new ApiError(
-        'RATE_LIMIT',
-        'به دلیل تلاش‌های ناموفق زیاد، ورود تا ۱۵ دقیقه بسته شد. بعداً دوباره تلاش کنید.',
-      );
-    throw unavailableCredential();
+    return managerLoginFailure(d, guardKey, guard);
   }
   if (result.uid !== user.id) {
     await d.auth.revoke(result.uid).catch(() => {});
     throw unavailableCredential();
   }
   if (guard) await d.store.delete(`login_guards/${guardKey}`);
-  return { user, tokens: result.tokens };
+  return { user, request, tokens: result.tokens };
 }
 
 /** Password sign-in also reveals the request state to its own applicant, without issuing a session. */
@@ -402,17 +567,36 @@ export async function managerAccessSignIn(
   input: z.infer<typeof managerAccessLoginSchema>,
 ): Promise<ManagerLoginResult> {
   const phone = normalizedPhone(input.phone);
-  const { user, tokens } = await credentialsForManager(d, phone, input.password);
-  if (user.status === 'active') {
+  const { user, tokens, request } = await credentialsForManager(d, phone, input.password);
+  if (user.role === 'manager' && user.status === 'active' && tokens) {
     const lastActiveAt = nowIso(d);
     await d.store.update(`users/${user.id}`, { lastActiveAt });
     await track(d, 'login_success', user.id, { panel: 'manager' }).catch(() => {});
     return { state: 'active', user: users.publicUser({ ...user, lastActiveAt }), ...tokens };
   }
 
+  if (user.role === 'marketer' && request?.existingAccount) {
+    if (request.status === 'pending')
+      return {
+        state: 'pending',
+        message: 'درخواست دسترسی شما در انتظار بررسی ادمین است. پس از تصمیم‌گیری دوباره وارد شوید.',
+      };
+    if (request.status === 'review_requested')
+      return {
+        state: 'review_requested',
+        message: 'درخواست بازبینی شما ثبت شده و دوباره در صف بررسی ادمین قرار دارد.',
+      };
+    if (request.status === 'rejected')
+      return {
+        state: 'rejected',
+        message: 'فعلاً امکان دسترسی به پنل مدیر برای شما فراهم نیست.',
+        reviewNote: request.reviewNote,
+        appealCount: request.appeals.length,
+      };
+  }
+
   // No credential is returned for inactive accounts. Revoke the unreturned sign-in token as well.
-  await d.auth.revoke(user.id).catch(() => {});
-  const request = await d.store.get<ManagerAccessRequest>(`manager_access_requests/${user.id}`);
+  if (tokens) await d.auth.revoke(user.id).catch(() => {});
   if (request?.status === 'pending')
     return {
       state: 'pending',
@@ -442,8 +626,8 @@ export async function submitManagerAccessAppeal(
   input: z.infer<typeof managerAccessAppealSchema>,
 ) {
   const phone = normalizedPhone(input.phone);
-  const { user } = await credentialsForManager(d, phone, input.password);
-  await d.auth.revoke(user.id).catch(() => {});
+  const { user, tokens } = await credentialsForManager(d, phone, input.password);
+  if (user.role === 'manager' && tokens) await d.auth.revoke(user.id).catch(() => {});
   const path = `manager_access_requests/${user.id}`;
   const now = nowIso(d);
   const message = input.message.trim();
@@ -496,6 +680,7 @@ export async function listManagerAccessRequests(
       return {
         id: request.userId,
         userId: request.userId,
+        existingAccount: Boolean(request.existingAccount),
         fullName: request.fullName,
         phone: request.phone,
         nationalCode,
@@ -524,7 +709,27 @@ export async function approveManagerAccess(
   const userPath = `users/${requestId}`;
   const teamPath = `teams/${input.teamId}`;
   const now = nowIso(d);
+  const requestBefore = await d.store.get<ManagerAccessRequest>(path);
+  let managerPassword: string | null = null;
+  if (requestBefore?.existingAccount) {
+    if (!requestBefore.managerPasswordCiphertext)
+      throw new ApiError('CONFLICT', 'رمز ورود انتخاب‌شده برای این درخواست در دسترس نیست.');
+    try {
+      managerPassword = await decryptPrivateText(
+        requestBefore.managerPasswordCiphertext,
+        d.config.localSecret,
+      );
+    } catch {
+      throw new ApiError(
+        'CONFLICT',
+        'رمز ورود این درخواست قابل بازیابی نیست؛ با متقاضی تماس بگیرید.',
+      );
+    }
+  }
   let approvedName = '';
+  let previousApplicant: Doc<User> | null = null;
+  let previousTeamManagerId: string | null = null;
+  let approvedRequest: Doc<ManagerAccessRequest> | null = null;
 
   await d.store.runTransaction(async (tx) => {
     const [request, applicant, team] = await Promise.all([
@@ -535,14 +740,29 @@ export async function approveManagerAccess(
     if (!request || !applicant) throw new ApiError('NOT_FOUND', 'درخواست پیدا نشد.');
     if (request.status !== 'pending' && request.status !== 'review_requested')
       throw new ApiError('CONFLICT', 'این درخواست قبلاً بررسی شده است.');
-    if (applicant.role !== 'manager' || applicant.status !== 'inactive')
+    const applicantMatches = request.existingAccount
+      ? applicant.role === 'marketer' && applicant.status === 'active'
+      : applicant.role === 'manager' && applicant.status === 'inactive';
+    if (!applicantMatches)
       throw new ApiError('CONFLICT', 'وضعیت حساب با درخواست دسترسی هم‌خوان نیست.');
+    if (
+      Boolean(request.existingAccount) !== Boolean(requestBefore?.existingAccount) ||
+      request.managerPasswordCiphertext !== requestBefore?.managerPasswordCiphertext
+    )
+      throw new ApiError('CONFLICT', 'اطلاعات درخواست تغییر کرده است؛ درخواست را تازه‌سازی کنید.');
     if (!team || team.archived) throw new ApiError('VALIDATION', 'تیم انتخاب‌شده معتبر نیست.');
     if (team.managerId && team.managerId !== requestId)
       throw new ApiError('CONFLICT', 'این تیم از قبل مدیر دارد؛ ابتدا تیم دیگری انتخاب کنید.');
 
-    approvedName = applicant.name;
+    previousApplicant = applicant;
+    previousTeamManagerId = team.managerId;
+    approvedRequest = request;
+    approvedName = request.fullName;
     tx.update(userPath, {
+      name: request.fullName,
+      avatarUrl: request.avatarUrl,
+      avatarPath: request.avatarPath,
+      nationalCodeHash: request.nationalCodeHash,
       role: 'manager',
       status: 'active',
       teamId: input.teamId,
@@ -562,6 +782,69 @@ export async function approveManagerAccess(
     });
   });
 
+  if (managerPassword !== null) {
+    try {
+      await d.auth.setPassword(requestId, managerPassword);
+    } catch {
+      try {
+        await d.store.runTransaction(async (tx) => {
+          const [request, applicant, team] = await Promise.all([
+            tx.get<ManagerAccessRequest>(path),
+            tx.get<User>(userPath),
+            tx.get<Team>(teamPath),
+          ]);
+          if (
+            !request ||
+            request.status !== 'approved' ||
+            !applicant ||
+            applicant.role !== 'manager' ||
+            team?.managerId !== requestId ||
+            !previousApplicant ||
+            !approvedRequest
+          )
+            return;
+          tx.update(userPath, {
+            name: previousApplicant.name,
+            avatarUrl: previousApplicant.avatarUrl,
+            avatarPath: previousApplicant.avatarPath,
+            nationalCodeHash: previousApplicant.nationalCodeHash,
+            role: previousApplicant.role,
+            status: previousApplicant.status,
+            teamId: previousApplicant.teamId,
+            province: previousApplicant.province,
+            city: previousApplicant.city,
+            updatedAt: nowIso(d),
+          });
+          tx.update(teamPath, { managerId: previousTeamManagerId, updatedAt: nowIso(d) });
+          tx.update(path, {
+            status: approvedRequest.status,
+            reviewNote: approvedRequest.reviewNote,
+            reviewedBy: approvedRequest.reviewedBy,
+            reviewedAt: approvedRequest.reviewedAt,
+            phoneReviewedExternallyBy: approvedRequest.phoneReviewedExternallyBy,
+            phoneReviewedExternallyAt: approvedRequest.phoneReviewedExternallyAt,
+            updatedAt: nowIso(d),
+          });
+        });
+      } catch {
+        console.warn('[manager-access] Could not roll back approval after password update failed.');
+      }
+      throw new ApiError(
+        'INTERNAL',
+        'تنظیم رمز ورود مدیر انجام نشد؛ درخواست در صف بررسی باقی ماند و می‌توانید دوباره تلاش کنید.',
+      );
+    }
+  }
+
+  if (managerPassword !== null) {
+    try {
+      await d.store.update(path, { managerPasswordCiphertext: null, updatedAt: nowIso(d) });
+    } catch {
+      console.warn(
+        '[manager-access] Could not clear the encrypted Manager password after approval.',
+      );
+    }
+  }
   await d.auth.setDisabled(requestId, false);
   await d.auth.setClaims(requestId, { role: 'manager' });
   await d.auth.revoke(requestId);
@@ -606,9 +889,12 @@ export async function rejectManagerAccess(
     if (!request || !applicant) throw new ApiError('NOT_FOUND', 'درخواست پیدا نشد.');
     if (request.status !== 'pending' && request.status !== 'review_requested')
       throw new ApiError('CONFLICT', 'این درخواست قبلاً بررسی شده است.');
-    if (applicant.role !== 'manager' || applicant.status !== 'inactive')
+    const applicantMatches = request.existingAccount
+      ? applicant.role === 'marketer' && applicant.status === 'active'
+      : applicant.role === 'manager' && applicant.status === 'inactive';
+    if (!applicantMatches)
       throw new ApiError('CONFLICT', 'وضعیت حساب با درخواست دسترسی هم‌خوان نیست.');
-    applicantName = applicant.name;
+    applicantName = request.fullName;
     tx.update(path, {
       status: 'rejected' satisfies ManagerAccessStatus,
       reviewNote: input.reason.trim(),

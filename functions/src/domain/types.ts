@@ -46,6 +46,10 @@ export interface ManagerAccessAppeal {
 /** A Manager application. National-code plaintext is encrypted at rest and only revealed to Admins. */
 export interface ManagerAccessRequest {
   userId: string;
+  /** True when the application requests a role change on an existing active marketer account. */
+  existingAccount?: boolean;
+  /** Encrypted proposed Manager password; retained only until approval for existing accounts. */
+  managerPasswordCiphertext?: string | null;
   fullName: string;
   phone: string;
   nationalCodeCiphertext: string;

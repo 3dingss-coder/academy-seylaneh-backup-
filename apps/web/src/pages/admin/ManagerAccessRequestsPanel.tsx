@@ -125,8 +125,7 @@ export function ManagerAccessRequestsPanel() {
           <ShieldCheck className="size-4" aria-hidden /> بررسی شماره تماس
         </b>
         <span className="mt-1 block text-xs leading-6 text-amber-800">
-          سامانه پیامک یا OTP ندارد. پیش از فعال‌سازی، شماره تماس را خارج از سامانه بررسی کنید و در
-          مرحلهٔ تأیید، این بررسی را اعلام کنید.
+          پیش از فعال‌سازی، شماره تماس را دستی بررسی و نتیجه را در مرحلهٔ تأیید ثبت کنید.
         </span>
       </div>
 
@@ -249,10 +248,7 @@ export function ManagerAccessRequestsPanel() {
                 onChange={(event) => setPhoneReviewed(event.target.checked)}
                 className="mt-1 size-4 accent-[#0d704e]"
               />
-              <span>
-                شماره تماس را خارج از سامانه بررسی کرده‌ام. این مرحله جایگزین OTP نیست و به‌صورت
-                تأیید دستی ثبت می‌شود.
-              </span>
+              <span>با متقاضی تماس گرفته‌ام و شمارهٔ درج‌شده را بررسی کرده‌ام.</span>
             </label>
             {formError && (
               <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">
@@ -348,6 +344,11 @@ function RequestCard({
             <p className="mt-1 text-xs text-text-secondary">
               ثبت درخواست: {faDateTime(request.createdAt)}
             </p>
+            {request.existingAccount && (
+              <p className="mt-1 text-xs font-bold text-[#0d704e]">
+                درخواست تغییر نقش حساب بازاریاب به مدیر
+              </p>
+            )}
           </div>
         </div>
         <span
@@ -378,7 +379,7 @@ function RequestCard({
         <InfoRow
           icon={<Clock3 className="size-4" />}
           label="وضعیت شماره"
-          value={request.phoneReviewedExternally ? 'بررسی دستی ثبت شده' : 'با پیامک تأیید نشده'}
+          value={request.phoneReviewedExternally ? 'بررسی دستی ثبت شده' : 'در انتظار بررسی دستی'}
         />
       </div>
 

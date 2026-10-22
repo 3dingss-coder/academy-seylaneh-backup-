@@ -222,7 +222,7 @@ test('manager: team dashboard, completion report and CSV export', async ({ page 
   await expect(page.getByRole('button', { name: 'خروجی CSV' })).toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'خروجی CSV' }).click();
-  expect((await download).suggestedFilename()).toMatch(/^completion-report-.*\.csv$/);
+  expect((await download).suggestedFilename()).toMatch(/^manager-learning-report-.*\.csv$/);
 });
 
 test('admin: brands with real logos, unassigned tab, package editor', async ({ page }) => {

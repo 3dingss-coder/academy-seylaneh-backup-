@@ -92,7 +92,7 @@ function DesktopSidebar({ title, items }: { title: string; items: PanelNavItem[]
         <AppLogo withTitle className="[&_img]:h-8 [&_img]:w-auto" />
       </Link>
       <nav aria-label="فهرست اصلی ادمین" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        <p className="mb-2 px-3 text-[11px] font-bold text-[#7a8279]">مدیریت آکادمی</p>
+        <p className="mb-2 px-3 text-[11px] font-bold text-[#52645b]">مدیریت آکادمی</p>
         <NavList items={items} pathname={pathname} variant="rail" />
       </nav>
       <div className="mx-3 mb-3 flex h-28 shrink-0 items-end overflow-hidden rounded-2xl bg-gradient-to-br from-[#e7f6ed] to-[#f4f0df] px-2 pt-2">
@@ -201,7 +201,7 @@ function DesktopHeader() {
               <span className="block max-w-36 truncate text-sm font-bold text-[#173e35]">
                 {user?.name ?? 'کاربر'}
               </span>
-              <span className="block text-xs text-[#718078]">
+              <span className="block text-xs text-[#52645b]">
                 {user ? ROLE_LABEL[user.role] : ''}
               </span>
             </span>
@@ -516,7 +516,7 @@ function MobileMenu({
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3">
-          <p className="mb-2 px-3 text-[11px] font-bold text-[#7a8279]">{title}</p>
+          <p className="mb-2 px-3 text-[11px] font-bold text-[#52645b]">{title}</p>
           <NavList items={items} pathname={pathname} onNavigate={onClose} variant="rail" />
           <div className="mt-auto border-t border-[#e7e3d8] pt-3">
             <Link

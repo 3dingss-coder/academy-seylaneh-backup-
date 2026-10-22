@@ -72,7 +72,7 @@ export function AdminDashboard() {
     <div className="flex flex-col gap-4 sm:gap-5">
       <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-[#718078]">مدیریت آکادمی / نمای کلی</p>
+          <p className="text-xs font-bold text-[#52645b]">مدیریت آکادمی / نمای کلی</p>
           <h1 className="mt-1 text-2xl font-black text-[#172235] sm:text-[28px]">
             سلام، ادمین عزیز
           </h1>
@@ -328,7 +328,7 @@ function MetricCard({
       <div>
         <p className="text-sm font-semibold text-[#67736c]">{title}</p>
         <p className="mt-1 text-2xl font-black tracking-tight text-[#172235]">{value}</p>
-        <p className="mt-1 truncate text-xs text-[#869089]">{note}</p>
+        <p className="mt-1 truncate text-xs text-[#52645b]">{note}</p>
       </div>
     </Link>
   );
@@ -375,7 +375,7 @@ function AttentionStrip({ data }: { data: DashboardData }) {
         </span>
         <div>
           <h2 className="text-sm font-extrabold text-[#26362e]">نیازمند پیگیری</h2>
-          <p className="text-xs text-[#718078]">
+          <p className="text-xs text-[#52645b]">
             {activeAlerts.length
               ? 'موارد باز را مستقیماً از همین‌جا بررسی کنید.'
               : 'همهٔ موارد فوری رسیدگی شده‌اند.'}
@@ -592,7 +592,7 @@ function MessagesTab({
           >
             <p className="text-sm text-[#67736c]">{label}</p>
             <p className="mt-1 text-2xl font-black text-[#172235]">{faNumber(value)}</p>
-            <p className="mt-1 text-xs text-[#869089]">{note}</p>
+            <p className="mt-1 text-xs text-[#52645b]">{note}</p>
           </Link>
         ))}
       </div>
@@ -713,7 +713,7 @@ function ActivityChart({
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-extrabold text-[#24372e]">{title}</h2>
-          <p className="mt-1 text-xs text-[#839087]">
+          <p className="mt-1 text-xs text-[#52645b]">
             {label} در هر روز · {toPersianDigits(period)} روز گذشته
           </p>
         </div>
@@ -752,7 +752,7 @@ function ActivityChart({
                     x={pad.left - 8}
                     y={y + 4}
                     textAnchor="end"
-                    className="fill-[#7f8b82] text-[10px]"
+                    className="fill-[#52645b] text-[10px]"
                   >
                     {toPersianDigits(value)}
                   </text>
@@ -795,7 +795,7 @@ function ActivityChart({
                   x={pad.left + plotW * pos}
                   y={height - 8}
                   textAnchor={pos === 0 ? 'start' : pos === 1 ? 'end' : 'middle'}
-                  className="fill-[#7f8b82] text-[10px]"
+                  className="fill-[#52645b] text-[10px]"
                 >
                   {dateLabel(row.date)}
                 </text>
@@ -810,7 +810,7 @@ function ActivityChart({
             <p className="mt-2 text-sm font-bold text-[#3b5144]">
               هنوز دادهٔ کافی برای این بازه ثبت نشده است.
             </p>
-            <p className="mt-1 text-xs text-[#849188]">
+            <p className="mt-1 text-xs text-[#52645b]">
               به‌محض ثبت فعالیت کاربران، روند اینجا نمایش داده می‌شود.
             </p>
           </div>
@@ -834,7 +834,7 @@ function RoleDistribution({ counts }: { counts: Record<Role, number> }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-extrabold text-[#24372e]">توزیع کاربران بر اساس نقش</h2>
-          <p className="mt-1 text-xs text-[#839087]">ترکیب حساب‌های فعال و غیرفعال</p>
+          <p className="mt-1 text-xs text-[#52645b]">ترکیب حساب‌های فعال و غیرفعال</p>
         </div>
         <Link
           to="/admin/users"
@@ -877,7 +877,7 @@ function RoleDistribution({ counts }: { counts: Record<Role, number> }) {
           <div className="absolute inset-0 grid place-items-center text-center">
             <div>
               <p className="text-2xl font-black text-[#172235]">{faNumber(total)}</p>
-              <p className="text-xs text-[#839087]">کاربر</p>
+              <p className="text-xs text-[#52645b]">کاربر</p>
             </div>
           </div>
         </div>
@@ -893,7 +893,7 @@ function RoleDistribution({ counts }: { counts: Record<Role, number> }) {
               </span>
               <span className="font-extrabold text-[#24372e]">
                 {faNumber(count)}{' '}
-                <span className="text-xs font-normal text-[#839087]">
+                <span className="text-xs font-normal text-[#52645b]">
                   ({faPercent(total ? (count / total) * 100 : 0)})
                 </span>
               </span>
@@ -931,11 +931,11 @@ function RecentUsers({
                   <span className="block truncate text-sm font-bold text-[#273831]">
                     {user.name}
                   </span>
-                  <span className="block truncate text-xs text-[#7f8b82]">
+                  <span className="block truncate text-xs text-[#52645b]">
                     {ROLE_LABELS[user.role]} · {user.city ?? user.province ?? 'موقعیت ثبت نشده'}
                   </span>
                 </span>
-                <span className="shrink-0 text-left text-[11px] text-[#879189]">
+                <span className="shrink-0 text-left text-[11px] text-[#52645b]">
                   {relativeTime(user.createdAt)}
                 </span>
               </Link>
@@ -975,7 +975,7 @@ function RecentPackages({
                   <span className="block truncate text-sm font-bold text-[#273831]">
                     {pkg.title}
                   </span>
-                  <span className="block text-xs text-[#7f8b82]">
+                  <span className="block text-xs text-[#52645b]">
                     افزوده‌شده {relativeTime(pkg.createdAt)}
                   </span>
                 </span>
@@ -1017,12 +1017,12 @@ function RecentActivity({
                   <span className="block truncate text-sm font-bold text-[#273831]">
                     {eventTitle(event)}
                   </span>
-                  <span className="block truncate text-xs text-[#7f8b82]">
+                  <span className="block truncate text-xs text-[#52645b]">
                     {event.actorName}
                     {event.entity ? ` · ${entityLabel(event.entity)}` : ''}
                   </span>
                 </span>
-                <span className="shrink-0 text-left text-[11px] text-[#879189]">
+                <span className="shrink-0 text-left text-[11px] text-[#52645b]">
                   {relativeTime(event.at)}
                 </span>
               </>
@@ -1077,7 +1077,7 @@ function ContentStatus({ data }: { data: DashboardData }) {
       label: 'بایگانی',
       value: data.content.archived,
       to: '/admin/archive',
-      color: 'text-[#738078]',
+      color: 'text-[#52645b]',
     },
   ];
   const total = values.reduce((sum, item) => sum + item.value, 0);
@@ -1086,7 +1086,7 @@ function ContentStatus({ data }: { data: DashboardData }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="font-extrabold text-[#24372e]">وضعیت محتوای آموزشی</h2>
-          <p className="mt-1 text-xs text-[#839087]">موجودی محتوا بر اساس مرحلهٔ انتشار</p>
+          <p className="mt-1 text-xs text-[#52645b]">موجودی محتوا بر اساس مرحلهٔ انتشار</p>
         </div>
         <Link to="/admin/content" className="text-sm font-bold text-[#08704f]">
           مدیریت محتوا
@@ -1113,7 +1113,7 @@ function ContentStatus({ data }: { data: DashboardData }) {
             to={item.to}
             className="rounded-xl border border-[#edf0eb] bg-[#fff] p-3 hover:border-[#b7d6c5]"
           >
-            <p className="text-xs text-[#718078]">{item.label}</p>
+            <p className="text-xs text-[#52645b]">{item.label}</p>
             <p className={cn('mt-1 text-xl font-black', item.color)}>{faNumber(item.value)}</p>
           </Link>
         ))}
@@ -1150,7 +1150,7 @@ function MiniStat({
         <Icon className="size-5" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-xs text-[#738078]">{label}</span>
+        <span className="block text-xs text-[#52645b]">{label}</span>
         <span className="mt-1 block truncate text-lg font-black text-[#24372e]">{value}</span>
       </span>
       <ArrowDownLeft className="size-4 shrink-0 text-[#a0aaa2]" aria-hidden="true" />
@@ -1181,7 +1181,7 @@ function PanelEmpty({ icon: Icon, text }: { icon: typeof Users; text: string }) 
     <div className="grid min-h-40 place-items-center px-4 text-center">
       <div>
         <Icon className="mx-auto size-7 text-[#9aa99e]" aria-hidden="true" />
-        <p className="mt-2 text-sm text-[#718078]">{text}</p>
+        <p className="mt-2 text-sm text-[#52645b]">{text}</p>
       </div>
     </div>
   );

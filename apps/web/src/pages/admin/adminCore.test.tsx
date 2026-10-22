@@ -268,7 +268,7 @@ describe('admin shell + core — enterprise console contracts', () => {
             packages: [],
           },
         }),
-        'GET /v1/me/notifications': () => ({ data: { unread: 0, items: [] } }),
+        'GET /v1/me/notifications': () => ({ data: { unread: 2, items: [] } }),
         'GET /v1/me/messages': () => ({ data: [] }),
         'GET /v1/me/badges': () => ({ data: [] }),
         'GET /v1/admin/notification-templates': () => ({ data: [] }),
@@ -277,6 +277,11 @@ describe('admin shell + core — enterprise console contracts', () => {
     renderApp('/admin/profile');
     expect(await screen.findByRole('heading', { name: 'پروفایل ادمین' })).toBeInTheDocument();
     expect(screen.getAllByText('پنل مدیریت').length).toBeGreaterThan(0);
+    const notificationLinks = await screen.findAllByRole('link', {
+      name: 'اعلان‌ها، ۲ اعلان خوانده‌نشده',
+    });
+    expect(notificationLinks.length).toBeGreaterThan(0);
+    expect(notificationLinks[0]).toHaveAttribute('href', '/admin/notifications');
     fireEvent.click(screen.getByRole('button', { name: 'اعلان‌ها و پیام‌ها' }));
     expect(await screen.findByRole('tab', { name: /صندوق من/ })).toBeInTheDocument();
   });

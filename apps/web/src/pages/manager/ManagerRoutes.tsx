@@ -12,6 +12,7 @@ import { RetakeList } from '@/components/reports/RetakeList';
 import { PanelLayout } from '@/layouts/PanelLayout';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ManagerProfilePage } from './ManagerProfilePage';
+import { ManagerProfileCompletionPage } from './ManagerProfileCompletionPage';
 import { ManagerCampaignRoute, ManagerCampaignsPage } from './ManagerCampaigns';
 import { ManagerDashboard } from './ManagerDashboard';
 import { ManagerMember } from './ManagerMember';
@@ -32,6 +33,7 @@ const MOBILE_NAV = NAV.filter((item) => item.to !== '/manager/profile');
 export default function ManagerRoutes() {
   return (
     <Routes>
+      <Route path="complete-profile" element={<ManagerProfileCompletionPage />} />
       <Route element={<PanelLayout title="مدیریت تیم" items={NAV} mobileItems={MOBILE_NAV} />}>
         <Route index element={<ManagerDashboard />} />
         <Route path="members" element={<ManagerMembersPage />} />

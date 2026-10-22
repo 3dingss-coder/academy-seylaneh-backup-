@@ -22,7 +22,9 @@ import { PageTransition } from '@/components/layout/PageTransition';
 import { api } from '@/lib/api';
 import { isItemActive } from '@/lib/navMatch';
 import { useAuth } from '@/lib/auth';
+import { useNotifications } from '@/lib/queries';
 import { cn } from '@/lib/cn';
+import { toPersianDigits } from '@/lib/digits';
 import { ROLE_LABEL } from '@/lib/format';
 import type { AdminBrand, AdminPackage, AdminProduct } from '@/lib/types';
 import type { PanelNavItem } from '@/layouts/PanelLayout';
@@ -35,6 +37,8 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
   const isDetail = Boolean(current && pathname !== current.to);
   const backTo = current?.to ?? '/admin';
   const [mobileOpen, setMobileOpen] = useState(false);
+  const notifications = useNotifications();
+  const unreadNotifications = notifications.data?.unread ?? 0;
 
   useEffect(() => {
     setMobileOpen(false);
@@ -61,8 +65,9 @@ export function AdminPanelLayout({ title, items }: { title: string; items: Panel
       <div className="flex min-h-dvh" dir="rtl">
         <DesktopSidebar title={title} items={items} />
         <div className="min-w-0 flex-1 bg-[#f8f7f2]">
-          <DesktopHeader />
+          <DesktopHeader unreadNotifications={unreadNotifications} />
           <MobileHeader
+            unreadNotifications={unreadNotifications}
             pageTitle={pageTitle}
             isDetail={isDetail}
             backTo={backTo}
@@ -181,7 +186,7 @@ function NavList({
   );
 }
 
-function DesktopHeader() {
+function DesktopHeader({ unreadNotifications }: { unreadNotifications: number }) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -215,7 +220,7 @@ function DesktopHeader() {
         <HeaderLink to="/admin/mentor" label="راهنمای پنل">
           <CircleHelp className="size-5" aria-hidden="true" />
         </HeaderLink>
-        <HeaderLink to="/admin/notifications" label="اعلان‌ها">
+        <HeaderLink to="/admin/notifications" label="اعلان‌ها" badge={unreadNotifications}>
           <Bell className="size-5" aria-hidden="true" />
         </HeaderLink>
         <div ref={accountRef} className="relative ms-2">
@@ -274,15 +279,35 @@ function DesktopHeader() {
   );
 }
 
-function HeaderLink({ to, label, children }: { to: string; label: string; children: ReactNode }) {
+function HeaderLink({
+  to,
+  label,
+  children,
+  badge = 0,
+}: {
+  to: string;
+  label: string;
+  children: ReactNode;
+  badge?: number;
+}) {
+  const accessibleLabel =
+    badge > 0 ? `${label}، ${toPersianDigits(badge)} اعلان خوانده‌نشده` : label;
   return (
     <Link
       to={to}
-      aria-label={label}
-      title={label}
-      className="flex size-11 items-center justify-center rounded-full text-[#4a6259] transition-colors hover:bg-[#f2f5f1] hover:text-[#075b44]"
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
+      className="relative flex size-11 items-center justify-center rounded-full text-[#4a6259] transition-colors hover:bg-[#f2f5f1] hover:text-[#075b44]"
     >
       {children}
+      {badge > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute -end-0.5 -top-0.5 grid min-h-4 min-w-4 place-items-center rounded-full border-2 border-[#fffdf8] bg-[#b42318] px-1 text-[9px] font-extrabold leading-none text-white"
+        >
+          {badge > 9 ? '۹+' : toPersianDigits(badge)}
+        </span>
+      )}
     </Link>
   );
 }
@@ -460,6 +485,7 @@ function QuickSearch() {
 }
 
 function MobileHeader({
+  unreadNotifications,
   pageTitle,
   isDetail,
   backTo,
@@ -467,6 +493,7 @@ function MobileHeader({
   menuOpen,
   menuId,
 }: {
+  unreadNotifications: number;
   pageTitle: string;
   isDetail: boolean;
   backTo: string;
@@ -505,10 +532,22 @@ function MobileHeader({
       </p>
       <Link
         to="/admin/notifications"
-        aria-label="اعلان‌ها"
-        className="flex size-11 items-center justify-center rounded-full text-[#3e584f] hover:bg-[#f4f5f1]"
+        aria-label={
+          unreadNotifications > 0
+            ? `اعلان‌ها، ${toPersianDigits(unreadNotifications)} اعلان خوانده‌نشده`
+            : 'اعلان‌ها'
+        }
+        className="relative flex size-11 items-center justify-center rounded-full text-[#3e584f] hover:bg-[#f4f5f1]"
       >
         <Bell className="size-5" aria-hidden="true" />
+        {unreadNotifications > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute -end-0.5 -top-0.5 grid min-h-4 min-w-4 place-items-center rounded-full border-2 border-[#fffdf8] bg-[#b42318] px-1 text-[9px] font-extrabold leading-none text-white"
+          >
+            {unreadNotifications > 9 ? '۹+' : toPersianDigits(unreadNotifications)}
+          </span>
+        )}
       </Link>
     </header>
   );

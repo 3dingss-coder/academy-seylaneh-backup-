@@ -122,6 +122,57 @@ describe('NotificationsPage — three real tabs (inbox / templates / manual send
     expect(screen.queryByText('قبولی آزمون')).toBeNull();
   });
 
+  it('opens the Manager review queue from an Admin in-app notification', async () => {
+    const notification: NotificationItem = {
+      id: 'manager-request-notification',
+      type: 'manual',
+      title: 'درخواست جدید دسترسی مدیر',
+      body: 'مریم مدیرخواه درخواست دسترسی پنل مدیر داده است.',
+      actionRef: '/admin/users?tab=manager-requests',
+      readAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    mockApi(
+      signIn({
+        'GET /v1/me/notifications': () => ({ data: { unread: 1, items: [notification] } }),
+        'POST /v1/me/notifications/manager-request-notification/read': () => ({
+          data: { ok: true },
+        }),
+        'GET /v1/admin/users': () => ({ data: [] }),
+        'GET /v1/admin/teams': () => ({ data: [] }),
+        'GET /v1/admin/manager-access-requests': () => ({
+          data: [
+            {
+              id: 'manager-applicant',
+              userId: 'manager-applicant',
+              existingAccount: false,
+              fullName: 'مریم مدیرخواه',
+              phone: '09125550100',
+              nationalCode: '1234567891',
+              managementProvince: 'تهران',
+              managementCity: 'تهران',
+              avatarUrl: '',
+              status: 'pending',
+              reviewNote: null,
+              reviewedAt: null,
+              phoneReviewedExternally: false,
+              appeals: [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+        }),
+      }),
+    );
+    renderApp('/admin/notifications');
+    fireEvent.click(await screen.findByRole('button', { name: /درخواست جدید دسترسی مدیر/ }));
+    expect(
+      await screen.findByRole('heading', { name: 'مدیریت نقش مدیران و درخواست‌ها' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('مریم مدیرخواه')).toBeInTheDocument();
+    expect(screen.getByText('درخواست‌های مدیران')).toBeInTheDocument();
+  });
+
   it('keeps notification templates editable (PUT with the typed text)', async () => {
     const { calls } = mockApi(
       signIn({

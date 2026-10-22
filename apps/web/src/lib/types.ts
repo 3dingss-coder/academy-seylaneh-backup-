@@ -21,6 +21,9 @@ export interface Me {
   status: 'active' | 'inactive' | 'blacklisted';
   pointsBalance: number;
   onboardedAt: string | null;
+  /** True only for an Admin-provisioned Manager who has not finished first-login setup. */
+  managerProfileRequired?: boolean;
+  managerProfileCompletedAt?: string | null;
   lastActiveAt: string | null;
   createdAt: string;
 }
@@ -825,8 +828,14 @@ export interface AdminQuiz {
 export interface AdminTeam {
   id: string;
   name: string;
+  /** Compatibility primary-manager fields; managerIds/managers support multiple Managers. */
   managerId: string | null;
   managerName: string | null;
+  managerIds?: string[];
+  managers?: Array<{ id: string; name: string; status: 'active' | 'inactive' }>;
+  activeManagerCount?: number;
+  province?: string | null;
+  city?: string | null;
   memberCount: number;
 }
 export interface AdminPath {

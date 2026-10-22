@@ -7,12 +7,28 @@ import { parse } from '../http/validate';
 import type { Deps } from '../services/context';
 import * as reports from '../services/reports';
 import * as pushCampaigns from '../services/push-campaigns';
+import * as users from '../services/users';
 
-/** Spec §21.3 — team scope enforced in every service call (teamId == manager.teamId). */
+/** Manager APIs require the Manager role; services scope every read and mutation to the assigned team. */
 export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   const r = Router();
   r.use('/manager', requireRole('manager'));
   const uid = (req: Parameters<typeof me>[0]) => me(req).id;
+  r.post(
+    '/manager/complete-profile',
+    h(async (req) =>
+      users.completeManagerProfile(
+        d,
+        me(req),
+        parse(users.managerProfileCompletionSchema, req.body),
+      ),
+    ),
+  );
+  r.use('/manager', (req, _res, next) => {
+    if (me(req).managerProfileRequired)
+      return next(new ApiError('FORBIDDEN', 'ابتدا پروفایل مدیر را تکمیل کنید.'));
+    next();
+  });
   r.get(
     '/manager/profile',
     h(async (req) => reports.managerProfile(d, me(req))),

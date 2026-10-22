@@ -99,6 +99,25 @@ describe('manager campaign studio — hard team boundaries', () => {
     expect((await ctx.api(managerA.token).get('/v1/admin/push-campaigns')).status).toBe(403);
   });
 
+  it('includes marketers from the assigned city territory, but not other cities, in campaigns', async () => {
+    await ctx.deps.store.update('teams/team-a', { province: 'تهران', city: 'تهران' });
+    await ctx.deps.store.update(`users/${marketerB.id}`, { province: 'تهران', city: 'تهران' });
+    await addDevice(marketerA.token, 'tehran-team-device-0001');
+    await addDevice(marketerB.token, 'tehran-other-team-device-0002');
+
+    const cityPreview = await ctx
+      .api(managerA.token)
+      .post('/v1/manager/campaigns/audience-preview', { channel: 'android' });
+    expect(cityPreview.status).toBe(200);
+    expect(cityPreview.body.data).toMatchObject({ users: 2, withPushDevice: 2 });
+
+    await ctx.deps.store.update(`users/${marketerB.id}`, { province: 'اصفهان', city: 'اصفهان' });
+    const outsidePreview = await ctx
+      .api(managerA.token)
+      .post('/v1/manager/campaigns/audience-preview', { channel: 'android' });
+    expect(outsidePreview.body.data).toMatchObject({ users: 1, withPushDevice: 1 });
+  });
+
   it('lets a manager send an owned campaign to the team, but not edit an admin campaign', async () => {
     await addDevice(marketerA.token, 'team-a-send-token-0001');
     await addDevice(marketerB.token, 'team-b-send-token-0002');

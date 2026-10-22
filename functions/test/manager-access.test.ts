@@ -230,6 +230,8 @@ describe('Manager access request and review', () => {
 
   it('requires external contact review, provisions the chosen team, then signs the Manager in', async () => {
     const admin = await ctx.user('admin');
+    const existingManager = await ctx.user('manager', { teamId: 'team-a' });
+    await ctx.deps.store.update('teams/team-a', { managerId: existingManager.id });
     await submitApplication();
     const applicant = await applicantByPhone();
 
@@ -258,7 +260,19 @@ describe('Manager access request and review', () => {
       province: 'تهران',
       city: 'تهران',
     });
-    expect(team?.managerId).toBe(applicant.id);
+    expect(team?.managerId).toBe(existingManager.id);
+    const teamList = await ctx.api(admin.token).get('/v1/admin/teams');
+    const assignedTeam = (
+      teamList.body.data as Array<{
+        id: string;
+        managerIds: string[];
+        activeManagerCount: number;
+      }>
+    ).find((item) => item.id === 'team-a');
+    expect(assignedTeam).toMatchObject({
+      managerIds: expect.arrayContaining([existingManager.id, applicant.id]),
+      activeManagerCount: 2,
+    });
     expect(request).toMatchObject({
       status: 'approved',
       phoneReviewedExternallyBy: admin.id,

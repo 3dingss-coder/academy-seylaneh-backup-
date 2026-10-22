@@ -28,9 +28,14 @@ export interface User {
   status: UserStatus;
   pointsBalance: number;
   onboardedAt: string | null;
+  /** Admin-provisioned Managers must complete their own profile before using Manager APIs. */
+  managerProfileRequired?: boolean;
+  managerProfileCompletedAt?: string | null;
   lastActiveAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Previous access state while status is `blacklisted`, restored on archive restore. */
+  blacklistedFromStatus?: 'active' | 'inactive' | null;
   /** Set while status is `blacklisted` (archive tab «لیست سیاه»). */
   blacklistedAt?: string | null;
   blacklistedBy?: string | null;
@@ -100,7 +105,11 @@ export interface ArchivedReport {
 
 export interface Team {
   name: string;
+  /** Legacy primary-manager pointer; all Managers with `teamId` are now first-class team managers. */
   managerId: string | null;
+  /** Optional city territory; managers also see marketers whose residence matches this pair. */
+  province?: string | null;
+  city?: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;

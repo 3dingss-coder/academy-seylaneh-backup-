@@ -53,6 +53,18 @@ export function RequireAuth({ roles, children }: { roles: Role[]; children: Reac
       return <WrongAccount panel={panel} role={user.role} from={loc.pathname} />;
     return <Navigate to={homePathFor(user.role)} replace />;
   }
+  if (
+    user.role === 'manager' &&
+    user.managerProfileRequired &&
+    loc.pathname !== '/manager/complete-profile'
+  )
+    return <Navigate to="/manager/complete-profile" replace />;
+  if (
+    user.role === 'manager' &&
+    !user.managerProfileRequired &&
+    loc.pathname === '/manager/complete-profile'
+  )
+    return <Navigate to="/manager" replace />;
   if (user.role === 'marketer' && !user.onboardedAt && loc.pathname !== '/onboarding')
     return <Navigate to="/onboarding" replace />;
   return <>{children}</>;

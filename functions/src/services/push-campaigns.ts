@@ -16,6 +16,7 @@ import type {
   User,
 } from '../domain/types';
 import { audit, track, type Actor, type Deps } from './context';
+import { activeTeamAudience } from './team-scope';
 
 /**
  * Admin push campaigns (studio). Storage: the generic document store (`push_campaigns`,
@@ -314,9 +315,11 @@ async function resolveAudience(
   tokens: Map<string, DeviceToken[]>,
 ): Promise<{ userIds: string[]; reachable: number; webDevices: number; androidDevices: number }> {
   const where: Where[] = [['status', '==', 'active']];
-  if (aud.type === 'team') where.push(['teamId', '==', aud.targetId]);
   if (aud.type === 'role') where.push(['role', '==', aud.targetId]);
-  let users = await d.store.query<User>({ collection: 'users', where });
+  let users =
+    aud.type === 'team'
+      ? await activeTeamAudience(d, aud.targetId ?? '')
+      : await d.store.query<User>({ collection: 'users', where });
   if (aud.type === 'user') users = users.filter((u) => u.id === aud.targetId);
   const platform = aud.channel === 'any' ? null : aud.channel;
   const userIds: string[] = [];

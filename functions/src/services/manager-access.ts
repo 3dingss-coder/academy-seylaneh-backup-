@@ -751,8 +751,6 @@ export async function approveManagerAccess(
     )
       throw new ApiError('CONFLICT', 'اطلاعات درخواست تغییر کرده است؛ درخواست را تازه‌سازی کنید.');
     if (!team || team.archived) throw new ApiError('VALIDATION', 'تیم انتخاب‌شده معتبر نیست.');
-    if (team.managerId && team.managerId !== requestId)
-      throw new ApiError('CONFLICT', 'این تیم از قبل مدیر دارد؛ ابتدا تیم دیگری انتخاب کنید.');
 
     previousApplicant = applicant;
     previousTeamManagerId = team.managerId;
@@ -768,9 +766,11 @@ export async function approveManagerAccess(
       teamId: input.teamId,
       province: request.managementProvince,
       city: request.managementCity,
+      managerProfileRequired: false,
+      managerProfileCompletedAt: now,
       updatedAt: now,
     });
-    tx.update(teamPath, { managerId: requestId, updatedAt: now });
+    tx.update(teamPath, { managerId: team.managerId ?? requestId, updatedAt: now });
     tx.update(path, {
       status: 'approved' satisfies ManagerAccessStatus,
       reviewNote: null,
@@ -798,7 +798,7 @@ export async function approveManagerAccess(
             request.status !== 'approved' ||
             !applicant ||
             applicant.role !== 'manager' ||
-            team?.managerId !== requestId ||
+            applicant.teamId !== input.teamId ||
             !previousApplicant ||
             !approvedRequest
           )
@@ -813,9 +813,12 @@ export async function approveManagerAccess(
             teamId: previousApplicant.teamId,
             province: previousApplicant.province,
             city: previousApplicant.city,
+            managerProfileRequired: previousApplicant.managerProfileRequired ?? false,
+            managerProfileCompletedAt: previousApplicant.managerProfileCompletedAt ?? null,
             updatedAt: nowIso(d),
           });
-          tx.update(teamPath, { managerId: previousTeamManagerId, updatedAt: nowIso(d) });
+          if (team?.managerId === requestId)
+            tx.update(teamPath, { managerId: previousTeamManagerId, updatedAt: nowIso(d) });
           tx.update(path, {
             status: approvedRequest.status,
             reviewNote: approvedRequest.reviewNote,

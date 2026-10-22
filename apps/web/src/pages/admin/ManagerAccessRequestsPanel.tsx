@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -97,11 +97,8 @@ export function ManagerAccessRequestsPanel() {
     ]);
   };
 
-  const availableTeams = useMemo(
-    () =>
-      (teams.data ?? []).filter((team) => !team.managerId || team.managerId === approval?.userId),
-    [teams.data, approval?.userId],
-  );
+  // A team may have any number of Managers; its primary `managerId` is only a legacy pointer.
+  const availableTeams = teams.data ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -237,8 +234,7 @@ export function ManagerAccessRequestsPanel() {
             </Select>
             {!teams.isLoading && availableTeams.length === 0 && (
               <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800">
-                تیم خالی برای تخصیص وجود ندارد. ابتدا در بخش تیم‌ها تیم ایجاد کنید یا مدیر فعلی را
-                جابه‌جا کنید.
+                تیمی برای تخصیص وجود ندارد. ابتدا در بخش تیم‌ها یک تیم ایجاد کنید.
               </p>
             )}
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
@@ -322,7 +318,9 @@ function RequestCard({
 }) {
   const status = REQUEST_STATUS[request.status];
   const canReview = OPEN_STATUSES.has(request.status);
-  const assignedTeam = teams.find((team) => team.managerId === request.userId);
+  const assignedTeam = teams.find(
+    (team) => team.managerId === request.userId || team.managerIds?.includes(request.userId),
+  );
 
   return (
     <Card className="flex flex-col gap-4 border-[#e3e8df] p-4 sm:p-5">

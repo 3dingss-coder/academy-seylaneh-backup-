@@ -397,6 +397,14 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
     '/admin/users',
     h(async (req) => users.listUsers(d, parse(users.adminUserQuery, req.query))),
   );
+  r.post(
+    '/admin/users',
+    h(
+      async (req) =>
+        users.adminCreateUser(d, actorOf(req), parse(users.adminCreateUserSchema, req.body)),
+      201,
+    ),
+  );
   r.get(
     '/admin/users/:id',
     h(async (req) => reports.userTimeline(d, me(req), id(req))),
@@ -428,12 +436,7 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
   r.patch(
     '/admin/teams/:id',
     h(async (req) =>
-      users.updateTeam(
-        d,
-        actorOf(req),
-        id(req),
-        parse(users.teamSchema.partial().extend({ archived: z.boolean().optional() }), req.body),
-      ),
+      users.updateTeam(d, actorOf(req), id(req), parse(users.teamPatchSchema, req.body)),
     ),
   );
 

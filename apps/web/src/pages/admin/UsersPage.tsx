@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   Pencil,
   Phone,
+  Plus,
   Search,
   Trash2,
   UserRound,
@@ -71,6 +72,7 @@ export function UsersPage() {
   const [team, setTeam] = useState('');
   const [city, setCity] = useState('');
   const [edit, setEdit] = useState<{ accounts: Me[]; id: string } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [del, setDel] = useState<PersonGroup<Me> | null>(null);
   const editUser = edit
     ? (edit.accounts.find((a) => a.id === edit.id) ?? edit.accounts[0])
@@ -90,6 +92,16 @@ export function UsersPage() {
         variant="admin"
         title="کاربران"
         subtitle="مدیریت نقش‌ها، تیم‌ها و درخواست‌های دسترسی مدیران"
+        actions={
+          activeTab === 'accounts' ? (
+            <Button
+              icon={<Plus className="size-4" aria-hidden />}
+              onClick={() => setCreateOpen(true)}
+            >
+              کاربر جدید
+            </Button>
+          ) : undefined
+        }
       />
       <Tabs
         label="بخش‌های مدیریت کاربران"
@@ -300,10 +312,180 @@ export function UsersPage() {
               onClose={() => setEdit(null)}
             />
           )}
+          {createOpen && <CreateUserDialog onClose={() => setCreateOpen(false)} />}
           {del && <DeleteUsersDialog group={del} onClose={() => setDel(null)} />}
         </>
       )}
     </div>
+  );
+}
+
+interface CreatedAdminUser {
+  user: Me;
+  temporaryPassword: string | null;
+}
+
+function CreateUserDialog({ onClose }: { onClose: () => void }) {
+  const teams = useTeams();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<'marketer' | 'manager'>('manager');
+  const [teamId, setTeamId] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [created, setCreated] = useState<CreatedAdminUser | null>(null);
+  const create = useMutation({
+    mutationFn: () =>
+      api.post<CreatedAdminUser>('/admin/users', {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
+        role,
+        teamId: teamId || null,
+      }),
+    onSuccess: (result) => {
+      setCreated(result);
+      void qc.invalidateQueries({ queryKey: ['admin'] });
+      toast.show({ type: 'success', message: 'حساب کاربر ساخته شد.' });
+    },
+    onError: (cause) => {
+      setErrors(cause instanceof ApiError ? cause.fields : {});
+      toast.show({ type: 'error', message: errMsg(cause) });
+    },
+  });
+  const selectedTeam = teams.data?.find((team) => team.id === (created?.user.teamId ?? teamId));
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={created ? 'حساب ساخته شد' : 'ساخت کاربر جدید'}
+      size="md"
+      footer={
+        created ? (
+          <Button onClick={onClose}>بستن</Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              انصراف
+            </Button>
+            <Button
+              loading={create.isPending}
+              disabled={
+                firstName.trim().length < 2 ||
+                lastName.trim().length < 2 ||
+                !phone.trim() ||
+                (role === 'manager' && !teamId)
+              }
+              onClick={() => create.mutate()}
+            >
+              ساخت حساب
+            </Button>
+          </>
+        )
+      }
+    >
+      {created ? (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-2xl border border-[#c9dfcc] bg-[#f1f8f1] p-4">
+            <p className="font-extrabold text-[#145b43]">{created.user.name}</p>
+            <p className="mt-1 text-sm text-text-secondary">
+              {ROLE_LABEL[created.user.role]}
+              {selectedTeam ? ` · ${selectedTeam.name}` : ''}
+            </p>
+            <p className="mt-2 text-sm">
+              شمارهٔ ورود:{' '}
+              <b dir="ltr" className="inline-block font-mono">
+                {toPersianDigits(created.user.phone ?? '')}
+              </b>
+            </p>
+          </div>
+          {created.user.role === 'manager' && created.temporaryPassword ? (
+            <div role="status" className="rounded-2xl border border-[#efd9a6] bg-[#fff8e8] p-4">
+              <p className="text-sm font-extrabold text-[#70520e]">رمز موقت مدیر — نمایش یک‌باره</p>
+              <p dir="ltr" className="mt-2 select-all text-center font-mono text-xl font-black">
+                {created.temporaryPassword}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[#67583a]">
+                این رمز را مستقیماً در اختیار مدیر بگذارید. حساب فعال است و نیازی به درخواست دسترسی
+                ندارد؛ در نخستین ورود، تکمیل پروفایل و ساخت رمز شخصی الزامی است.
+              </p>
+            </div>
+          ) : (
+            <p className="rounded-xl bg-surface-2 p-3 text-sm leading-6 text-text-secondary">
+              حساب بازاریاب ساخته شد و طبق روش ورود معمول بازاریابان در دسترس است.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="نام"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+              error={errors.firstName}
+              autoComplete="given-name"
+              disabled={create.isPending}
+            />
+            <Input
+              label="نام خانوادگی"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              error={errors.lastName}
+              autoComplete="family-name"
+              disabled={create.isPending}
+            />
+          </div>
+          <Input
+            label="شماره موبایل"
+            type="tel"
+            inputMode="tel"
+            dir="ltr"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            error={errors.phone}
+            autoComplete="tel"
+            disabled={create.isPending}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label="نقش"
+              value={role}
+              onChange={(event) => setRole(event.target.value as 'marketer' | 'manager')}
+              error={errors.role}
+              disabled={create.isPending}
+            >
+              <option value="marketer">{ROLE_LABEL.marketer}</option>
+              <option value="manager">{ROLE_LABEL.manager}</option>
+            </Select>
+            <Select
+              label={role === 'manager' ? 'تیم مدیر' : 'تیم'}
+              value={teamId}
+              onChange={(event) => setTeamId(event.target.value)}
+              error={errors.teamId}
+              disabled={create.isPending}
+              hint={role === 'manager' ? 'انتخاب تیم برای مدیر الزامی است.' : 'اختیاری'}
+            >
+              <option value="">{role === 'manager' ? 'انتخاب تیم' : 'بدون تیم'}</option>
+              {(teams.data ?? []).map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                  {team.city ? ` · ${team.city}` : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {role === 'manager' && (
+            <p className="rounded-xl border border-[#dce9dc] bg-[#f6faf5] p-3 text-xs leading-6 text-[#52645b]">
+              مدیر بلافاصله به حساب فعال و محدودهٔ همین تیم دسترسی می‌گیرد؛ پیش از دیدن گزارش‌ها
+              باید پروفایل خود را کامل و رمز موقت را عوض کند.
+            </p>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -536,13 +718,18 @@ function UserDialog({
             ))}
           </Select>
           <Select
-            label="وضعیت"
+            label={role === 'manager' ? 'دسترسی پنل مدیر' : 'وضعیت حساب'}
             value={status}
             onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
             error={errors.status}
+            hint={
+              role === 'manager' ? 'مسدودسازی، ورود و نشست‌های فعلی مدیر را می‌بندد.' : undefined
+            }
           >
-            <option value="active">فعال</option>
-            <option value="inactive">غیرفعال</option>
+            <option value="active">{role === 'manager' ? 'فعال — اجازهٔ ورود' : 'فعال'}</option>
+            <option value="inactive">
+              {role === 'manager' ? 'مسدود — ورود بسته است' : 'غیرفعال'}
+            </option>
           </Select>
         </div>
         <ResidencePicker

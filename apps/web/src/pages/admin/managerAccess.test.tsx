@@ -47,7 +47,17 @@ describe('Admin Manager access review area', () => {
       'GET /v1/me': () => ({ data: admin }),
       'GET /v1/admin/users': () => ({ data: [] }),
       'GET /v1/admin/teams': () => ({
-        data: [{ id: 'team-1', name: 'تیم تهران', managerId: null }],
+        data: [
+          {
+            id: 'team-1',
+            name: 'تیم تهران',
+            managerId: 'manager-existing',
+            managerName: 'مدیر فعلی',
+            managerIds: ['manager-existing'],
+            activeManagerCount: 1,
+            memberCount: 4,
+          },
+        ],
       }),
       'GET /v1/admin/manager-access-requests': () => ({ data: [application] }),
       'POST /v1/admin/manager-access-requests/request-1/approve': (body) => ({

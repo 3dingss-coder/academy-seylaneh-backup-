@@ -16,6 +16,7 @@ import { loadLearningForUsers, loadUserLearning, type PackageView } from './lear
 import { archivedReportKeys } from './archive';
 import { notifyTemplate } from './notify';
 import { publicUser } from './users';
+import { isUserInManagerTeam, teamMarketers } from './team-scope';
 
 /** Laggard = overdue & incomplete, or ≤72h left with < 50% progress. */
 export function isLagging(p: PackageView, now: Date): boolean {
@@ -108,16 +109,10 @@ export function summarize(members: MemberLearning[], now: Date) {
   };
 }
 
-// ─── Manager scope (spec §19.4 #3: teamId == manager.teamId) ────────────────
+// ─── Manager scope: explicit team members plus the team's optional city territory ───
 export async function teamMembers(d: Deps, manager: Doc<User>): Promise<Array<Doc<User>>> {
   if (!manager.teamId) return [];
-  return d.store.query<User>({
-    collection: 'users',
-    where: [
-      ['teamId', '==', manager.teamId],
-      ['role', '==', 'marketer'],
-    ],
-  });
+  return teamMarketers(d, manager.teamId);
 }
 
 export async function assertTeamMember(
@@ -128,8 +123,11 @@ export async function assertTeamMember(
   const u = await d.store.get<User>(`users/${userId}`);
   // Admins may inspect anyone; managers only their own team. Same 403 for "not found" to avoid probing.
   if (!u) throw new ApiError(manager.role === 'manager' ? 'FORBIDDEN' : 'NOT_FOUND');
-  if (manager.role === 'manager' && (!manager.teamId || u.teamId !== manager.teamId))
-    throw new ApiError('FORBIDDEN', 'این کاربر عضو تیم شما نیست.');
+  if (manager.role === 'manager') {
+    const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
+    if (!manager.teamId || !isUserInManagerTeam(u, manager.teamId, team))
+      throw new ApiError('FORBIDDEN', 'این کاربر عضو تیم شما نیست.');
+  }
   return u;
 }
 
@@ -148,18 +146,19 @@ export async function managerProfile(d: Deps, manager: Doc<User>) {
 
 export async function managerDashboard(d: Deps, manager: Doc<User>) {
   const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
+  const scopedUsers = await teamMembers(d, manager);
   const members = await loadMembers(
     d,
-    (await teamMembers(d, manager)).filter((u) => u.status === 'active'),
+    scopedUsers.filter((u) => u.status === 'active'),
   );
+  const memberIds = new Set(scopedUsers.map((u) => u.id));
   const pendingRetakes = manager.teamId
-    ? await d.store.query<RetakeRequest>({
-        collection: 'retake_requests',
-        where: [
-          ['teamId', '==', manager.teamId],
-          ['status', '==', 'pending'],
-        ],
-      })
+    ? (
+        await d.store.query<RetakeRequest>({
+          collection: 'retake_requests',
+          where: [['status', '==', 'pending']],
+        })
+      ).filter((request) => memberIds.has(request.userId))
     : [];
   await track(d, 'manager_dashboard_viewed', manager.id);
   return {
@@ -729,11 +728,12 @@ export async function listRetakes(
   status: 'pending' | 'approved' | 'rejected' = 'pending',
 ) {
   const where: Array<[string, '==', unknown]> = [['status', '==', status]];
+  let list = await d.store.query<RetakeRequest>({ collection: 'retake_requests', where });
   if (viewer.role === 'manager') {
     if (!viewer.teamId) return [];
-    where.push(['teamId', '==', viewer.teamId]);
+    const memberIds = new Set((await teamMembers(d, viewer)).map((member) => member.id));
+    list = list.filter((request) => memberIds.has(request.userId));
   }
-  const list = await d.store.query<RetakeRequest>({ collection: 'retake_requests', where });
   const userDocs = (
     await d.store.getMany<User>([...new Set(list.map((r) => r.userId))].map((id) => `users/${id}`))
   ).filter((u): u is Doc<User> => !!u);
@@ -783,8 +783,15 @@ export async function reviewRetake(
   const result = await d.store.runTransaction(async (tx) => {
     const r = await tx.get<RetakeRequest>(path);
     if (!r) throw new ApiError('NOT_FOUND', 'درخواست پیدا نشد.');
-    if (reviewer.role === 'manager' && (!reviewer.teamId || r.teamId !== reviewer.teamId))
-      throw new ApiError('FORBIDDEN', 'این درخواست مربوط به تیم شما نیست.');
+    if (reviewer.role === 'manager') {
+      if (!reviewer.teamId) throw new ApiError('FORBIDDEN', 'این درخواست مربوط به تیم شما نیست.');
+      const [member, team] = await Promise.all([
+        tx.get<User>(`users/${r.userId}`),
+        tx.get<Team>(`teams/${reviewer.teamId}`),
+      ]);
+      if (!member || !isUserInManagerTeam(member, reviewer.teamId, team))
+        throw new ApiError('FORBIDDEN', 'این درخواست مربوط به تیم شما نیست.');
+    }
     if (reviewer.role === 'manager' && r.escalated && r.status === 'pending')
       throw new ApiError('FORBIDDEN', 'این درخواست به مدیر سیستم ارجاع شده است.');
     if (r.status !== 'pending') {

@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  FileText,
-  ImagePlus,
-  Link2,
-  Mic,
-  PhoneCall,
-  Plus,
-  Send,
-  ThumbsDown,
-  ThumbsUp,
-  X,
-} from 'lucide-react';
+import { FileText, ImagePlus, Link2, PhoneCall, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { Button, Skeleton, useToast } from '@/components/ui';
 import { Mascot } from '@/components/brand/Mascot';
 import { api } from '@/lib/api';
@@ -446,7 +436,7 @@ export function MentorChat({
             aria-expanded={plusOpen}
             onClick={() => setPlusOpen((v) => !v)}
             className="!size-12 !min-h-12 !px-0"
-            icon={<Plus className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="mentor-plus" className="size-6" />}
           />
           {plusOpen && (
             <div className="absolute bottom-full z-20 mb-2 flex w-56 max-w-[70vw] flex-col gap-1 rounded-card border border-marketer-border bg-marketer-surface p-2 shadow-md end-0">
@@ -515,7 +505,11 @@ export function MentorChat({
           aria-pressed={listening}
           onClick={startMic}
           className="!size-12 !min-h-12 !px-0"
-          icon={<Mic className="size-5" aria-hidden />}
+          icon={
+            <span className="grid size-8 place-items-center rounded-full bg-white">
+              <MarketerIcon name="mentor-mic" className="size-6" />
+            </span>
+          }
         />
         <Button
           type="submit"
@@ -523,7 +517,11 @@ export function MentorChat({
           aria-label="ارسال"
           loading={send.isPending}
           disabled={!text.trim() && attachments.length === 0}
-          icon={<Send className="size-5" aria-hidden />}
+          icon={
+            <span className="grid size-8 place-items-center rounded-full bg-white">
+              <MarketerIcon name="mentor-send" className="size-6" />
+            </span>
+          }
         />
         <input
           ref={imageRef}

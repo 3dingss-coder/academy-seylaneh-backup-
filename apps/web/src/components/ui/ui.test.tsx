@@ -214,6 +214,10 @@ describe('MarketerIcon', () => {
     'quiz-review',
     'retake-pending',
     'quiz-unavailable',
+    'profile',
+    'mentor-plus',
+    'mentor-mic',
+    'mentor-send',
   ] as MarketerIconName[])('maps %s to its decorative image asset', (name) => {
     const { container } = render(<MarketerIcon name={name} className="size-8" />);
     const icon = container.querySelector('img');

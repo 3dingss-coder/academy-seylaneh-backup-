@@ -25,7 +25,11 @@ export type MarketerIconName =
   | 'quiz-retry'
   | 'quiz-review'
   | 'retake-pending'
-  | 'quiz-unavailable';
+  | 'quiz-unavailable'
+  | 'profile'
+  | 'mentor-plus'
+  | 'mentor-mic'
+  | 'mentor-send';
 
 const ICON_SRC: Record<MarketerIconName, string> = {
   home: '/brand/m/icons/home-3d.png',
@@ -53,10 +57,22 @@ const ICON_SRC: Record<MarketerIconName, string> = {
   'quiz-review': '/brand/m/icons/quiz-review-3d.png',
   'retake-pending': '/brand/m/icons/retake-pending-3d.png',
   'quiz-unavailable': '/brand/m/icons/quiz-unavailable-3d.png',
+  profile: '/brand/m/icons/profile-3d.png',
+  'mentor-plus': '/brand/m/icons/mentor-plus-3d.png',
+  'mentor-mic': '/brand/m/icons/mentor-mic-3d.png',
+  'mentor-send': '/brand/m/icons/mentor-send-3d.png',
 };
 
 /** Decorative 3D marketer icon; adjacent text or the containing control names it accessibly. */
-export function MarketerIcon({ name, className }: { name: MarketerIconName; className?: string }) {
+export function MarketerIcon({
+  name,
+  className,
+  onError,
+}: {
+  name: MarketerIconName;
+  className?: string;
+  onError?: () => void;
+}) {
   return (
     <img
       src={ICON_SRC[name]}
@@ -65,6 +81,7 @@ export function MarketerIcon({ name, className }: { name: MarketerIconName; clas
       width={512}
       height={512}
       decoding="async"
+      onError={onError}
       className={cn('block shrink-0 object-contain', className)}
     />
   );

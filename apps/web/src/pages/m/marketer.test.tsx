@@ -180,13 +180,15 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     }
   });
 
-  it('uses the mascot as the default profile avatar and keeps success art out of the routine state', async () => {
+  it('uses the generic 3D profile avatar beside notifications and keeps success art out of routine state', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     const { container } = renderHome();
     await screen.findByTestId('next-item');
-    const avatar = container.querySelector('img[src="/brand/m/m-empty.png"]');
+    const avatar = container.querySelector('img[src="/brand/m/icons/profile-3d.png"]');
     expect(avatar).not.toBeNull();
     expect(avatar).toHaveAttribute('alt', '');
+    expect(avatar).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('link', { name: 'پروفایل سارا' })).toBeInTheDocument();
     expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
   });
 
@@ -555,6 +557,11 @@ describe('MentorPage — real mentor surface, mascot as supportive mentor state'
     expect(await screen.findByText('مزیت اصلی این محصول چیست؟')).toBeInTheDocument();
     expect(screen.getByLabelText('سؤال شما')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'پیوست تصویر، متن یا لینک' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'گفتن سؤال با صدا' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ارسال' })).toBeInTheDocument();
+    for (const name of ['mentor-plus', 'mentor-mic', 'mentor-send']) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
   });
 });
 

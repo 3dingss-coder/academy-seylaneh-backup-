@@ -412,10 +412,10 @@ function HomeGreeting({
   avatarUrl?: string | null;
   unread: number;
 }) {
-  const mascotSrc = '/brand/m/m-empty.png';
+  const profileIconSrc = '/brand/m/icons/profile-3d.png';
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const src =
-    avatarUrl && failedSrc !== avatarUrl ? avatarUrl : failedSrc !== mascotSrc ? mascotSrc : null;
+  const avatarSrc = avatarUrl && failedSrc !== avatarUrl ? avatarUrl : null;
+  const showProfileIcon = !avatarSrc && failedSrc !== profileIconSrc;
 
   return (
     <div className="flex items-center gap-3 rounded-card border border-marketer-border bg-marketer-surface px-3 py-3 shadow-sm">
@@ -424,13 +424,19 @@ function HomeGreeting({
         aria-label={`پروفایل ${firstName}`}
         className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-marketer-border bg-marketer-brand-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marketer-brand"
       >
-        {src ? (
+        {avatarSrc ? (
           <img
-            src={src}
+            src={avatarSrc}
             alt=""
             aria-hidden
-            className={`h-full w-full ${src === mascotSrc ? 'object-contain p-0.5' : 'object-cover'}`}
-            onError={() => setFailedSrc(src)}
+            className="h-full w-full object-cover"
+            onError={() => setFailedSrc(avatarSrc)}
+          />
+        ) : showProfileIcon ? (
+          <MarketerIcon
+            name="profile"
+            className="size-full p-1"
+            onError={() => setFailedSrc(profileIconSrc)}
           />
         ) : (
           <span aria-hidden className="text-base font-bold text-marketer-ink">

@@ -1,48 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  AlarmClockCheck,
-  Award,
-  Brain,
-  Lock,
-  Medal,
-  Sprout,
-  Star,
-  type LucideIcon,
-} from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { Card, CountUp, EmptyState, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { QueryState } from '@/components/common/QueryState';
+import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { faDate, faNumber } from '@/lib/format';
 import { qk } from '@/lib/queries';
 import type { BadgeView, PointsData } from '@/lib/types';
 
-const ICONS: Record<string, LucideIcon> = {
-  sprout: Sprout,
-  'alarm-clock-check': AlarmClockCheck,
-  brain: Brain,
-  medal: Medal,
-  star: Star,
+const ICONS: Record<string, MarketerIconName> = {
+  sprout: 'badge-sprout',
+  'alarm-clock-check': 'badge-clock',
+  brain: 'badge-brain',
+  medal: 'badge-medal',
+  star: 'badge-star',
 };
 
-const DEFAULT_ICON_TONE = {
-  shell: 'border-accent/30 bg-accent-light',
-  icon: 'bg-accent text-on-accent',
-};
-
-const ICON_TONES: Record<string, { shell: string; icon: string }> = {
-  sprout: {
-    shell: 'border-marketer-brand/30 bg-marketer-brand-soft',
-    icon: 'bg-cta text-on-cta',
-  },
-  'alarm-clock-check': DEFAULT_ICON_TONE,
-  brain: {
-    shell: 'border-violet/25 bg-violet-light',
-    icon: 'bg-violet-light text-violet-fg',
-  },
-  medal: DEFAULT_ICON_TONE,
-  star: DEFAULT_ICON_TONE,
+const DEFAULT_ICON_SHELL = 'border-accent/30 bg-accent-light';
+const ICON_SHELLS: Record<string, string> = {
+  sprout: 'border-marketer-brand/30 bg-marketer-brand-soft',
+  'alarm-clock-check': DEFAULT_ICON_SHELL,
+  brain: 'border-violet/25 bg-violet-light',
+  medal: DEFAULT_ICON_SHELL,
+  star: DEFAULT_ICON_SHELL,
 };
 
 const REASON: Record<string, string> = {
@@ -90,8 +72,8 @@ export function CardsPage() {
               />
 
               <div className="relative z-10 flex min-h-[188px] items-center gap-5 px-5 py-6 sm:min-h-[216px] sm:px-8">
-                <span className="flex size-16 shrink-0 items-center justify-center rounded-full border-[5px] border-white/20 bg-accent text-on-accent shadow-md sm:size-20">
-                  <Award className="size-8 sm:size-10" aria-hidden />
+                <span className="flex size-16 shrink-0 items-center justify-center rounded-full border-[5px] border-white/20 bg-marketer-surface shadow-md sm:size-20">
+                  <MarketerIcon name="badge-star" className="size-10 sm:size-12" />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-white/90 sm:text-base">امتیاز کل</p>
@@ -117,7 +99,7 @@ export function CardsPage() {
             aria-hidden
             className="flex size-10 items-center justify-center rounded-2xl bg-accent-light text-accent-fg"
           >
-            <Medal className="size-5" />
+            <MarketerIcon name="badge-medal" className="size-6" />
           </span>
         </div>
 
@@ -134,8 +116,8 @@ export function CardsPage() {
           {(list) => (
             <ul className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {list.map((b) => {
-                const Icon = ICONS[b.icon] ?? Medal;
-                const tone = ICON_TONES[b.icon] ?? DEFAULT_ICON_TONE;
+                const icon = ICONS[b.icon] ?? 'badge-medal';
+                const shell = ICON_SHELLS[b.icon] ?? DEFAULT_ICON_SHELL;
 
                 return (
                   <li key={b.id} className="min-w-0">
@@ -143,19 +125,12 @@ export function CardsPage() {
                       className={cn(
                         'relative flex h-full min-h-[208px] flex-col items-center overflow-hidden !rounded-hero p-4 text-center',
                         b.earned
-                          ? cn(tone.shell, 'shadow-md')
+                          ? cn(shell, 'shadow-md')
                           : 'border-marketer-border bg-marketer-surface-soft shadow-none',
                       )}
                     >
-                      <span
-                        className={cn(
-                          'relative mb-3 mt-1 flex size-[72px] shrink-0 items-center justify-center rounded-2xl border shadow-sm',
-                          b.earned
-                            ? cn(tone.icon, 'border-white/50')
-                            : 'border-marketer-border bg-marketer-surface text-marketer-muted',
-                        )}
-                      >
-                        <Icon className="size-8" aria-hidden />
+                      <span className="relative mb-3 mt-1 flex size-[72px] shrink-0 items-center justify-center rounded-2xl border border-marketer-border bg-marketer-surface shadow-sm">
+                        <MarketerIcon name={icon} className="size-8" />
                         {!b.earned && (
                           <span className="absolute -bottom-2 -end-2 flex size-8 items-center justify-center rounded-full border-2 border-marketer-surface bg-marketer-brand text-on-cta shadow-sm">
                             <Lock className="size-4" aria-hidden />

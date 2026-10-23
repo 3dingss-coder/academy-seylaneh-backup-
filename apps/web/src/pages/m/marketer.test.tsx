@@ -247,6 +247,33 @@ describe('CardsPage — points and badge ledger', () => {
             earned: false,
             earnedAt: null,
           },
+          {
+            id: 'badge-on-time',
+            code: 'on-time',
+            title: 'به‌موقع',
+            description: 'آموزش را سر وقت کامل کن.',
+            icon: 'alarm-clock-check',
+            earned: true,
+            earnedAt: '2026-10-22T10:00:00.000Z',
+          },
+          {
+            id: 'badge-medal',
+            code: 'consistent',
+            title: 'پیوسته',
+            description: 'یادگیری را ادامه بده.',
+            icon: 'medal',
+            earned: true,
+            earnedAt: '2026-10-22T10:00:00.000Z',
+          },
+          {
+            id: 'badge-star',
+            code: 'top-star',
+            title: 'ستاره',
+            description: 'به روند خوبت ادامه بده.',
+            icon: 'star',
+            earned: true,
+            earnedAt: '2026-10-22T10:00:00.000Z',
+          },
         ],
       }),
     });
@@ -257,6 +284,15 @@ describe('CardsPage — points and badge ledger', () => {
     expect(screen.getByText('آزمون‌یار')).toBeInTheDocument();
     expect(screen.getByText('تکمیل به‌موقع')).toBeInTheDocument();
     expect(screen.getByText('+۵۰')).toBeInTheDocument();
+    for (const name of [
+      'badge-sprout',
+      'badge-clock',
+      'badge-brain',
+      'badge-medal',
+      'badge-star',
+    ]) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
   });
 });
 

@@ -10,7 +10,12 @@ export type MarketerIconName =
   | 'quiz'
   | 'audio'
   | 'video'
-  | 'deadline';
+  | 'deadline'
+  | 'badge-sprout'
+  | 'badge-clock'
+  | 'badge-brain'
+  | 'badge-medal'
+  | 'badge-star';
 
 const ICON_SRC: Record<MarketerIconName, string> = {
   home: '/brand/m/icons/home-3d.png',
@@ -23,6 +28,11 @@ const ICON_SRC: Record<MarketerIconName, string> = {
   audio: '/brand/m/icons/audio-3d.png',
   video: '/brand/m/icons/video-3d.png',
   deadline: '/brand/m/icons/deadline-3d.png',
+  'badge-sprout': '/brand/m/icons/badge-sprout-3d.png',
+  'badge-clock': '/brand/m/icons/badge-clock-3d.png',
+  'badge-brain': '/brand/m/icons/badge-brain-3d.png',
+  'badge-medal': '/brand/m/icons/badge-medal-3d.png',
+  'badge-star': '/brand/m/icons/badge-star-3d.png',
 };
 
 /** Decorative 3D marketer icon; adjacent text or the containing control names it accessibly. */

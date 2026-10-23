@@ -44,7 +44,7 @@
 - Keep shared semantic success, danger, warning, and accent tokens for statuses. The accent is not used with white text.
 - Keep touch targets, focus visibility, RTL layout, and existing desktop horizontal navigation/mobile Home–Learning–Messages–Cards tabs.
 - Use the supplied mascot/brand assets only where they support an empty, completion, or mentor state; utility screens should prioritize their task content.
-- Keep the 3D icon set role-scoped: the two completed batches cover home, learning, messages, cards, mentor, notifications, quizzes, audio, video, and deadlines. These images are decorative (`alt=""`); links and controls keep their accessible names. The generic `BottomNav` retains its legacy Lucide fallback, while `MarketerLayout` opts in to its 3D navigation icons explicitly.
+- Keep the 3D icon set role-scoped: three completed batches cover home, learning, messages, cards, mentor, notifications, quizzes, audio, video, deadlines, and the five API-defined achievement symbols (sprout, on-time, brain, medal, star). These images are decorative (`alt=""`); links and controls keep their accessible names. The generic `BottomNav` retains its legacy Lucide fallback, while `MarketerLayout` opts in to its 3D navigation icons explicitly.
 
 ## Scope and approval boundary
 

@@ -37,6 +37,12 @@ describe('Button', () => {
     render(<Button>ورود</Button>);
     expect(screen.getByRole('button').className).toContain('min-h-12');
   });
+  it('centers icon-only buttons without an empty label flex item', () => {
+    render(<Button aria-label="آیکون" icon={<span data-testid="icon-only" />} />);
+    const button = screen.getByRole('button', { name: 'آیکون' });
+    expect(button.children).toHaveLength(1);
+    expect(button.firstElementChild).toBe(screen.getByTestId('icon-only'));
+  });
 });
 
 describe('Input', () => {
@@ -215,6 +221,11 @@ describe('MarketerIcon', () => {
     'retake-pending',
     'quiz-unavailable',
     'profile',
+    'profile-settings',
+    'profile-security',
+    'profile-location',
+    'profile-camera',
+    'profile-logout',
     'mentor-plus',
     'mentor-mic',
     'mentor-send',

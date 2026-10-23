@@ -69,7 +69,7 @@ export function Button({
       {...rest}
     >
       {loading ? <Spinner className="size-4" /> : icon}
-      <span>{children}</span>
+      {children === null || children === undefined ? null : <span>{children}</span>}
     </button>
   );
 }

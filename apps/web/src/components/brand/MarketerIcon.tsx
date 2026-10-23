@@ -27,6 +27,11 @@ export type MarketerIconName =
   | 'retake-pending'
   | 'quiz-unavailable'
   | 'profile'
+  | 'profile-settings'
+  | 'profile-security'
+  | 'profile-location'
+  | 'profile-camera'
+  | 'profile-logout'
   | 'mentor-plus'
   | 'mentor-mic'
   | 'mentor-send';
@@ -58,6 +63,11 @@ const ICON_SRC: Record<MarketerIconName, string> = {
   'retake-pending': '/brand/m/icons/retake-pending-3d.png',
   'quiz-unavailable': '/brand/m/icons/quiz-unavailable-3d.png',
   profile: '/brand/m/icons/profile-3d.png',
+  'profile-settings': '/brand/m/icons/profile-settings-3d.png',
+  'profile-security': '/brand/m/icons/profile-security-3d.png',
+  'profile-location': '/brand/m/icons/profile-location-3d.png',
+  'profile-camera': '/brand/m/icons/profile-camera-3d.png',
+  'profile-logout': '/brand/m/icons/profile-logout-3d.png',
   'mentor-plus': '/brand/m/icons/mentor-plus-3d.png',
   'mentor-mic': '/brand/m/icons/mentor-mic-3d.png',
   'mentor-send': '/brand/m/icons/mentor-send-3d.png',

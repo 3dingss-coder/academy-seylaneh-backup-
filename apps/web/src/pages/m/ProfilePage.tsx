@@ -1,22 +1,8 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Bell,
-  Camera,
-  ChevronLeft,
-  Crown,
-  KeyRound,
-  LockKeyhole,
-  LogOut,
-  MapPin,
-  Medal,
-  Settings,
-  ShieldCheck,
-  Star,
-  Target,
-  UserRound,
-} from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
 import { Button, Card, Input, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { PushOptIn } from '@/components/common/PushOptIn';
@@ -126,6 +112,7 @@ export function ProfilePage({
   const [next, setNext] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<'' | 'profile' | 'avatar' | 'pw' | 'out'>('');
+  const [failedAvatarSrc, setFailedAvatarSrc] = useState<string | null>(null);
 
   const home = useHome(user?.id);
   const notifications = useNotifications(Boolean(user));
@@ -236,16 +223,19 @@ export function ProfilePage({
     nav('/login', { replace: true });
   };
 
-  const avatar = user.avatarUrl ? (
-    <img
-      src={fileUrl(user.avatarUrl)}
-      alt=""
-      className="size-full rounded-full object-cover"
-      decoding="async"
-    />
-  ) : (
-    <UserRound className="size-10 text-[#526B66]" aria-hidden />
-  );
+  const avatarSrc = user.avatarUrl ? fileUrl(user.avatarUrl) : null;
+  const avatar =
+    avatarSrc && failedAvatarSrc !== avatarSrc ? (
+      <img
+        src={avatarSrc}
+        alt=""
+        className="size-full rounded-full object-cover"
+        decoding="async"
+        onError={() => setFailedAvatarSrc(avatarSrc)}
+      />
+    ) : (
+      <MarketerIcon name="profile" className="size-10" />
+    );
 
   const shellClass = adminMode
     ? 'stagger flex w-full flex-col gap-4'
@@ -284,9 +274,9 @@ export function ProfilePage({
                   onClick={() => avatarInput.current?.click()}
                   disabled={busy === 'avatar'}
                   aria-label="تغییر عکس پروفایل"
-                  className="absolute -bottom-1 -right-1 grid size-11 place-items-center rounded-full border-4 border-[#FCF8F0] bg-[#075A73] text-white shadow-md disabled:opacity-50"
+                  className="absolute -bottom-1 -right-1 grid size-11 place-items-center rounded-full border-4 border-[#FCF8F0] bg-[#EAF4EF] shadow-md disabled:opacity-50"
                 >
-                  <Camera className="size-5" aria-hidden />
+                  <MarketerIcon name="profile-camera" className="size-6" />
                 </button>
                 <input
                   ref={avatarInput}
@@ -309,14 +299,14 @@ export function ProfilePage({
               value={name}
               onChange={(e) => setName(e.target.value)}
               error={errors.name}
-              icon={<UserRound className="size-5" aria-hidden />}
+              icon={<MarketerIcon name="profile" className="size-6" />}
               className="bg-[#FFFDF8]"
             />
 
             <div className="flex flex-col gap-1.5">
               <p className="text-sm font-semibold text-text">شماره موبایل</p>
               <div className="flex min-h-14 items-center gap-3 rounded-[18px] bg-[#EFEEE9] px-4 text-[#6E7775]">
-                <LockKeyhole className="size-5 shrink-0" aria-hidden />
+                <MarketerIcon name="profile-security" className="size-6 shrink-0" />
                 <span dir="ltr" className="flex-1 text-end">
                   {user.phone ? toPersianDigits(user.phone) : '—'}
                 </span>
@@ -326,7 +316,7 @@ export function ProfilePage({
             <div className="flex flex-col gap-1.5">
               <p className="text-sm font-semibold text-text">کد ملی</p>
               <div className="flex min-h-14 items-center gap-3 rounded-[18px] border border-[#E1DDD4] bg-[#FFFDF8] px-4">
-                <ShieldCheck className="size-5 shrink-0 text-[#7B8582]" aria-hidden />
+                <MarketerIcon name="profile-security" className="size-6 shrink-0" />
                 <span className="flex-1 text-end text-[#344A45]">
                   {user.hasNationalCode ? 'ثبت شده' : 'ثبت نشده'}
                 </span>
@@ -341,6 +331,8 @@ export function ProfilePage({
               cityError={errors.city}
               placeholder="استان"
               disabled={busy === 'profile'}
+              provinceIcon={<MarketerIcon name="profile-location" className="size-5" />}
+              cityIcon={<MarketerIcon name="profile-location" className="size-5" />}
             />
 
             <div className="flex flex-col gap-1.5">
@@ -361,9 +353,9 @@ export function ProfilePage({
                     </option>
                   ))}
                 </select>
-                <MapPin
-                  className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-[#7A8582]"
-                  aria-hidden
+                <MarketerIcon
+                  name="profile-location"
+                  className="pointer-events-none absolute right-4 top-1/2 size-6 -translate-y-1/2"
                 />
               </div>
             </div>
@@ -393,8 +385,8 @@ export function ProfilePage({
             onBack={() => setView('overview')}
             adminMode={adminMode}
           />
-          <PushOptIn />
-          <NotificationPrefsCard />
+          <PushOptIn marketerIcons />
+          <NotificationPrefsCard marketerIcons />
         </div>
       </div>
     );
@@ -413,7 +405,7 @@ export function ProfilePage({
             <form onSubmit={changePw} className="flex flex-col gap-3">
               <div className="mb-1 flex items-center gap-3">
                 <span className="grid size-11 place-items-center rounded-2xl bg-[#F3ECFF] text-[#7B45D1]">
-                  <KeyRound className="size-5" aria-hidden />
+                  <MarketerIcon name="profile-security" className="size-6" />
                 </span>
                 <h2 className="text-lg font-black text-[#153D36]">تغییر رمز</h2>
               </div>
@@ -452,27 +444,33 @@ export function ProfilePage({
     );
   }
 
-  const menuItems = [
+  const menuItems: Array<{
+    title: string;
+    subtitle: string;
+    icon: MarketerIconName;
+    iconClass: string;
+    onClick: () => void;
+  }> = [
     {
       title: 'اطلاعات شخصی',
       subtitle: 'مشاهده و ویرایش اطلاعات حساب',
-      icon: UserRound,
-      iconClass: 'bg-[#0EB784] text-white',
-      onClick: () => setView('personal' as const),
+      icon: 'profile',
+      iconClass: 'bg-[#E8F3EB]',
+      onClick: () => setView('personal'),
     },
     {
       title: 'محل فعالیت',
       subtitle: 'استان، شهر و محل فعالیت شما',
-      icon: MapPin,
-      iconClass: 'bg-[#5B9CF7] text-white',
-      onClick: () => setView('personal' as const),
+      icon: 'profile-location',
+      iconClass: 'bg-[#EAF1F7]',
+      onClick: () => setView('personal'),
     },
     {
       title: 'تنظیمات اعلان‌ها',
       subtitle: 'مدیریت اعلان‌ها و پیام‌ها',
-      icon: Bell,
-      iconClass: 'bg-[#FFB323] text-white',
-      onClick: () => setView('notifications' as const),
+      icon: 'notification',
+      iconClass: 'bg-[#FFF3D8]',
+      onClick: () => setView('notifications'),
     },
   ];
 
@@ -490,7 +488,7 @@ export function ProfilePage({
                 aria-label="تنظیمات حساب"
                 className="pressable grid size-12 place-items-center rounded-full border border-[#EEE6DA] bg-[#FFFDF8] text-[#596B67] shadow-sm"
               >
-                <Settings className="size-6" aria-hidden />
+                <MarketerIcon name="profile-settings" className="size-7" />
               </button>
               <button
                 type="button"
@@ -498,7 +496,7 @@ export function ProfilePage({
                 aria-label="اعلان‌ها و پیام‌ها"
                 className="pressable relative grid size-12 place-items-center rounded-full border border-[#EEE6DA] bg-[#FFFDF8] text-[#596B67] shadow-sm"
               >
-                <Bell className="size-6" aria-hidden />
+                <MarketerIcon name="notification" className="size-7" />
                 {unread > 0 && (
                   <span
                     aria-label={`${toPersianDigits(unread)} خوانده نشده`}
@@ -540,24 +538,24 @@ export function ProfilePage({
               aria-label="ویرایش اطلاعات شخصی"
               className="grid size-9 shrink-0 place-items-center rounded-full bg-[#F1F4F1] text-[#2C5750]"
             >
-              <UserRound className="size-4" aria-hidden />
+              <MarketerIcon name="profile-settings" className="size-5" />
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2.5">
           <StatCard
-            icon={<Star className="size-8 fill-[#FFB51E] text-[#F4A711]" aria-hidden />}
+            icon={<MarketerIcon name="badge-star" className="size-8" />}
             value={faNumber(points)}
             label="امتیاز کل"
           />
           <StatCard
-            icon={<Target className="size-8 text-[#12A879]" aria-hidden />}
+            icon={<MarketerIcon name="learning" className="size-8" />}
             value={faNumber(completedCourses)}
             label="دوره تکمیل شده"
           />
           <StatCard
-            icon={<Crown className="size-8 fill-[#FFB51E] text-[#F0A218]" aria-hidden />}
+            icon={<MarketerIcon name="badge-medal" className="size-8" />}
             value={faNumber(earnedBadges)}
             label="نشان کسب شده"
           />
@@ -566,7 +564,7 @@ export function ProfilePage({
         <Card className="!rounded-[24px] border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center rounded-full bg-[#FFF6D9] text-[#F0A218]">
-              <Medal className="size-9" aria-hidden />
+              <MarketerIcon name="badge-medal" className="size-10" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-[#6E7A76]">سطح فعلی شما</p>
@@ -591,7 +589,7 @@ export function ProfilePage({
         </Card>
 
         <div className="flex flex-col gap-2.5">
-          {menuItems.map(({ title, subtitle, icon: Icon, iconClass, onClick }) => (
+          {menuItems.map(({ title, subtitle, icon, iconClass, onClick }) => (
             <button
               key={title}
               type="button"
@@ -601,7 +599,7 @@ export function ProfilePage({
               <span
                 className={cn('grid size-12 shrink-0 place-items-center rounded-[15px]', iconClass)}
               >
-                <Icon className="size-6" aria-hidden />
+                <MarketerIcon name={icon} className="size-7" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-black text-[#173A34]">{title}</span>
@@ -619,7 +617,7 @@ export function ProfilePage({
           aria-label="خروج از حساب"
           className="pressable flex min-h-16 w-full items-center justify-center gap-3 rounded-[22px] border border-[#F3DED9] bg-[#FFF7F4] px-4 font-black text-[#E02D2D] shadow-sm disabled:opacity-50"
         >
-          <LogOut className="size-6" aria-hidden />
+          <MarketerIcon name="profile-logout" className="size-7" />
           <span>{busy === 'out' ? 'در حال خروج…' : 'خروج از حساب کاربری'}</span>
         </button>
       </div>

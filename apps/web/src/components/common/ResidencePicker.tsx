@@ -327,6 +327,9 @@ interface ResidencePickerProps {
   hideLabel?: boolean;
   /** Placeholder of the province trigger (default «استان خود را انتخاب کنید»). */
   placeholder?: string;
+  /** Optional role-scoped icon overrides; shared staff/admin forms keep the default glyphs. */
+  provinceIcon?: import('react').ReactNode;
+  cityIcon?: import('react').ReactNode;
 }
 
 /**
@@ -346,6 +349,8 @@ export function ResidencePicker({
   hideCity,
   hideLabel,
   placeholder,
+  provinceIcon,
+  cityIcon,
 }: ResidencePickerProps) {
   const [locations, setLocations] = useState<IranLocations | null>(null);
   const [failed, setFailed] = useState(false);
@@ -385,7 +390,7 @@ export function ResidencePicker({
         error={provinceError}
         clearable={clearable}
         hideLabel={hideLabel}
-        icon={<MapPin className="size-4.5" aria-hidden />}
+        icon={provinceIcon ?? <MapPin className="size-4.5" aria-hidden />}
         onOpen={openList}
         onSelect={(province) => onChange({ province, city: '' })}
         onClear={() => onChange({ province: '', city: '' })}
@@ -404,7 +409,7 @@ export function ResidencePicker({
           status={status}
           disabled={disabled}
           error={cityError}
-          icon={<Building2 className="size-4.5" aria-hidden />}
+          icon={cityIcon ?? <Building2 className="size-4.5" aria-hidden />}
           onOpen={openList}
           onSelect={(city) => onChange({ ...value, city })}
         />

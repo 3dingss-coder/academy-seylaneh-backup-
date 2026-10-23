@@ -46,6 +46,60 @@ const prefsView = () => ({
 });
 
 describe('ProfilePage — real account management', () => {
+  it('uses the 3D profile icon set across the marketer profile screens', async () => {
+    mockApi(
+      signIn({
+        'GET /v1/me/notification-prefs': () => ({ data: prefsView() }),
+      }),
+    );
+    const { container } = renderApp('/profile');
+    await screen.findByRole('heading', { name: 'پروفایل من' }, { timeout: 15000 });
+
+    const toolbarProfile = screen.getByRole('link', { name: 'پروفایل' });
+    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.png"]')).not.toBeNull();
+    for (const name of [
+      'profile-settings',
+      'notification',
+      'profile-location',
+      'badge-star',
+      'learning',
+      'badge-medal',
+      'profile-logout',
+    ]) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'ویرایش اطلاعات شخصی' }));
+    await screen.findByText('شماره موبایل');
+    for (const name of ['profile-camera', 'profile-security', 'profile-location']) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'بازگشت' }));
+    fireEvent.click(screen.getByRole('button', { name: /تنظیمات اعلان‌ها/ }));
+    const prefsHeading = await screen.findByRole('heading', { name: 'تنظیمات اعلان' });
+    expect(
+      prefsHeading.querySelector('img[src="/brand/m/icons/notification-3d.png"]'),
+    ).not.toBeNull();
+  }, 20000);
+
+  it('keeps the uploaded avatar next to notifications when the account has a real photo', async () => {
+    const avatarUrl = 'https://cdn.example.test/marketer-avatar.png';
+    mockApi(
+      signIn({
+        'GET /v1/me': () => ({ data: { ...MARKETER, avatarUrl } }),
+        'GET /v1/me/notification-prefs': () => ({ data: prefsView() }),
+      }),
+    );
+    renderApp('/profile');
+    await screen.findByRole('heading', { name: 'پروفایل من' }, { timeout: 15000 });
+    const toolbarProfile = screen.getByRole('link', { name: 'پروفایل' });
+    await waitFor(() =>
+      expect(toolbarProfile.querySelector(`img[src="${avatarUrl}"]`)).not.toBeNull(),
+    );
+    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.png"]')).toBeNull();
+  }, 20000);
+
   it('saves the display name through PATCH /me and shows the real toast', async () => {
     const { calls } = mockApi(
       signIn({

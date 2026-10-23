@@ -1,6 +1,6 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { UserRound, WifiOff } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLogo } from '@/components/brand/AppLogo';
 import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
@@ -8,6 +8,8 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { PageTransition } from '@/components/layout/PageTransition';
 import { CountBadge } from '@/components/ui/CountBadge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { fileUrl } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { toPersianDigits } from '@/lib/digits';
 import { clearSubject, isSubjectRoute } from '@/lib/pageContext';
@@ -37,6 +39,9 @@ const DESKTOP_NAV: Array<{
 /** Marketer shell: shared top bar, desktop navigation, and the four original mobile tabs. */
 export function MarketerLayout() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const [failedProfileAvatar, setFailedProfileAvatar] = useState<string | null>(null);
+  const profileAvatarSrc = user?.avatarUrl ? fileUrl(user.avatarUrl) : null;
   // The learning roadmap is an immersive, one-purpose screen with its own back/list actions.
   const isLearningPath = pathname === '/learn';
   const notifications = useNotifications();
@@ -115,7 +120,18 @@ export function MarketerLayout() {
                 aria-label="پروفایل"
                 className="flex size-12 items-center justify-center rounded-card text-marketer-muted hover:bg-marketer-surface-muted hover:text-marketer-ink"
               >
-                <UserRound className="size-6" aria-hidden />
+                {profileAvatarSrc && failedProfileAvatar !== profileAvatarSrc ? (
+                  <img
+                    src={profileAvatarSrc}
+                    alt=""
+                    aria-hidden
+                    decoding="async"
+                    className="size-8 rounded-full object-cover"
+                    onError={() => setFailedProfileAvatar(profileAvatarSrc)}
+                  />
+                ) : (
+                  <MarketerIcon name="profile" className="size-8" />
+                )}
               </Link>
             </div>
           </div>

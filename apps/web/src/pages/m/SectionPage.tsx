@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardCheck, Headphones, WifiOff } from 'lucide-react';
+import { CheckCircle2, WifiOff } from 'lucide-react';
 import { Button, Card, ErrorState, ProgressBar, Skeleton, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ProductImage } from '@/components/common/ProductImage';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { QueryState } from '@/components/common/QueryState';
 import { MentorLauncher } from '@/components/learning/MentorSheet';
 import { RememberPage } from '@/lib/pageContext';
@@ -85,7 +86,7 @@ function Player({ d }: { d: SectionDetail }) {
   const quizReady = !(d.packageQuizPassed ?? s.quizPassed);
   const sectionDone = !quizReady;
   return (
-    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-marketer-canvas px-4 py-5 sm:py-6">
       <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-5">
         <RememberPage
           kind="section"
@@ -117,8 +118,8 @@ function Player({ d }: { d: SectionDetail }) {
                 className={cn('w-full', s.mediaType === 'audio' ? 'h-40' : 'aspect-video')}
               />
             ) : media.isError ? (
-              <Card className="flex flex-col items-center gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] py-8 text-center">
-                <WifiOff className="size-8 text-muted" aria-hidden />
+              <Card className="flex flex-col items-center gap-2 !rounded-hero border-marketer-border bg-marketer-surface py-8 text-center">
+                <WifiOff className="size-8 text-marketer-muted" aria-hidden />
                 <ErrorState
                   message="پخش ممکن نشد. اتصال را بررسی کنید."
                   onRetry={() => void media.refetch()}
@@ -152,17 +153,17 @@ function Player({ d }: { d: SectionDetail }) {
               <ErrorState message="فایل این قسمت هنوز آماده نیست." />
             )}
 
-            <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.42)]">
+            <Card className="flex flex-col gap-2 !rounded-hero border-marketer-border bg-marketer-surface p-4 shadow-sm">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-bold text-text">
+                <span className="font-bold text-marketer-ink">
                   {progress.completed ? 'دیدن/شنیدن کامل شد' : 'پیشرفت این قسمت'}
                 </span>
-                <span className="text-text-secondary">
+                <span className="text-marketer-muted">
                   {clock(pos)} / {clock(dur)}
                 </span>
               </div>
               <ProgressBar value={playbackPercent} label="پیشرفت پخش" />
-              <p className="text-xs text-text-secondary">
+              <p className="text-xs text-marketer-muted">
                 {progress.completed ? (
                   <span className="inline-flex items-center gap-1 font-bold text-success-fg">
                     <CheckCircle2 className="size-4" aria-hidden /> این قسمت را کامل کردی.
@@ -177,7 +178,7 @@ function Player({ d }: { d: SectionDetail }) {
               <Button
                 size="lg"
                 block
-                icon={<ClipboardCheck className="size-5" aria-hidden />}
+                icon={<MarketerIcon name="quiz" className="size-5" />}
                 onClick={() => nav(`/quiz/${quizSectionId}`)}
                 data-testid="start-quiz"
               >
@@ -191,14 +192,14 @@ function Player({ d }: { d: SectionDetail }) {
           </div>
           <aside className="mt-4 flex flex-col gap-3 lg:mt-0 lg:w-80">
             {s.description && (
-              <Card className="!rounded-[22px] border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)]">
-                <h2 className="mb-1 text-sm font-bold text-text">درباره این قسمت</h2>
-                <p className="text-sm leading-7 text-text-secondary">{s.description}</p>
+              <Card className="!rounded-hero border-marketer-border bg-marketer-surface p-4 shadow-sm">
+                <h2 className="mb-1 text-sm font-bold text-marketer-ink">درباره این قسمت</h2>
+                <p className="text-sm leading-7 text-marketer-muted">{s.description}</p>
               </Card>
             )}
             <Link
               to={`/packages/${p.id}`}
-              className="pressable flex items-center gap-3 rounded-[22px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-[0_10px_26px_-24px_rgba(32,60,52,.35)] hover:bg-white"
+              className="pressable flex items-center gap-3 rounded-hero border border-marketer-border bg-marketer-surface p-3 shadow-sm hover:bg-marketer-surface-soft"
             >
               <ProductImage
                 src={p.product?.imageUrl ?? p.brand?.logoUrl}
@@ -206,8 +207,8 @@ function Player({ d }: { d: SectionDetail }) {
                 className="size-14"
               />
               <div className="min-w-0 text-sm">
-                <p className="font-bold text-text">{p.product?.name ?? p.brand?.name}</p>
-                <p className="text-xs text-text-secondary">{faDuration(s.durationSec)}</p>
+                <p className="font-bold text-marketer-ink">{p.product?.name ?? p.brand?.name}</p>
+                <p className="text-xs text-marketer-muted">{faDuration(s.durationSec)}</p>
               </div>
             </Link>
           </aside>
@@ -286,7 +287,7 @@ function FileView({
       {failed ? (
         <Card
           role="alert"
-          className="flex flex-col items-center gap-3 !rounded-[24px] border-[#F0D8D3] bg-[#FFF8F5] py-6 text-center text-danger-fg"
+          className="flex flex-col items-center gap-3 !rounded-hero border-danger/20 bg-danger-light py-6 text-center text-danger-fg"
           data-testid="media-error"
         >
           <p>
@@ -299,9 +300,9 @@ function FileView({
       ) : audio ? (
         <Card tone="brand" className="flex flex-col items-center gap-4 py-6">
           {poster ? (
-            <ProductImage src={poster} alt={title} className="size-32 bg-surface" />
+            <ProductImage src={poster} alt={title} className="size-32 bg-marketer-surface" />
           ) : (
-            <Headphones className="size-16 text-primary-fg" aria-hidden />
+            <MarketerIcon name="audio" className="size-16" />
           )}
           {/* eslint-disable-next-line jsx-a11y/media-has-caption -- caption files are V1 (spec §11); description is shown beside the player */}
           <audio
@@ -338,7 +339,7 @@ function FileView({
             onClick={() => setSpeed(r)}
             className={cn(
               'min-h-12 min-w-12 rounded-card px-2 text-sm font-bold',
-              rate === r ? 'bg-primary-light text-primary-fg' : 'text-text-secondary',
+              rate === r ? 'bg-marketer-brand-soft text-marketer-brand' : 'text-marketer-muted',
             )}
           >
             {toPersianDigits(String(r))}x
@@ -444,15 +445,15 @@ function YouTubeView({
         </div>
       )}
       {state === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface p-4 text-center text-sm text-text">
-          <WifiOff className="size-8 text-muted" aria-hidden />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-marketer-surface p-4 text-center text-sm text-marketer-ink">
+          <WifiOff className="size-8 text-marketer-muted" aria-hidden />
           ویدیو بارگذاری نشد. اگر یوتیوب در دسترس نیست، اتصال خود را بررسی کنید.
           <Button type="button" variant="secondary" onClick={onRetry}>
             تلاش دوباره برای پخش
           </Button>
           <button
             type="button"
-            className="min-h-12 px-3 font-bold text-primary-fg disabled:text-muted-fg"
+            className="min-h-12 px-3 font-bold text-marketer-brand disabled:text-marketer-muted"
             disabled={reportedYt}
             onClick={() => {
               setReportedYt(true);

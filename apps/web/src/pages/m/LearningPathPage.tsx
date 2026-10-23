@@ -57,23 +57,23 @@ function stepStatus(course: PackageSummary) {
     return {
       label: 'تکمیل‌شده',
       icon: Check,
-      node: 'bg-[#008A56] text-white shadow-[0_4px_12px_rgba(0,138,86,0.28)]',
-      text: 'text-[#047857]',
+      node: 'bg-cta text-on-cta shadow-sm',
+      text: 'text-marketer-brand',
     };
   }
   if (course.status === 'in_progress') {
     return {
       label: 'در حال یادگیری',
       icon: Check,
-      node: 'border-2 border-[#FFD26A] bg-gradient-to-b from-[#FFBF3F] to-[#F2911B] text-white shadow-[0_4px_12px_rgba(242,145,27,0.28)]',
-      text: 'text-[#8A5600]',
+      node: 'border-2 border-accent/40 bg-accent text-on-accent shadow-sm',
+      text: 'text-accent-fg',
     };
   }
   return {
     label: 'شروع‌نشده',
     icon: Check,
-    node: 'border-2 border-[#FFD26A] bg-gradient-to-b from-[#FFBF3F] to-[#F2911B] text-white shadow-[0_4px_12px_rgba(242,145,27,0.28)]',
-    text: 'text-[#64748B]',
+    node: 'border-2 border-marketer-border bg-marketer-surface text-marketer-muted shadow-xs',
+    text: 'text-marketer-muted',
   };
 }
 
@@ -82,23 +82,23 @@ export function LearningPathPage() {
   const q = usePackages();
 
   return (
-    <div className="min-h-[100dvh] bg-[#FEFBF1] px-3 py-3 sm:px-4 sm:py-4">
+    <div className="min-h-[100dvh] bg-marketer-path-canvas px-3 py-3 sm:px-4 sm:py-4">
       <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col gap-2">
         <header className="relative flex min-h-12 items-center justify-center">
           <Link
             to="/"
             aria-label="بازگشت به خانه"
-            className="pressable absolute left-0 grid size-12 place-items-center rounded-full text-[#0E3628] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-fg"
+            className="pressable absolute left-0 grid size-12 place-items-center rounded-full text-marketer-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-marketer-brand"
           >
             <ChevronLeft className="size-7" aria-hidden="true" />
           </Link>
-          <h1 className="text-xl font-extrabold text-[#0E3628] sm:text-2xl">مسیر یادگیری من</h1>
+          <h1 className="text-xl font-extrabold text-marketer-ink sm:text-2xl">مسیر یادگیری من</h1>
         </header>
         <StaleBanner show={q.isError && q.data !== undefined} onRetry={() => void q.refetch()} />
         <QueryState
           query={q}
           loading={
-            <div className="flex flex-col gap-3 rounded-hero border border-[#EEE7DC] bg-[#FFFCF6] p-4">
+            <div className="flex flex-col gap-3 rounded-hero border border-marketer-border bg-marketer-surface-soft p-4">
               <Skeleton className="h-48 w-2/5 rounded-full" />
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />
@@ -115,7 +115,7 @@ export function LearningPathPage() {
             return (
               <section
                 aria-label="مسیر آموزش‌های من"
-                className="relative isolate flex flex-1 flex-col gap-3 overflow-hidden rounded-[28px] bg-[#FEFBF1] pb-4"
+                className="relative isolate flex flex-1 flex-col gap-3 overflow-hidden rounded-hero bg-marketer-path-canvas pb-4"
               >
                 {steps.length === 0 ? (
                   <div className="relative z-20 flex min-h-72 flex-col items-center justify-center px-4 py-12 text-center">
@@ -161,7 +161,7 @@ export function LearningPathPage() {
                                         ? { left: 0, right: '42%', top: '26%', bottom: '8%' }
                                         : { left: '42%', right: 0, top: '26%', bottom: '8%' }
                                     }
-                                    className="pointer-events-none absolute bg-[#FEFBF1]"
+                                    className="pointer-events-none absolute bg-marketer-path-canvas"
                                   />
                                 )}
                                 {count <= 2 && (
@@ -172,7 +172,7 @@ export function LearningPathPage() {
                                         ? { left: 0, right: '19%', top: '48%', bottom: '8%' }
                                         : { left: '19%', right: 0, top: '48%', bottom: '8%' }
                                     }
-                                    className="pointer-events-none absolute bg-[#FEFBF1]"
+                                    className="pointer-events-none absolute bg-marketer-path-canvas"
                                   />
                                 )}
                                 {count === 3 && (
@@ -183,7 +183,7 @@ export function LearningPathPage() {
                                         ? { left: 0, right: '34%', top: '70%', bottom: '6%' }
                                         : { left: '34%', right: 0, top: '70%', bottom: '6%' }
                                     }
-                                    className="pointer-events-none absolute bg-[#FEFBF1]"
+                                    className="pointer-events-none absolute bg-marketer-path-canvas"
                                   />
                                 )}
                               </>
@@ -210,7 +210,7 @@ export function LearningPathPage() {
                                       : 'M 35 0 C 35 11, 44 15, 44 22'
                                   }
                                   fill="none"
-                                  stroke="#84B293"
+                                  stroke="var(--color-marketer-brand)"
                                   strokeWidth="9"
                                   strokeLinecap="round"
                                 />
@@ -272,9 +272,9 @@ export function LearningPathPage() {
                                                 top: `${pos.topPct}%`,
                                               }
                                         }
-                                        className="absolute -translate-y-1/2 rounded-xl bg-[#FEFBF1]/85 px-1.5 py-0.5 text-right backdrop-blur-[2px] transition-colors group-hover:bg-[#FEFBF1]"
+                                        className="absolute -translate-y-1/2 rounded-xl bg-marketer-path-canvas/85 px-1.5 py-0.5 text-right backdrop-blur-[2px] transition-colors group-hover:bg-marketer-path-canvas"
                                       >
-                                        <span className="block line-clamp-2 text-[14.5px] font-extrabold leading-snug text-[#0E3628] group-hover:text-[#097954] sm:text-base">
+                                        <span className="block line-clamp-2 text-[14.5px] font-extrabold leading-snug text-marketer-ink group-hover:text-marketer-brand sm:text-base">
                                           {numberedTitle}
                                         </span>
                                         <span
@@ -301,7 +301,7 @@ export function LearningPathPage() {
                           {hasNextSegment && (
                             <div
                               aria-hidden="true"
-                              className="relative -my-2 h-6 w-full overflow-hidden bg-[#FEFBF1]"
+                              className="relative -my-2 h-6 w-full overflow-hidden bg-marketer-path-canvas"
                             >
                               <svg
                                 viewBox="0 0 100 24"
@@ -315,7 +315,7 @@ export function LearningPathPage() {
                                       : 'M 48.8 0 C 48.8 12, 48.67 12, 48.67 24'
                                   }
                                   fill="none"
-                                  stroke="#84B293"
+                                  stroke="var(--color-marketer-brand)"
                                   strokeWidth="1.9"
                                   strokeLinecap="round"
                                 />
@@ -332,14 +332,14 @@ export function LearningPathPage() {
                   <Link
                     to="/learn/all"
                     data-testid="all-courses-link"
-                    className="pressable relative z-30 flex min-h-[64px] items-center justify-center rounded-full bg-gradient-to-b from-[#097954] to-[#055B3E] px-14 text-white shadow-[0_12px_26px_rgba(5,91,62,0.28)] transition-transform hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fg"
+                    className="pressable relative z-30 flex min-h-[64px] items-center justify-center rounded-full bg-brand-gradient px-14 text-on-cta shadow-brand transition-transform hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marketer-brand"
                   >
                     <span className="text-center text-base font-extrabold sm:text-lg">
                       مشاهده تمام دوره‌ها
                     </span>
                     <span
                       aria-hidden="true"
-                      className="absolute right-2.5 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-[#158862]"
+                      className="absolute right-2.5 top-1/2 grid size-12 -translate-y-1/2 place-items-center rounded-full bg-marketer-brand"
                     >
                       <ArrowRight className="size-6" aria-hidden="true" />
                     </span>

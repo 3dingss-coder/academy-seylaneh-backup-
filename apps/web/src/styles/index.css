@@ -72,6 +72,19 @@
   --color-violet: #7c3aed;
   --color-violet-light: #ede9fe;
   --color-violet-fg: #6d28d9;
+
+  /* Marketer's warm, product-facing surfaces. Kept role-scoped so the formal
+     Admin/Manager consoles continue using the neutral system surfaces above. */
+  --color-marketer-canvas: #fcf8f0;
+  --color-marketer-path-canvas: #fefbf1;
+  --color-marketer-surface: #fffdf8;
+  --color-marketer-surface-soft: #fffcf6;
+  --color-marketer-surface-muted: #f7f3ea;
+  --color-marketer-border: #eae2d7;
+  --color-marketer-ink: #17352a;
+  --color-marketer-muted: #596a65;
+  --color-marketer-brand: #0b6f59;
+  --color-marketer-brand-soft: #eaf4ef;
   /* text/icon colour ON solid fills (flips in dark mode so contrast stays ≥ 4.5:1) */
   --color-on-primary: #ffffff;
   --color-on-danger: #ffffff;
@@ -337,6 +350,16 @@
   --color-violet: #a78bfa;
   --color-violet-light: #241a3d;
   --color-violet-fg: #c4b5fd;
+  --color-marketer-canvas: #0a130f;
+  --color-marketer-path-canvas: #0a130f;
+  --color-marketer-surface: #111c17;
+  --color-marketer-surface-soft: #182721;
+  --color-marketer-surface-muted: #1b2b24;
+  --color-marketer-border: #263730;
+  --color-marketer-ink: #e8f1ec;
+  --color-marketer-muted: #a9bcb2;
+  --color-marketer-brand: #6ee7b7;
+  --color-marketer-brand-soft: #12291f;
   --color-scrim: rgb(2 8 5 / 0.62);
   --shadow-xs: 0 1px 1px rgb(0 0 0 / 0.3);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);

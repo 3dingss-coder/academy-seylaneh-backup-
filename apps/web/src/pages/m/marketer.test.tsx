@@ -6,10 +6,12 @@ import { mockApi } from '@/test/mockApi';
 import type { HomeData, PackageSummary } from '@/lib/types';
 import { EmptyState, ToastProvider } from '@/components/ui';
 import { Mascot } from '@/components/brand/Mascot';
+import { CardsPage } from './CardsPage';
 import { HomePage } from './HomePage';
 import { LearnPage } from './LearnPage';
 import { LearningPathPage } from './LearningPathPage';
 import { MentorPage } from './MentorPage';
+import { MessagesPage } from './MessagesPage';
 
 vi.mock('@/lib/auth', () => ({
   useAuth: () => ({ user: { id: 'u1', name: 'سارا محمدی', role: 'marketer' } }),
@@ -66,6 +68,28 @@ function renderHome() {
   );
 }
 
+function renderCards() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <CardsPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderMessages() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <MessagesPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 function renderLearn() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -101,25 +125,36 @@ afterEach(() => {
 });
 
 describe('HomePage — one dominant next action (marketer core principle)', () => {
-  it('renders the continue-card focal action + play CTA, progress ring and suggested courses', async () => {
+  it('renders the next lesson, live progress metrics, route shortcuts and assigned courses', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     renderHome();
     expect(await screen.findByTestId('next-item')).toBeInTheDocument();
     // The visible button keeps the real action label accessible (fixture action = «start»).
     expect(screen.getByRole('button', { name: /شروع: بخش اول/ })).toBeInTheDocument();
-    // Fixed microcopy follows the approved page reference; names, course content and progress stay live.
-    expect(screen.getByText('ادامه یادگیری')).toBeInTheDocument();
-    expect(screen.getByText('پیشرفت کلی شما')).toBeInTheDocument();
-    expect(screen.getByText('در مسیر عالی هستید!')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'بخش اول' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'پیشرفت کلی شما' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'در حال یادگیری: ۱' })).toHaveAttribute(
+      'href',
+      '/learn/all',
+    );
+    expect(screen.getByRole('link', { name: 'آموزش جدید: ۰' })).toHaveAttribute(
+      'href',
+      '/learn/all',
+    );
+    expect(screen.getByRole('link', { name: 'تکمیل‌شده: ۰' })).toHaveAttribute(
+      'href',
+      '/learn/all',
+    );
+    expect(screen.getByRole('link', { name: 'امتیازها: ۱۲۰' })).toHaveAttribute('href', '/cards');
     expect(screen.getByText('امروز یک قدم دیگر به موفقیت نزدیک‌تر شدی!')).toBeInTheDocument();
-    expect(screen.getByText('دوره‌ها')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'دوره‌ها' })).toHaveAttribute('href', '/learn/all');
-    expect(screen.getByText('مسیر یادگیری')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'مسیر یادگیری' })).toHaveAttribute('href', '/learn');
-    expect(screen.getByText('آزمون‌ها')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'آزمون‌ها' })).toHaveAttribute('href', '/learn/all');
-    expect(screen.getByText('مدال')).toBeInTheDocument();
-    expect(screen.getByText('دوره‌های پیشنهادی')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'امتیاز و نشان‌ها' })).toHaveAttribute(
+      'href',
+      '/cards',
+    );
+    expect(screen.getByRole('heading', { name: 'آموزش‌های من' })).toBeInTheDocument();
     expect(screen.getByTestId('package-card')).toBeInTheDocument();
   });
 
@@ -145,6 +180,19 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     expect(illustration).toHaveAttribute('alt', '');
   });
 
+  it('uses a neutral no-next message when assigned learning is not all complete', async () => {
+    mockApi(homeRoutes({ ...HOME_ROUTINE, nextItem: null }));
+    const { container } = renderHome();
+    expect(
+      await screen.findByRole('heading', { name: 'فعلاً درس بعدی در دسترس نیست' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /دیدن همه آموزش‌ها/ })).toHaveAttribute(
+      'href',
+      '/learn/all',
+    );
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
+  });
+
   it('all-done success moment carries the delivered celebration asset and keeps the message', async () => {
     mockApi(
       homeRoutes({
@@ -154,9 +202,113 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
       }),
     );
     const { container } = renderHome();
-    expect(await screen.findByText('همه آموزش‌ها را تمام کردی! 🎉')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'همه آموزش‌ها را تمام کردی!' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.')).toBeInTheDocument();
     expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).not.toBeNull();
+  });
+});
+
+describe('CardsPage — points and badge ledger', () => {
+  it('shows the API balance, earned and locked badges, and ledger reasons', async () => {
+    mockApi({
+      'GET /v1/me/points': () => ({
+        data: {
+          balance: 420,
+          ledger: [
+            {
+              id: 'ledger-1',
+              amount: 50,
+              reason: 'on_time_completion',
+              refId: 'p1',
+              createdAt: '2026-10-22T10:00:00.000Z',
+            },
+          ],
+        },
+      }),
+      'GET /v1/me/badges': () => ({
+        data: [
+          {
+            id: 'badge-earned',
+            code: 'first-step',
+            title: 'قدم اول',
+            description: 'نخستین آموزش را کامل کن.',
+            icon: 'sprout',
+            earned: true,
+            earnedAt: '2026-10-22T10:00:00.000Z',
+          },
+          {
+            id: 'badge-locked',
+            code: 'quiz-master',
+            title: 'آزمون‌یار',
+            description: 'در آزمون قبول شو.',
+            icon: 'brain',
+            earned: false,
+            earnedAt: null,
+          },
+        ],
+      }),
+    });
+    const { container } = renderCards();
+    expect(await screen.findByTestId('points-balance')).toHaveTextContent('۴۲۰');
+    expect(container.querySelector('.bg-hero')).not.toBeNull();
+    expect(screen.getByText('قدم اول')).toBeInTheDocument();
+    expect(screen.getByText('آزمون‌یار')).toBeInTheDocument();
+    expect(screen.getByText('تکمیل به‌موقع')).toBeInTheDocument();
+    expect(screen.getByText('+۵۰')).toBeInTheDocument();
+  });
+});
+
+describe('MessagesPage — notifications and manager notes', () => {
+  it('keeps the two inboxes distinct and shows their live content', async () => {
+    mockApi({
+      'GET /v1/me/notifications': () => ({
+        data: {
+          unread: 1,
+          items: [
+            {
+              id: 'notification-1',
+              type: 'manual',
+              title: 'یادآوری آموزش',
+              body: 'یک درس برای تکمیل داری.',
+              actionRef: null,
+              readAt: null,
+              createdAt: '2026-10-22T10:00:00.000Z',
+            },
+          ],
+        },
+      }),
+      'GET /v1/me/messages': () => ({
+        data: [
+          {
+            id: 'message-1',
+            type: 'message',
+            body: 'لطفاً درس اول را مرور کن.',
+            packageId: 'p1',
+            fromName: 'مدیر تیم',
+            readAt: null,
+            createdAt: '2026-10-22T10:00:00.000Z',
+          },
+        ],
+      }),
+    });
+    renderMessages();
+    expect(await screen.findByText('یادآوری آموزش')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /پیام مدیر/ }));
+    expect(await screen.findByText('مدیر تیم')).toBeInTheDocument();
+    expect(screen.getByText('لطفاً درس اول را مرور کن.')).toBeInTheDocument();
+  });
+
+  it('shows separate empty states for notifications and manager messages', async () => {
+    mockApi({
+      'GET /v1/me/notifications': () => ({ data: { unread: 0, items: [] } }),
+      'GET /v1/me/messages': () => ({ data: [] }),
+    });
+    renderMessages();
+    expect(await screen.findByText('اعلانی نداری')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /پیام مدیر/ }));
+    expect(await screen.findByText('پیامی از مدیر نداری')).toBeInTheDocument();
   });
 });
 

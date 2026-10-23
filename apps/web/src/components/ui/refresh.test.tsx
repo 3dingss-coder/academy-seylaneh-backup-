@@ -87,8 +87,12 @@ describe('design refresh — navigation', () => {
           <BottomNav />
         </MemoryRouter>,
       );
-      expect(screen.getByRole('link', { name: 'آموزش‌ها' }).className).toContain('text-primary-fg');
-      expect(screen.getByRole('link', { name: 'خانه' }).className).not.toContain('text-primary-fg');
+      expect(screen.getByRole('link', { name: 'آموزش‌ها' }).className).toContain(
+        'text-marketer-brand',
+      );
+      expect(screen.getByRole('link', { name: 'خانه' }).className).not.toContain(
+        'text-marketer-brand',
+      );
       expect(screen.queryByRole('link', { name: 'آزمون‌ها' })).toBeNull();
     },
   );

@@ -71,18 +71,18 @@ export function LearnPage() {
   }, [brand, brands]);
 
   return (
-    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-6">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-marketer-canvas px-4 py-5 sm:py-6">
       <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5">
         <PageHeader title="آموزش‌ها" />
 
         <section
           aria-label="فیلتر آموزش‌ها"
-          className="rounded-[24px] border border-[#E9E1D5] bg-[#FFFDF8] p-3 shadow-[0_12px_30px_-28px_rgba(32,60,52,.4)] sm:p-4"
+          className="rounded-hero border border-marketer-border bg-marketer-surface p-3 shadow-sm sm:p-4"
         >
           <div
             role="group"
             aria-label="وضعیت آموزش‌ها"
-            className="grid grid-cols-3 gap-1.5 rounded-[18px] bg-[#F2EFE8] p-1.5 sm:gap-2"
+            className="grid grid-cols-3 gap-1.5 rounded-card bg-marketer-surface-muted p-1.5 sm:gap-2"
           >
             {FILTERS.map(({ value, label }) => {
               const selected = tab === value;
@@ -93,10 +93,10 @@ export function LearnPage() {
                   aria-pressed={selected}
                   onClick={() => setTab(value)}
                   className={cn(
-                    'pressable flex min-h-12 min-w-0 items-center justify-center gap-1 rounded-full px-1.5 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fg sm:gap-1.5 sm:px-2 sm:text-sm',
+                    'pressable flex min-h-12 min-w-0 items-center justify-center gap-1 rounded-full px-1.5 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marketer-brand sm:gap-1.5 sm:px-2 sm:text-sm',
                     selected
                       ? 'bg-cta text-on-cta shadow-sm'
-                      : 'text-text-secondary hover:bg-[#FFFDF8] hover:text-text',
+                      : 'text-marketer-muted hover:bg-marketer-surface hover:text-marketer-ink',
                   )}
                 >
                   <span className="truncate">{label}</span>
@@ -104,7 +104,9 @@ export function LearnPage() {
                     aria-hidden="true"
                     className={cn(
                       'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] leading-none sm:text-xs',
-                      selected ? 'bg-white/20' : 'bg-white/75',
+                      selected
+                        ? 'bg-marketer-surface text-marketer-brand'
+                        : 'bg-marketer-surface text-marketer-muted',
                     )}
                   >
                     {counts[value].toLocaleString('fa-IR')}
@@ -115,14 +117,14 @@ export function LearnPage() {
           </div>
 
           {brands.length > 1 && (
-            <div className="mt-4 border-t border-[#ECE4D8] pt-3">
+            <div className="mt-4 border-t border-marketer-border pt-3">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-sm font-bold text-text">برندها</p>
+                <p className="text-sm font-bold text-marketer-ink">برندها</p>
                 {brand && (
                   <button
                     type="button"
                     onClick={() => setBrand(null)}
-                    className="min-h-12 rounded-full px-3 text-xs font-bold text-primary-fg hover:bg-primary-light"
+                    className="min-h-12 rounded-full px-3 text-xs font-bold text-marketer-brand hover:bg-marketer-brand-soft"
                   >
                     نمایش همه
                   </button>
@@ -142,11 +144,11 @@ export function LearnPage() {
                     className={cn(
                       'pressable flex min-h-14 shrink-0 items-center gap-2 rounded-full border px-2 pe-4 text-sm font-bold transition-colors',
                       brand === b.id
-                        ? 'border-primary bg-primary-light text-primary-fg shadow-sm'
-                        : 'border-[#E6DED2] bg-[#FFFDF8] text-text-secondary hover:border-primary/40 hover:bg-primary-light/40',
+                        ? 'border-marketer-brand bg-marketer-brand-soft text-marketer-brand shadow-sm'
+                        : 'border-marketer-border bg-marketer-surface text-marketer-muted hover:border-marketer-brand/40 hover:bg-marketer-brand-soft',
                     )}
                   >
-                    <span className="grid size-10 place-items-center rounded-full bg-[#FFFDF8] shadow-xs">
+                    <span className="grid size-10 place-items-center rounded-full bg-marketer-surface shadow-xs">
                       <BrandLogo
                         name={b.name}
                         logoUrl={b.logoUrl}
@@ -186,17 +188,17 @@ export function LearnPage() {
             ) : (
               <section
                 aria-labelledby="learn-list-title"
-                className="rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.36)]"
+                className="rounded-hero border border-marketer-border bg-marketer-surface p-4 shadow-sm"
               >
                 <div className="mb-3 flex items-end justify-between gap-3">
-                  <h2 id="learn-list-title" className="text-base font-extrabold text-text">
+                  <h2 id="learn-list-title" className="text-base font-extrabold text-marketer-ink">
                     {tab === 'all'
                       ? 'آموزش‌های من'
                       : tab === 'in_progress'
                         ? 'در حال یادگیری'
                         : 'آموزش‌های تکمیل‌شده'}
                   </h2>
-                  <p className="shrink-0 text-xs text-text-secondary">
+                  <p className="shrink-0 text-xs text-marketer-muted">
                     {items.length.toLocaleString('fa-IR')} آموزش
                   </p>
                 </div>

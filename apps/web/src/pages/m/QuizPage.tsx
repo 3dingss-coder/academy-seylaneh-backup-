@@ -199,11 +199,11 @@ function QuizFlow({
   // ── M8 result ──
   if (result) {
     return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
         {header}
         <Card
           tone={result.passed ? 'brand' : 'default'}
-          className="relative flex flex-col items-center gap-2 overflow-hidden !rounded-[28px] border-[#E8E1D6] bg-[#FFFDF8] py-7 text-center shadow-[0_16px_38px_-30px_rgba(32,60,52,.42)]"
+          className="relative flex flex-col items-center gap-2 overflow-hidden !rounded-hero border-marketer-border bg-marketer-surface py-7 text-center shadow-md"
           data-testid="quiz-result"
         >
           {result.passed && <Confetti />}
@@ -216,18 +216,20 @@ function QuizFlow({
             center={
               <span className="absolute flex flex-col items-center leading-tight">
                 {result.passed ? (
-                  <PartyPopper className="animate-pop size-7 text-primary-fg" aria-hidden />
+                  <PartyPopper className="animate-pop size-7 text-marketer-brand" aria-hidden />
                 ) : (
                   <XCircle className="animate-shake size-7 text-danger" aria-hidden />
                 )}
-                <span className="text-xl font-extrabold text-text">{faPercent(result.score)}</span>
+                <span className="text-xl font-extrabold text-marketer-ink">
+                  {faPercent(result.score)}
+                </span>
               </span>
             }
           />
-          <h2 className="mt-1 text-xl font-bold text-text">
+          <h2 className="mt-1 text-xl font-bold text-marketer-ink">
             {result.passed ? 'قبول شدی! 🎉' : 'این بار قبول نشدی'}
           </h2>
-          <p className="text-sm text-text-secondary">
+          <p className="text-sm text-marketer-muted">
             {toPersianDigits(result.correctCount)} پاسخ درست از {toPersianDigits(result.total)} •
             نمره قبولی {faPercent(result.passScore)}
           </p>
@@ -237,7 +239,7 @@ function QuizFlow({
             </p>
           )}
           {!result.passed && (
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-marketer-muted">
               برای تلاش بعدی، یک بار ویدیو را ببین یا پادکست را گوش بده.
               {result.remainingAttempts > 0 &&
                 ` (${toPersianDigits(result.remainingAttempts)} فرصت دیگر داری)`}
@@ -255,7 +257,7 @@ function QuizFlow({
                 <Card
                   key={r.questionId}
                   className={cn(
-                    'flex gap-3 !rounded-[20px] border-s-4 bg-[#FFFDF8] shadow-xs',
+                    'flex gap-3 !rounded-card border-s-4 bg-marketer-surface shadow-xs',
                     r.correct ? 'border-s-success' : 'border-s-danger',
                   )}
                 >
@@ -271,11 +273,11 @@ function QuizFlow({
                     />
                   )}
                   <div className="text-sm">
-                    <p className="font-bold text-text">
+                    <p className="font-bold text-marketer-ink">
                       {toPersianDigits(i + 1)}. {qq?.stem}
                     </p>
                     {r.explanation && (
-                      <p className="mt-1 leading-7 text-text-secondary">{r.explanation}</p>
+                      <p className="mt-1 leading-7 text-marketer-muted">{r.explanation}</p>
                     )}
                   </div>
                 </Card>
@@ -379,7 +381,7 @@ function QuizFlow({
     else
       body = (
         <>
-          <Card className="flex flex-col gap-2 !rounded-[24px] border-[#E8E1D6] bg-[#FFFDF8] p-5 text-sm text-text shadow-[0_12px_30px_-28px_rgba(32,60,52,.4)]">
+          <Card className="flex flex-col gap-2 !rounded-hero border-marketer-border bg-marketer-surface p-5 text-sm text-marketer-ink shadow-sm">
             <p>• {toPersianDigits(d.quiz.questionCount)} سؤال چهارگزینه‌ای</p>
             <p>• نمره قبولی: {faPercent(d.quiz.passScore)}</p>
             <p>
@@ -399,7 +401,7 @@ function QuizFlow({
         </>
       );
     return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
         {header}
         {body}
       </div>
@@ -410,15 +412,15 @@ function QuizFlow({
   if (!q) return null;
   const last = idx === questions.length - 1;
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-[28px] bg-[#FCF8F0] p-1 sm:p-2">
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
       {header}
-      <div className="flex items-center gap-3 rounded-[20px] border border-[#ECE4D8] bg-[#FFFDF8] p-3 shadow-xs">
+      <div className="flex items-center gap-3 rounded-card border border-marketer-border bg-marketer-surface p-3 shadow-xs">
         <ProgressBar
           value={((idx + 1) / questions.length) * 100}
           label="پیشرفت آزمون"
           className="flex-1"
         />
-        <span className="text-sm font-bold text-text-secondary">
+        <span className="text-sm font-bold text-marketer-muted">
           سؤال {toPersianDigits(idx + 1)} از {toPersianDigits(questions.length)}
         </span>
       </div>
@@ -427,18 +429,18 @@ function QuizFlow({
         className={dir === 'next' ? 'animate-slide-in-end' : 'animate-slide-in-start'}
       >
         <fieldset className="stagger flex flex-col gap-3">
-          <legend className="mb-3 text-lg font-bold leading-8 text-text">{q.stem}</legend>
+          <legend className="mb-3 text-lg font-bold leading-8 text-marketer-ink">{q.stem}</legend>
           {q.options.map((o) => {
             const checked = answers[q.id] === o.key;
             return (
               <label
                 key={o.key}
                 className={cn(
-                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-[20px] border-2 bg-[#FFFDF8] p-3 text-base shadow-xs',
+                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-card border-2 bg-marketer-surface p-3 text-base shadow-xs',
                   'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-info',
                   checked
-                    ? 'border-primary bg-primary-light shadow-sm'
-                    : 'border-[#E7E0D6] hover:border-primary/40 hover:bg-white hover:shadow-xs',
+                    ? 'border-marketer-brand bg-marketer-brand-soft shadow-sm'
+                    : 'border-marketer-border hover:border-marketer-brand/40 hover:bg-marketer-surface-soft hover:shadow-xs',
                 )}
               >
                 <input
@@ -452,14 +454,16 @@ function QuizFlow({
                 <span
                   className={cn(
                     'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-[transform,background-color] duration-200 ease-spring',
-                    checked ? 'scale-110 bg-cta text-on-cta' : 'bg-surface-2 text-text-secondary',
+                    checked
+                      ? 'scale-110 bg-cta text-on-cta'
+                      : 'bg-marketer-surface-muted text-marketer-muted',
                   )}
                 >
                   {OPTION_LABEL[o.key] ?? o.key}
                 </span>
-                <span className="flex-1 text-text">{o.text}</span>
+                <span className="flex-1 text-marketer-ink">{o.text}</span>
                 {checked && (
-                  <CheckCircle2 className="animate-pop size-5 text-primary-fg" aria-hidden />
+                  <CheckCircle2 className="animate-pop size-5 text-marketer-brand" aria-hidden />
                 )}
               </label>
             );
@@ -525,7 +529,7 @@ function QuizFlow({
           </>
         }
       >
-        <p className="text-sm text-text-secondary">بعد از ارسال نمی‌توانی پاسخ‌ها را تغییر بدهی.</p>
+        <p className="text-sm text-marketer-muted">بعد از ارسال نمی‌توانی پاسخ‌ها را تغییر بدهی.</p>
       </Modal>
     </div>
   );

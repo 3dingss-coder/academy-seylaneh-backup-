@@ -27,22 +27,19 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 const DEFAULT_ICON_TONE = {
-  shell: 'border-amber-200 bg-amber-50',
+  shell: 'border-accent/30 bg-accent-light',
   icon: 'bg-accent text-on-accent',
 };
 
 const ICON_TONES: Record<string, { shell: string; icon: string }> = {
   sprout: {
-    shell: 'border-primary-200 bg-primary-50',
-    icon: 'bg-primary text-on-cta',
+    shell: 'border-marketer-brand/30 bg-marketer-brand-soft',
+    icon: 'bg-cta text-on-cta',
   },
-  'alarm-clock-check': {
-    shell: 'border-amber-200 bg-amber-50',
-    icon: 'bg-accent text-on-accent',
-  },
+  'alarm-clock-check': DEFAULT_ICON_TONE,
   brain: {
-    shell: 'border-violet-200 bg-violet-light',
-    icon: 'bg-violet text-white',
+    shell: 'border-violet/25 bg-violet-light',
+    icon: 'bg-violet-light text-violet-fg',
   },
   medal: DEFAULT_ICON_TONE,
   star: DEFAULT_ICON_TONE,
@@ -74,50 +71,36 @@ export function CardsPage() {
 
       <QueryState
         query={points}
-        loading={<Skeleton className="h-[188px] w-full rounded-[28px] sm:h-[216px]" />}
+        loading={<Skeleton className="h-[188px] w-full rounded-hero sm:h-[216px]" />}
       >
         {(p) => (
           <section aria-label="امتیاز کل">
             <Card
+              tone="hero"
               padded={false}
-              className="relative min-h-[188px] overflow-hidden !rounded-[28px] border-amber-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#fff7dc_52%,#ecfdf5_100%)] shadow-md sm:min-h-[216px]"
+              className="relative min-h-[188px] overflow-hidden !rounded-hero sm:min-h-[216px]"
             >
               <div
                 aria-hidden
-                className="absolute -end-16 -top-20 size-56 rounded-full bg-amber-200/40 blur-3xl"
+                className="bg-dots pointer-events-none absolute inset-0 text-white/10 [mask-image:radial-gradient(70%_70%_at_0%_0%,#000,transparent)]"
               />
               <div
                 aria-hidden
-                className="absolute -bottom-24 -start-14 size-64 rounded-full bg-primary-200/35 blur-3xl"
+                className="pointer-events-none absolute -end-10 -top-12 size-40 rounded-full bg-white/10"
               />
 
-              <img
-                src="/brand/mascot.webp"
-                alt=""
-                width={250}
-                height={324}
-                decoding="async"
-                aria-hidden
-                className="pointer-events-none absolute -bottom-12 -start-5 h-[208px] max-w-[48%] select-none object-contain drop-shadow-md sm:-bottom-14 sm:start-5 sm:h-[274px] lg:start-12"
-              />
-
-              <div className="relative z-10 flex min-h-[188px] items-center sm:min-h-[216px]">
-                <div className="ms-auto w-[64%] py-6 pe-4 ps-2 sm:w-[57%] sm:pe-8 lg:w-[52%]">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-accent-light text-accent-fg shadow-sm">
-                      <Award className="size-6" aria-hidden />
-                    </span>
-                    <p className="text-sm font-bold text-text-secondary sm:text-base">امتیاز کل</p>
-                  </div>
-
-                  <div className="flex items-end gap-2">
-                    <p
-                      className="text-[2.65rem] font-black leading-none text-brand-deep sm:text-6xl"
-                      data-testid="points-balance"
-                    >
-                      <CountUp value={p.balance} format={faNumber} />
-                    </p>
-                  </div>
+              <div className="relative z-10 flex min-h-[188px] items-center gap-5 px-5 py-6 sm:min-h-[216px] sm:px-8">
+                <span className="flex size-16 shrink-0 items-center justify-center rounded-full border-[5px] border-white/20 bg-accent text-on-accent shadow-md sm:size-20">
+                  <Award className="size-8 sm:size-10" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white/90 sm:text-base">امتیاز کل</p>
+                  <p
+                    className="mt-2 text-4xl font-black leading-none text-white sm:text-6xl"
+                    data-testid="points-balance"
+                  >
+                    <CountUp value={p.balance} format={faNumber} />
+                  </p>
                 </div>
               </div>
             </Card>
@@ -127,7 +110,7 @@ export function CardsPage() {
 
       <section aria-labelledby="badges-title">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id="badges-title" className="text-lg font-extrabold text-text sm:text-xl">
+          <h2 id="badges-title" className="text-lg font-extrabold text-marketer-ink sm:text-xl">
             نشان‌ها
           </h2>
           <span
@@ -143,7 +126,7 @@ export function CardsPage() {
           loading={
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-hidden>
               {Array.from({ length: 5 }, (_, i) => (
-                <Skeleton key={i} className="h-[208px] w-full rounded-[22px]" />
+                <Skeleton key={i} className="h-[208px] w-full rounded-hero" />
               ))}
             </div>
           }
@@ -158,40 +141,42 @@ export function CardsPage() {
                   <li key={b.id} className="min-w-0">
                     <Card
                       className={cn(
-                        'relative flex h-full min-h-[208px] flex-col items-center overflow-hidden !rounded-[22px] p-4 text-center',
+                        'relative flex h-full min-h-[208px] flex-col items-center overflow-hidden !rounded-hero p-4 text-center',
                         b.earned
                           ? cn(tone.shell, 'shadow-md')
-                          : 'border-border bg-surface-2/70 shadow-none',
+                          : 'border-marketer-border bg-marketer-surface-soft shadow-none',
                       )}
                     >
                       <span
                         className={cn(
-                          'relative mb-3 mt-1 flex size-[72px] shrink-0 items-center justify-center rounded-[24px] border shadow-sm',
+                          'relative mb-3 mt-1 flex size-[72px] shrink-0 items-center justify-center rounded-2xl border shadow-sm',
                           b.earned
                             ? cn(tone.icon, 'border-white/50')
-                            : 'border-border bg-surface text-muted-fg',
+                            : 'border-marketer-border bg-marketer-surface text-marketer-muted',
                         )}
                       >
                         <Icon className="size-8" aria-hidden />
                         {!b.earned && (
-                          <span className="absolute -bottom-2 -end-2 flex size-8 items-center justify-center rounded-full border-2 border-surface-2 bg-muted-fg text-white shadow-sm">
+                          <span className="absolute -bottom-2 -end-2 flex size-8 items-center justify-center rounded-full border-2 border-marketer-surface bg-marketer-brand text-on-cta shadow-sm">
                             <Lock className="size-4" aria-hidden />
                             <span className="sr-only">قفل شده</span>
                           </span>
                         )}
                       </span>
 
-                      <p className="text-sm font-extrabold leading-6 text-text">{b.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-text-secondary">{b.description}</p>
+                      <p className="text-sm font-extrabold leading-6 text-marketer-ink">
+                        {b.title}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-marketer-muted">{b.description}</p>
 
                       {b.earnedAt && (
-                        <p className="mt-auto pt-3 text-[11px] font-medium text-primary-fg">
+                        <p className="mt-auto pt-3 text-[11px] font-medium text-marketer-brand">
                           {faDate(b.earnedAt)}
                         </p>
                       )}
 
                       {!b.earned && (
-                        <p className="mt-auto flex items-center gap-1 pt-3 text-[11px] font-bold text-muted-fg">
+                        <p className="mt-auto flex items-center gap-1 pt-3 text-[11px] font-bold text-marketer-muted">
                           <Lock className="size-3" aria-hidden />
                           قفل شده
                         </p>
@@ -206,7 +191,7 @@ export function CardsPage() {
       </section>
 
       <section aria-labelledby="ledger-title">
-        <h2 id="ledger-title" className="mb-3 text-lg font-extrabold text-text sm:text-xl">
+        <h2 id="ledger-title" className="mb-3 text-lg font-extrabold text-marketer-ink sm:text-xl">
           تاریخچه امتیاز
         </h2>
 
@@ -214,9 +199,9 @@ export function CardsPage() {
           query={points}
           loading={
             <div className="space-y-2" aria-hidden>
-              <Skeleton className="h-[72px] w-full rounded-[18px]" />
-              <Skeleton className="h-[72px] w-full rounded-[18px]" />
-              <Skeleton className="h-[72px] w-full rounded-[18px]" />
+              <Skeleton className="h-[72px] w-full rounded-card" />
+              <Skeleton className="h-[72px] w-full rounded-card" />
+              <Skeleton className="h-[72px] w-full rounded-card" />
             </div>
           }
           isEmpty={(p) => p.ledger.length === 0}
@@ -228,24 +213,24 @@ export function CardsPage() {
           }
         >
           {(p) => (
-            <ul className="stagger overflow-hidden rounded-[22px] border border-border bg-surface shadow-sm">
+            <ul className="stagger overflow-hidden rounded-hero border border-marketer-border bg-marketer-surface shadow-sm">
               {p.ledger.map((l) => (
                 <li
                   key={l.id}
-                  className="flex min-h-[72px] items-center justify-between gap-4 border-b border-border px-4 py-3 last:border-b-0 sm:px-5"
+                  className="flex min-h-[72px] items-center justify-between gap-4 border-b border-marketer-border px-4 py-3 last:border-b-0 sm:px-5"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-extrabold text-text sm:text-base">
+                    <p className="truncate text-sm font-extrabold text-marketer-ink sm:text-base">
                       {REASON[l.reason] ?? l.reason}
                     </p>
-                    <p className="mt-0.5 text-xs text-text-secondary">{faDate(l.createdAt)}</p>
+                    <p className="mt-0.5 text-xs text-marketer-muted">{faDate(l.createdAt)}</p>
                   </div>
 
                   <span
                     className={cn(
                       'shrink-0 rounded-xl px-2.5 py-1 text-sm font-black sm:text-base',
                       l.amount >= 0
-                        ? 'bg-primary-light text-primary-fg'
+                        ? 'bg-marketer-brand-soft text-marketer-brand'
                         : 'bg-danger-light text-danger-fg',
                     )}
                     dir="ltr"

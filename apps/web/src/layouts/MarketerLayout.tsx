@@ -1,19 +1,9 @@
 import { Suspense, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import {
-  Award,
-  Bell,
-  BookOpen,
-  Bot,
-  Home,
-  Mail,
-  SquarePlay,
-  Trophy,
-  UserRound,
-  WifiOff,
-} from 'lucide-react';
+import { UserRound, WifiOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLogo } from '@/components/brand/AppLogo';
+import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { PageTransition } from '@/components/layout/PageTransition';
 import { CountBadge } from '@/components/ui/CountBadge';
@@ -26,19 +16,29 @@ import { flushBeats } from '@/lib/offline-queue';
 import { useOnline } from '@/lib/online';
 import { useMessages, useNotifications } from '@/lib/queries';
 
-const DESKTOP_NAV = [
-  { to: '/', label: 'خانه', icon: Home },
-  { to: '/learn', label: 'آموزش‌ها', icon: BookOpen, match: ['/packages', '/sections', '/quiz'] },
-  { to: '/messages', label: 'پیام‌ها', icon: Mail },
-  { to: '/cards', label: 'مدال', icon: Trophy },
-  { to: '/mentor', label: 'منتور', icon: Bot },
+const DESKTOP_NAV: Array<{
+  to: string;
+  label: string;
+  image: MarketerIconName;
+  match?: string[];
+}> = [
+  { to: '/', label: 'خانه', image: 'home' },
+  {
+    to: '/learn',
+    label: 'آموزش‌ها',
+    image: 'learning',
+    match: ['/learn/all', '/packages', '/sections', '/quiz'],
+  },
+  { to: '/messages', label: 'پیام‌ها', image: 'messages' },
+  { to: '/cards', label: 'کارت‌ها', image: 'cards' },
+  { to: '/mentor', label: 'منتور', image: 'mentor' },
 ];
 
-/** Marketer shell: header (logo, bell, profile) + bottom nav on mobile, top nav on desktop. */
+/** Marketer shell: shared top bar, desktop navigation, and the four original mobile tabs. */
 export function MarketerLayout() {
   const { pathname } = useLocation();
+  // The learning roadmap is an immersive, one-purpose screen with its own back/list actions.
   const isLearningPath = pathname === '/learn';
-  const isProfile = pathname === '/profile';
   const notifications = useNotifications();
   const messages = useMessages();
   const qc = useQueryClient();
@@ -64,61 +64,40 @@ export function MarketerLayout() {
 
   return (
     <div
-      className={
-        isLearningPath
-          ? 'min-h-dvh bg-[#FCF7EE] pb-0'
-          : isProfile
-            ? 'min-h-dvh bg-[#FCF8F0] pb-28 lg:pb-8'
-            : 'min-h-dvh bg-[#FCF8F0] pb-28 lg:pb-8'
-      }
-      style={pathname === '/' ? { backgroundColor: '#FCF7EE' } : undefined}
+      className={cn(
+        'min-h-dvh',
+        isLearningPath ? 'bg-marketer-path-canvas pb-0' : 'bg-marketer-canvas pb-28 lg:pb-8',
+      )}
     >
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-40 hidden w-[176px] flex-col border-e border-[#EAE2D7] bg-[#FFFDF8] px-3 py-5 shadow-[10px_0_30px_-30px_rgba(32,60,52,.28)]',
-          !isLearningPath && 'lg:flex',
-        )}
-      >
-        <Link to="/" aria-label="خانه" className="mb-6 flex min-h-12 items-center justify-center">
-          <AppLogo />
-        </Link>
-
-        <nav aria-label="ناوبری اصلی" className="flex flex-1 flex-col gap-1.5">
-          {DESKTOP_NAV.map(({ to, label, icon: Icon, match }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                cn(
-                  'pressable flex min-h-12 items-center gap-2.5 rounded-[16px] px-3 text-sm font-bold transition-colors',
-                  isActive || match?.some((p) => pathname.startsWith(p))
-                    ? 'bg-primary-light text-primary-fg'
-                    : 'text-text-secondary hover:bg-[#F7F3EA] hover:text-text',
-                )
-              }
-            >
-              <Icon className="size-5 shrink-0" aria-hidden />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
-      <div className={cn(!isLearningPath && 'lg:pl-[176px]')}>
-        <header
-          className={cn(
-            'sticky top-0 z-30 border-b border-[#EAE2D7] bg-[#FFFDF8]/95 shadow-[0_8px_24px_-24px_rgba(32,60,52,.32)] lg:backdrop-blur-md',
-            // The home and immersive learning-path screens own their page-specific headers.
-            (pathname === '/' || isLearningPath || isProfile) && 'hidden',
-          )}
-        >
-          <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-2 px-4">
-            <Link to="/" aria-label="خانه" className="lg:hidden">
+      {!isLearningPath && (
+        <header className="sticky top-0 z-30 border-b border-marketer-border bg-marketer-surface/95 shadow-xs">
+          <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-3 px-4 lg:px-6">
+            <Link to="/" aria-label="خانه" className="shrink-0">
               <AppLogo />
             </Link>
-            <div className="hidden text-sm font-black text-[#315A52] lg:block">آکادمی سیلانه</div>
-            <div className="flex items-center">
+
+            <nav aria-label="ناوبری اصلی" className="hidden items-center gap-1 lg:flex">
+              {DESKTOP_NAV.map(({ to, label, image, match }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  className={({ isActive }) =>
+                    cn(
+                      'pressable flex min-h-12 items-center gap-1.5 rounded-card px-3 text-sm font-bold transition-colors',
+                      isActive || match?.some((p) => pathname.startsWith(p))
+                        ? 'bg-marketer-brand-soft text-marketer-brand'
+                        : 'text-marketer-muted hover:bg-marketer-surface-muted hover:text-marketer-ink',
+                    )
+                  }
+                >
+                  <MarketerIcon name={image} className="size-6" />
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="flex shrink-0 items-center">
               <Link
                 to="/messages"
                 aria-label={
@@ -126,68 +105,71 @@ export function MarketerLayout() {
                     ? `پیام‌ها و اعلان‌ها — ${toPersianDigits(unread)} خوانده‌نشده`
                     : 'پیام‌ها و اعلان‌ها'
                 }
-                className="relative flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
+                className="relative flex size-12 items-center justify-center rounded-card text-marketer-muted hover:bg-marketer-surface-muted hover:text-marketer-ink"
               >
-                <Bell className="size-6" aria-hidden />
+                <MarketerIcon name="notification" className="size-6" />
                 <CountBadge count={unread} className="end-2 top-2" />
               </Link>
               <Link
                 to="/profile"
                 aria-label="پروفایل"
-                className="flex size-12 items-center justify-center rounded-card text-text-secondary hover:bg-[#F7F3EA]"
+                className="flex size-12 items-center justify-center rounded-card text-marketer-muted hover:bg-marketer-surface-muted hover:text-marketer-ink"
               >
                 <UserRound className="size-6" aria-hidden />
               </Link>
             </div>
           </div>
         </header>
-        {!online && (
-          <div
-            role="status"
-            className="mx-auto mt-2 flex max-w-[920px] items-center justify-center gap-2 rounded-[18px] border border-warning/20 bg-warning-light px-4 py-2.5 text-sm font-bold text-text shadow-xs"
-          >
-            <WifiOff className="size-4 text-warning" aria-hidden />
-            اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
-          </div>
-        )}
-        <main
-          className={
-            isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[1240px] px-4 py-4 lg:px-6'
-          }
+      )}
+
+      {!online && (
+        <div
+          role="status"
+          className="mx-auto mt-2 flex max-w-[920px] items-center justify-center gap-2 rounded-card border border-warning/20 bg-warning-light px-4 py-2.5 text-sm font-bold text-text shadow-xs"
         >
-          <PageTransition>
-            <Suspense
-              fallback={
-                <div
-                  className="mx-auto flex w-full max-w-[920px] flex-col gap-3 rounded-[24px] border border-[#ECE4D8] bg-[#FFFDF8] p-4 shadow-[0_12px_30px_-28px_rgba(32,60,52,.35)]"
-                  aria-busy
-                >
-                  <Skeleton className="h-8 w-1/2 rounded-xl" />
-                  <Skeleton className="h-40 w-full rounded-[20px]" />
-                  <Skeleton className="h-14 w-full rounded-[18px]" />
-                </div>
-              }
-            >
-              <Outlet />
-            </Suspense>
-          </PageTransition>
-        </main>
-        {!isLearningPath && (
-          <BottomNav
-            items={[
-              { to: '/', label: 'خانه', icon: Home },
-              {
-                to: '/learn',
-                label: 'آموزش‌ها',
-                icon: SquarePlay,
-                match: ['/packages', '/sections', '/quiz'],
-              },
-              { to: '/cards', label: 'مدال', icon: Award },
-              { to: '/profile', label: 'پروفایل', icon: UserRound },
-            ]}
-          />
-        )}
-      </div>
+          <WifiOff className="size-4 text-warning" aria-hidden />
+          اتصال اینترنت قطع است. پیشرفت شما ذخیره می‌شود و بعد از اتصال ارسال می‌گردد.
+        </div>
+      )}
+
+      <main
+        className={
+          isLearningPath ? 'mx-auto max-w-none p-0' : 'mx-auto max-w-[1240px] px-4 py-4 lg:px-6'
+        }
+      >
+        <PageTransition>
+          <Suspense
+            fallback={
+              <div
+                className="mx-auto flex w-full max-w-[920px] flex-col gap-3 rounded-hero border border-marketer-border bg-marketer-surface p-4 shadow-md"
+                aria-busy
+              >
+                <Skeleton className="h-8 w-1/2 rounded-xl" />
+                <Skeleton className="h-40 w-full rounded-hero" />
+                <Skeleton className="h-14 w-full rounded-card" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </PageTransition>
+      </main>
+
+      {!isLearningPath && (
+        <BottomNav
+          items={[
+            { to: '/', label: 'خانه', image: 'home' },
+            {
+              to: '/learn',
+              label: 'آموزش‌ها',
+              image: 'learning',
+              match: ['/learn/all', '/packages', '/sections', '/quiz'],
+            },
+            { to: '/messages', label: 'پیام‌ها', image: 'messages', badge: unread },
+            { to: '/cards', label: 'کارت‌ها', image: 'cards' },
+          ]}
+        />
+      )}
     </div>
   );
 }

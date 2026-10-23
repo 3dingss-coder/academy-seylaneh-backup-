@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Award,
-  Bell,
-  BookCheck,
-  CalendarDays,
   CheckCheck,
   GraduationCap,
   Megaphone,
@@ -15,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Button, EmptyState, TableSkeleton } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
-import { Mascot } from '@/components/brand/Mascot';
+import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
 import { QueryState } from '@/components/common/QueryState';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -25,31 +22,48 @@ import { track } from '@/lib/telemetry';
 
 type InboxTab = 'notifications' | 'messages';
 type NotificationIcon = ComponentType<LucideProps>;
+type MarketerNotificationIcon = Extract<MarketerIconName, 'deadline' | 'notification' | 'quiz'>;
+type NotificationGlyph = NotificationIcon | MarketerNotificationIcon;
 
-const ICONS: Record<string, NotificationIcon> = {
+const ICONS: Record<string, NotificationGlyph> = {
   welcome: Sparkles,
   new_assignment: GraduationCap,
   reminder: GraduationCap,
-  deadline_warning: CalendarDays,
-  deadline_passed: CalendarDays,
-  quiz_passed: BookCheck,
-  quiz_failed: BookCheck,
-  retake_request: BookCheck,
-  retake_reviewed: BookCheck,
+  deadline_warning: 'deadline',
+  deadline_passed: 'deadline',
+  quiz_passed: 'quiz',
+  quiz_failed: 'quiz',
+  retake_request: 'quiz',
+  retake_reviewed: 'quiz',
   manager_message: Megaphone,
   mentor_nudge: Sparkles,
   weekly_digest: Megaphone,
   badge_earned: Award,
   escalation: Megaphone,
-  manual: Bell,
-  automation: Bell,
+  manual: 'notification',
+  automation: 'notification',
 };
+
+function NotificationGlyphView({
+  glyph,
+  className,
+}: {
+  glyph: NotificationGlyph;
+  className: string;
+}) {
+  if (typeof glyph === 'string') return <MarketerIcon name={glyph} className={className} />;
+  const Icon = glyph;
+  return <Icon className={className} aria-hidden />;
+}
 
 function UnreadDot() {
   return (
     <span className="relative mt-1 flex size-2.5 shrink-0" aria-label="خوانده نشده" role="status">
-      <span aria-hidden className="animate-pulse-dot absolute inset-0 rounded-full bg-primary" />
-      <span className="relative size-2.5 rounded-full bg-primary" aria-hidden />
+      <span
+        aria-hidden
+        className="animate-pulse-dot absolute inset-0 rounded-full bg-marketer-brand"
+      />
+      <span className="relative size-2.5 rounded-full bg-marketer-brand" aria-hidden />
     </span>
   );
 }
@@ -77,7 +91,7 @@ export function MessagesPage() {
   const unreadNotifications = n.data?.unread ?? 0;
 
   return (
-    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-[#FCF8F0] px-4 py-5 sm:py-7">
+    <div className="-mx-4 -my-4 min-h-[calc(100dvh-4rem)] bg-marketer-canvas px-4 py-5 sm:py-7">
       <div className="mx-auto flex max-w-[820px] flex-col gap-5">
         <PageHeader
           title="اعلان‌ها و پیام‌ها"
@@ -88,7 +102,7 @@ export function MessagesPage() {
                 loading={readAll.isPending}
                 onClick={() => readAll.mutate()}
                 icon={<CheckCheck className="size-5" aria-hidden />}
-                className="border-[#C9DDD3] bg-[#F2F8F4] px-5 text-[#154E42] shadow-none hover:bg-[#EAF4EF]"
+                className="border-marketer-border bg-marketer-surface px-5 text-marketer-ink shadow-none hover:bg-marketer-surface-soft"
               >
                 همه خوانده شد
               </Button>
@@ -99,7 +113,7 @@ export function MessagesPage() {
         <div
           role="tablist"
           aria-label="نوع"
-          className="grid grid-cols-2 overflow-hidden rounded-[22px] border border-[#E6DED2] bg-[#FFFDF8] shadow-xs"
+          className="grid grid-cols-2 overflow-hidden rounded-hero border border-marketer-border bg-marketer-surface shadow-xs"
         >
           <button
             type="button"
@@ -107,17 +121,17 @@ export function MessagesPage() {
             aria-selected={tab === 'notifications'}
             onClick={() => setTab('notifications')}
             className={cn(
-              'pressable flex min-h-16 items-center justify-center gap-3 rounded-[20px] px-4 text-base font-extrabold sm:text-lg',
+              'pressable flex min-h-16 items-center justify-center gap-3 rounded-card px-4 text-base font-extrabold sm:text-lg',
               tab === 'notifications'
-                ? 'border border-[#0B6F59] bg-[#F1F8F4] text-[#123E35] shadow-sm'
-                : 'text-[#263B37] hover:bg-[#F8F5EE]',
+                ? 'border border-marketer-brand/30 bg-marketer-brand-soft text-marketer-ink shadow-sm'
+                : 'text-marketer-ink hover:bg-marketer-surface-muted',
             )}
           >
             <span>اعلان‌ها</span>
             {unreadNotifications > 0 && (
               <span
                 aria-label={`${unreadNotifications.toLocaleString('fa-IR')} اعلان خوانده نشده`}
-                className="flex min-w-8 items-center justify-center rounded-full bg-[#F45B57] px-2 py-1 text-sm font-black text-white"
+                className="flex min-w-8 items-center justify-center rounded-full bg-danger px-2 py-1 text-sm font-black text-on-danger"
               >
                 {unreadNotifications.toLocaleString('fa-IR')}
               </span>
@@ -130,17 +144,17 @@ export function MessagesPage() {
             aria-selected={tab === 'messages'}
             onClick={() => setTab('messages')}
             className={cn(
-              'pressable flex min-h-16 items-center justify-center gap-3 rounded-[20px] px-4 text-base font-extrabold sm:text-lg',
+              'pressable flex min-h-16 items-center justify-center gap-3 rounded-card px-4 text-base font-extrabold sm:text-lg',
               tab === 'messages'
-                ? 'border border-[#0B6F59] bg-[#F1F8F4] text-[#123E35] shadow-sm'
-                : 'text-[#263B37] hover:bg-[#F8F5EE]',
+                ? 'border border-marketer-brand/30 bg-marketer-brand-soft text-marketer-ink shadow-sm'
+                : 'text-marketer-ink hover:bg-marketer-surface-muted',
             )}
           >
             <span>پیام مدیر</span>
             {unreadMsgs > 0 && (
               <span
                 aria-label={`${unreadMsgs.toLocaleString('fa-IR')} پیام خوانده نشده`}
-                className="flex min-w-8 items-center justify-center rounded-full bg-[#F45B57] px-2 py-1 text-sm font-black text-white"
+                className="flex min-w-8 items-center justify-center rounded-full bg-danger px-2 py-1 text-sm font-black text-on-danger"
               >
                 {unreadMsgs.toLocaleString('fa-IR')}
               </span>
@@ -156,14 +170,18 @@ export function MessagesPage() {
             empty={
               <EmptyState
                 title="اعلانی نداری"
-                illustration={<Mascot mood="thinking" className="h-24 w-auto" />}
+                illustration={
+                  <span className="grid size-16 place-items-center rounded-2xl bg-marketer-brand-soft text-marketer-brand">
+                    <MarketerIcon name="notification" className="size-8" />
+                  </span>
+                }
               />
             }
           >
             {(d) => (
               <ul className="stagger flex flex-col gap-3">
                 {d.items.map((it) => {
-                  const Icon = ICONS[it.type] ?? Bell;
+                  const glyph = ICONS[it.type] ?? 'notification';
                   const unread = !it.readAt;
                   const reward = it.type === 'badge_earned';
 
@@ -182,10 +200,10 @@ export function MessagesPage() {
                           }
                         }}
                         className={cn(
-                          'pressable relative flex min-h-[132px] w-full items-start gap-4 rounded-[22px] border px-4 py-5 text-start shadow-xs sm:min-h-[142px] sm:px-5 sm:py-6',
+                          'pressable relative flex min-h-[132px] w-full items-start gap-4 rounded-hero border px-4 py-5 text-start shadow-xs sm:min-h-[142px] sm:px-5 sm:py-6',
                           unread
-                            ? 'border-[#CFE2D7] bg-[#F3F9F5] shadow-[0_8px_24px_-22px_rgba(17,79,63,0.55)]'
-                            : 'border-[#E8E0D5] bg-[#FFFDF8] hover:bg-white',
+                            ? 'border-marketer-brand/25 bg-marketer-brand-soft shadow-sm'
+                            : 'border-marketer-border bg-marketer-surface hover:bg-marketer-surface-soft',
                         )}
                       >
                         {unread && (
@@ -196,32 +214,32 @@ export function MessagesPage() {
 
                         <span
                           className={cn(
-                            'flex size-14 shrink-0 items-center justify-center rounded-[18px] sm:size-16',
+                            'flex size-14 shrink-0 items-center justify-center rounded-card sm:size-16',
                             reward
-                              ? 'bg-[#FFF2CF] text-[#E59A13]'
+                              ? 'bg-accent-light text-accent-fg'
                               : unread
-                                ? 'bg-[#E7F3EC] text-[#0B6F59]'
-                                : 'bg-[#EFF4EF] text-[#1B6958]',
+                                ? 'bg-marketer-brand-soft text-marketer-brand'
+                                : 'bg-marketer-surface-muted text-marketer-brand',
                           )}
                         >
-                          <Icon className="size-7 sm:size-8" aria-hidden />
+                          <NotificationGlyphView glyph={glyph} className="size-7 sm:size-8" />
                         </span>
 
                         <div className="min-w-0 flex-1 pe-3">
                           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
                             <p
                               className={cn(
-                                'text-[15px] leading-7 text-[#113F36] sm:text-base',
+                                'text-[15px] leading-7 text-marketer-ink sm:text-base',
                                 unread ? 'font-black' : 'font-extrabold',
                               )}
                             >
                               {it.title}
                             </p>
-                            <p className="shrink-0 text-xs font-medium text-[#65736F] sm:text-sm">
+                            <p className="shrink-0 text-xs font-medium text-marketer-muted sm:text-sm">
                               {faRelative(it.createdAt)}
                             </p>
                           </div>
-                          <p className="mt-1 text-sm leading-7 text-[#5B6462] sm:text-base sm:leading-8">
+                          <p className="mt-1 text-sm leading-7 text-marketer-muted sm:text-base sm:leading-8">
                             {it.body}
                           </p>
                         </div>
@@ -240,7 +258,11 @@ export function MessagesPage() {
             empty={
               <EmptyState
                 title="پیامی از مدیر نداری"
-                illustration={<Mascot mood="thinking" className="h-24 w-auto" />}
+                illustration={
+                  <span className="grid size-16 place-items-center rounded-2xl bg-marketer-brand-soft text-marketer-brand">
+                    <MessageSquareText className="size-8" aria-hidden />
+                  </span>
+                }
               />
             }
           >
@@ -258,10 +280,10 @@ export function MessagesPage() {
                           if (it.packageId) nav(`/packages/${it.packageId}`);
                         }}
                         className={cn(
-                          'pressable relative flex min-h-[132px] w-full items-start gap-4 rounded-[22px] border px-4 py-5 text-start shadow-xs sm:min-h-[142px] sm:px-5 sm:py-6',
+                          'pressable relative flex min-h-[132px] w-full items-start gap-4 rounded-hero border px-4 py-5 text-start shadow-xs sm:min-h-[142px] sm:px-5 sm:py-6',
                           unread
-                            ? 'border-[#CFE2D7] bg-[#F3F9F5] shadow-[0_8px_24px_-22px_rgba(17,79,63,0.55)]'
-                            : 'border-[#E8E0D5] bg-[#FFFDF8] hover:bg-white',
+                            ? 'border-marketer-brand/25 bg-marketer-brand-soft shadow-sm'
+                            : 'border-marketer-border bg-marketer-surface hover:bg-marketer-surface-soft',
                         )}
                       >
                         {unread && (
@@ -270,7 +292,7 @@ export function MessagesPage() {
                           </span>
                         )}
 
-                        <span className="flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-[#E7F3EC] text-[#0B6F59] sm:size-16">
+                        <span className="flex size-14 shrink-0 items-center justify-center rounded-card bg-marketer-brand-soft text-marketer-brand sm:size-16">
                           <MessageSquareText className="size-7 sm:size-8" aria-hidden />
                         </span>
 
@@ -279,23 +301,23 @@ export function MessagesPage() {
                             <div className="flex min-w-0 flex-wrap items-center gap-2">
                               <p
                                 className={cn(
-                                  'text-[15px] leading-7 text-[#113F36] sm:text-base',
+                                  'text-[15px] leading-7 text-marketer-ink sm:text-base',
                                   unread ? 'font-black' : 'font-extrabold',
                                 )}
                               >
                                 {it.fromName}
                               </p>
                               {it.type === 'note' && (
-                                <span className="rounded-full bg-[#FFF2CF] px-2.5 py-1 text-xs font-bold text-[#8C5B06]">
+                                <span className="rounded-full bg-accent-light px-2.5 py-1 text-xs font-bold text-accent-fg">
                                   یادداشت روی آموزش
                                 </span>
                               )}
                             </div>
-                            <p className="shrink-0 text-xs font-medium text-[#65736F] sm:text-sm">
+                            <p className="shrink-0 text-xs font-medium text-marketer-muted sm:text-sm">
                               {faRelative(it.createdAt)}
                             </p>
                           </div>
-                          <p className="mt-1 whitespace-pre-line text-sm leading-7 text-[#4F5D59] sm:text-base sm:leading-8">
+                          <p className="mt-1 whitespace-pre-line text-sm leading-7 text-marketer-muted sm:text-base sm:leading-8">
                             {it.body}
                           </p>
                         </div>

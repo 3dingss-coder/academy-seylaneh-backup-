@@ -24,7 +24,7 @@ export function PackageCard({
     <Link
       to={`/packages/${p.id}`}
       className={cn(
-        'pressable group grid min-h-36 gap-4 overflow-hidden rounded-[20px] border border-border bg-surface p-4 shadow-xs hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:border-primary',
+        'pressable group grid min-h-36 gap-4 overflow-hidden rounded-hero border border-marketer-border bg-marketer-surface p-4 shadow-xs hover:-translate-y-0.5 hover:border-marketer-brand/30 hover:shadow-md focus-visible:border-marketer-brand',
         educationLayout
           ? 'grid-cols-[1fr_96px] sm:grid-cols-[1fr_112px]'
           : 'grid-cols-[96px_1fr] sm:grid-cols-[104px_1fr]',
@@ -35,13 +35,13 @@ export function PackageCard({
         src={image}
         alt={p.product?.name ?? p.brand?.name ?? p.title}
         className={cn(
-          'size-24 self-start rounded-[18px] border border-border bg-background object-contain p-2 shadow-xs transition-transform duration-300 ease-soft group-hover:scale-[1.03] sm:size-28',
+          'size-24 self-start rounded-card !border-marketer-border !bg-marketer-surface object-contain p-2 shadow-xs transition-transform duration-300 ease-soft group-hover:scale-[1.03] sm:size-28',
           educationLayout && 'order-2',
         )}
       />
       <div className={cn('flex min-w-0 flex-1 flex-col', educationLayout && 'order-1')}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-extrabold text-primary-fg">
+          <p className="text-xs font-extrabold text-marketer-brand">
             {p.brand?.name}
             {p.product ? '' : p.brand ? ' — آموزش برند' : ''}
           </p>
@@ -51,10 +51,10 @@ export function PackageCard({
             </span>
           )}
         </div>
-        <h3 className="mt-1 line-clamp-2 text-base font-extrabold leading-7 text-text">
+        <h3 className="mt-1 line-clamp-2 text-base font-extrabold leading-7 text-marketer-ink">
           {p.title}
         </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-marketer-muted">
           <span className="inline-flex items-center gap-1">
             <Clock className="size-3.5" aria-hidden />
             {faDuration(p.totalDurationSec)}
@@ -66,7 +66,7 @@ export function PackageCard({
         </div>
         <div className="mt-auto flex items-center gap-2 pt-3">
           <ProgressBar value={p.percent} label={`پیشرفت ${p.title}`} className="min-w-0 flex-1" />
-          <span className="text-xs font-extrabold text-primary-fg">{faPercent(p.percent)}</span>
+          <span className="text-xs font-extrabold text-marketer-brand">{faPercent(p.percent)}</span>
         </div>
       </div>
     </Link>

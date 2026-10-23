@@ -1,8 +1,9 @@
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { BottomNav } from '@/components/layout/BottomNav';
+import { BottomNav, type BottomNavItem } from '@/components/layout/BottomNav';
 import { BrandLogo } from '@/components/brand/BrandLogo';
+import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
 import {
   Button,
   Card,
@@ -150,8 +151,8 @@ describe('Toast', () => {
 });
 
 describe('BottomNav', () => {
-  it('renders the four marketer tabs and keeps exams inside each course', () => {
-    render(
+  it('keeps legacy Lucide tabs for generic callers such as the gallery', () => {
+    const { container } = render(
       <MemoryRouter>
         <BottomNav />
       </MemoryRouter>,
@@ -159,8 +160,50 @@ describe('BottomNav', () => {
     for (const label of ['خانه', 'آموزش‌ها', 'مدال', 'پروفایل']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
     }
-    expect(screen.getByRole('link', { name: 'آموزش‌ها' })).toHaveAttribute('href', '/learn');
-    expect(screen.queryByRole('link', { name: 'آزمون‌ها' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'پیام‌ها' })).toBeNull();
+    expect(container.querySelectorAll('img[src^="/brand/m/icons/"]')).toHaveLength(0);
+    expect(container.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(4);
+  });
+
+  it('uses the 3D icon set only when marketer navigation items are passed explicitly', () => {
+    const items = [
+      { to: '/', label: 'خانه', image: 'home' },
+      { to: '/learn', label: 'آموزش‌ها', image: 'learning' },
+      { to: '/messages', label: 'پیام‌ها', image: 'messages' },
+      { to: '/cards', label: 'کارت‌ها', image: 'cards' },
+    ] satisfies BottomNavItem[];
+    const { container } = render(
+      <MemoryRouter>
+        <BottomNav items={items} />
+      </MemoryRouter>,
+    );
+
+    for (const name of ['home', 'learning', 'messages', 'cards']) {
+      const icon = container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`);
+      expect(icon).toHaveAttribute('alt', '');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+});
+
+describe('MarketerIcon', () => {
+  it.each([
+    'home',
+    'learning',
+    'messages',
+    'cards',
+    'mentor',
+    'notification',
+    'quiz',
+    'audio',
+    'video',
+    'deadline',
+  ] as MarketerIconName[])('maps %s to its decorative image asset', (name) => {
+    const { container } = render(<MarketerIcon name={name} className="size-8" />);
+    const icon = container.querySelector('img');
+    expect(icon).toHaveAttribute('src', `/brand/m/icons/${name}-3d.png`);
+    expect(icon).toHaveAttribute('alt', '');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 });
 

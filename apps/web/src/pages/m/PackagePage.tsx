@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, Lock, MessageSquareQuote } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Lock } from 'lucide-react';
 import {
   Button,
   CountdownChip,
@@ -280,7 +280,7 @@ export function PackagePage() {
                     >
                       <div className="flex items-center gap-2 border-b border-warning/20 px-4 py-3">
                         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-light text-accent-fg">
-                          <MessageSquareQuote className="size-5" aria-hidden />
+                          <MarketerIcon name="manager-note" className="size-5" />
                         </span>
                         <h2 className="text-sm font-black text-marketer-ink">پیام مدیر</h2>
                       </div>

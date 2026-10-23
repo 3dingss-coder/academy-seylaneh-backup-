@@ -1,15 +1,7 @@
-import { useState, type ComponentType } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Award,
-  CheckCheck,
-  GraduationCap,
-  Megaphone,
-  MessageSquareText,
-  Sparkles,
-  type LucideProps,
-} from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { Button, EmptyState, TableSkeleton } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
@@ -21,40 +13,37 @@ import { qk, useMessages, useNotifications } from '@/lib/queries';
 import { track } from '@/lib/telemetry';
 
 type InboxTab = 'notifications' | 'messages';
-type NotificationIcon = ComponentType<LucideProps>;
-type MarketerNotificationIcon = Extract<MarketerIconName, 'deadline' | 'notification' | 'quiz'>;
-type NotificationGlyph = NotificationIcon | MarketerNotificationIcon;
+type MarketerNotificationIcon = Extract<
+  MarketerIconName,
+  | 'announcement'
+  | 'assignment'
+  | 'badge-medal'
+  | 'deadline'
+  | 'manager-note'
+  | 'notification'
+  | 'quiz'
+  | 'weekly-summary'
+  | 'welcome'
+>;
 
-const ICONS: Record<string, NotificationGlyph> = {
-  welcome: Sparkles,
-  new_assignment: GraduationCap,
-  reminder: GraduationCap,
+const ICONS: Record<string, MarketerNotificationIcon> = {
+  welcome: 'welcome',
+  new_assignment: 'assignment',
+  reminder: 'assignment',
   deadline_warning: 'deadline',
   deadline_passed: 'deadline',
   quiz_passed: 'quiz',
   quiz_failed: 'quiz',
   retake_request: 'quiz',
   retake_reviewed: 'quiz',
-  manager_message: Megaphone,
-  mentor_nudge: Sparkles,
-  weekly_digest: Megaphone,
-  badge_earned: Award,
-  escalation: Megaphone,
+  manager_message: 'manager-note',
+  mentor_nudge: 'welcome',
+  weekly_digest: 'weekly-summary',
+  badge_earned: 'badge-medal',
+  escalation: 'announcement',
   manual: 'notification',
   automation: 'notification',
 };
-
-function NotificationGlyphView({
-  glyph,
-  className,
-}: {
-  glyph: NotificationGlyph;
-  className: string;
-}) {
-  if (typeof glyph === 'string') return <MarketerIcon name={glyph} className={className} />;
-  const Icon = glyph;
-  return <Icon className={className} aria-hidden />;
-}
 
 function UnreadDot() {
   return (
@@ -222,7 +211,7 @@ export function MessagesPage() {
                                 : 'bg-marketer-surface-muted text-marketer-brand',
                           )}
                         >
-                          <NotificationGlyphView glyph={glyph} className="size-7 sm:size-8" />
+                          <MarketerIcon name={glyph} className="size-7 sm:size-8" />
                         </span>
 
                         <div className="min-w-0 flex-1 pe-3">
@@ -260,7 +249,7 @@ export function MessagesPage() {
                 title="پیامی از مدیر نداری"
                 illustration={
                   <span className="grid size-16 place-items-center rounded-2xl bg-marketer-brand-soft text-marketer-brand">
-                    <MessageSquareText className="size-8" aria-hidden />
+                    <MarketerIcon name="manager-note" className="size-8" />
                   </span>
                 }
               />
@@ -293,7 +282,7 @@ export function MessagesPage() {
                         )}
 
                         <span className="flex size-14 shrink-0 items-center justify-center rounded-card bg-marketer-brand-soft text-marketer-brand sm:size-16">
-                          <MessageSquareText className="size-7 sm:size-8" aria-hidden />
+                          <MarketerIcon name="manager-note" className="size-7 sm:size-8" />
                         </span>
 
                         <div className="min-w-0 flex-1 pe-3">

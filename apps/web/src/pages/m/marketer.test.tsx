@@ -312,6 +312,51 @@ describe('MessagesPage — notifications and manager notes', () => {
               readAt: null,
               createdAt: '2026-10-22T10:00:00.000Z',
             },
+            {
+              id: 'notification-2',
+              type: 'welcome',
+              title: 'به مسیر یادگیری خوش آمدی',
+              body: 'هر روز یک قدم جلوتر برو.',
+              actionRef: null,
+              readAt: '2026-10-22T10:00:00.000Z',
+              createdAt: '2026-10-22T09:00:00.000Z',
+            },
+            {
+              id: 'notification-3',
+              type: 'new_assignment',
+              title: 'آموزش تازه',
+              body: 'یک آموزش جدید به تو اختصاص داده شد.',
+              actionRef: null,
+              readAt: '2026-10-22T10:00:00.000Z',
+              createdAt: '2026-10-21T10:00:00.000Z',
+            },
+            {
+              id: 'notification-4',
+              type: 'manager_message',
+              title: 'پیام مدیر',
+              body: 'مدیر تیم برایت پیامی فرستاده است.',
+              actionRef: null,
+              readAt: '2026-10-22T10:00:00.000Z',
+              createdAt: '2026-10-20T10:00:00.000Z',
+            },
+            {
+              id: 'notification-5',
+              type: 'weekly_digest',
+              title: 'خلاصه هفتگی',
+              body: 'مروری بر هفته گذشته.',
+              actionRef: null,
+              readAt: '2026-10-22T10:00:00.000Z',
+              createdAt: '2026-10-19T10:00:00.000Z',
+            },
+            {
+              id: 'notification-6',
+              type: 'escalation',
+              title: 'اطلاعیه جدید',
+              body: 'یک نکته تازه برای تیمت داریم.',
+              actionRef: null,
+              readAt: '2026-10-22T10:00:00.000Z',
+              createdAt: '2026-10-18T10:00:00.000Z',
+            },
           ],
         },
       }),
@@ -329,11 +374,21 @@ describe('MessagesPage — notifications and manager notes', () => {
         ],
       }),
     });
-    renderMessages();
+    const { container } = renderMessages();
     expect(await screen.findByText('یادآوری آموزش')).toBeInTheDocument();
+    for (const name of [
+      'notification',
+      'welcome',
+      'assignment',
+      'weekly-summary',
+      'announcement',
+    ]) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
     fireEvent.click(screen.getByRole('tab', { name: /پیام مدیر/ }));
     expect(await screen.findByText('مدیر تیم')).toBeInTheDocument();
     expect(screen.getByText('لطفاً درس اول را مرور کن.')).toBeInTheDocument();
+    expect(container.querySelector('img[src="/brand/m/icons/manager-note-3d.png"]')).not.toBeNull();
   });
 
   it('shows separate empty states for notifications and manager messages', async () => {

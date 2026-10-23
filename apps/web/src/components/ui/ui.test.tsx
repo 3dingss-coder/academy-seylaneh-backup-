@@ -203,6 +203,11 @@ describe('MarketerIcon', () => {
     'badge-brain',
     'badge-medal',
     'badge-star',
+    'welcome',
+    'assignment',
+    'announcement',
+    'manager-note',
+    'weekly-summary',
   ] as MarketerIconName[])('maps %s to its decorative image asset', (name) => {
     const { container } = render(<MarketerIcon name={name} className="size-8" />);
     const icon = container.querySelector('img');

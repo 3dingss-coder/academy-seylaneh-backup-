@@ -1,16 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Award,
-  BookOpen,
-  Bot,
-  CalendarCheck,
-  CheckCircle2,
-  ChevronLeft,
-  Play,
-  ShieldCheck,
-} from 'lucide-react';
+import { Award, BookOpen, CalendarCheck, CheckCircle2, ChevronLeft, Play } from 'lucide-react';
 import {
   CountBadge,
   CountUp,
@@ -221,7 +212,7 @@ export function HomePage() {
             to={topNudge.actionRef ?? '/mentor'}
             className="pressable flex min-h-14 items-center gap-3 rounded-card border border-marketer-border bg-marketer-surface px-4 py-3 shadow-sm hover:bg-marketer-surface-soft"
           >
-            <Bot className="size-5 shrink-0 text-marketer-brand" aria-hidden />
+            <MarketerIcon name="mentor" className="size-6 shrink-0" />
             <span className="min-w-0 flex-1 truncate text-sm text-marketer-ink">
               {topNudge.message}
             </span>
@@ -289,22 +280,22 @@ export function HomePage() {
         >
           <StatTile
             to="/learn/all"
-            icon={<CalendarCheck className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="assignment" className="size-6" />}
             label="دوره‌ها"
           />
           <StatTile
             to="/learn"
-            icon={<BookOpen className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="learning" className="size-6" />}
             label="مسیر یادگیری"
           />
           <StatTile
             to="/learn/all"
-            icon={<ShieldCheck className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="quiz" className="size-6" />}
             label="آزمون‌ها"
           />
           <StatTile
             to="/cards"
-            icon={<Award className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="badge-medal" className="size-6" />}
             label="امتیاز و نشان‌ها"
           />
         </nav>

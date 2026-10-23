@@ -158,6 +158,28 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     expect(screen.getByTestId('package-card')).toBeInTheDocument();
   });
 
+  it('reuses marketer illustrations for the home shortcuts and a live mentor nudge', async () => {
+    mockApi({
+      ...homeRoutes(HOME_ROUTINE),
+      'GET /v1/me/mentor/nudges': () => ({
+        data: [
+          {
+            id: 'nudge-1',
+            ruleId: 'rule-1',
+            message: 'برای این آموزش از منتور کمک بگیر.',
+            actionRef: '/mentor',
+            createdAt: '2026-10-22T10:00:00.000Z',
+          },
+        ],
+      }),
+    });
+    const { container } = renderHome();
+    expect(await screen.findByText('برای این آموزش از منتور کمک بگیر.')).toBeInTheDocument();
+    for (const name of ['mentor', 'assignment', 'learning', 'quiz', 'badge-medal']) {
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+    }
+  });
+
   it('uses the mascot as the default profile avatar and keeps success art out of the routine state', async () => {
     mockApi(homeRoutes(HOME_ROUTINE));
     const { container } = renderHome();

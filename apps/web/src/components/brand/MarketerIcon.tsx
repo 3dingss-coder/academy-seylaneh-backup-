@@ -20,7 +20,12 @@ export type MarketerIconName =
   | 'assignment'
   | 'announcement'
   | 'manager-note'
-  | 'weekly-summary';
+  | 'weekly-summary'
+  | 'quiz-passed'
+  | 'quiz-retry'
+  | 'quiz-review'
+  | 'retake-pending'
+  | 'quiz-unavailable';
 
 const ICON_SRC: Record<MarketerIconName, string> = {
   home: '/brand/m/icons/home-3d.png',
@@ -43,6 +48,11 @@ const ICON_SRC: Record<MarketerIconName, string> = {
   announcement: '/brand/m/icons/announcement-3d.png',
   'manager-note': '/brand/m/icons/manager-note-3d.png',
   'weekly-summary': '/brand/m/icons/weekly-summary-3d.png',
+  'quiz-passed': '/brand/m/icons/quiz-passed-3d.png',
+  'quiz-retry': '/brand/m/icons/quiz-retry-3d.png',
+  'quiz-review': '/brand/m/icons/quiz-review-3d.png',
+  'retake-pending': '/brand/m/icons/retake-pending-3d.png',
+  'quiz-unavailable': '/brand/m/icons/quiz-unavailable-3d.png',
 };
 
 /** Decorative 3D marketer icon; adjacent text or the containing control names it accessibly. */

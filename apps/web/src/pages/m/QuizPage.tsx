@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  PartyPopper,
   RotateCcw,
   Send,
   Sparkles,
@@ -22,6 +21,7 @@ import {
   Skeleton,
   useToast,
 } from '@/components/ui';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { PageHeader } from '@/components/common/PageHeader';
 import { RememberPage } from '@/lib/pageContext';
 import { QueryState } from '@/components/common/QueryState';
@@ -215,11 +215,10 @@ function QuizFlow({
             tone={result.passed ? 'success' : 'danger'}
             center={
               <span className="absolute flex flex-col items-center leading-tight">
-                {result.passed ? (
-                  <PartyPopper className="animate-pop size-7 text-marketer-brand" aria-hidden />
-                ) : (
-                  <XCircle className="animate-shake size-7 text-danger" aria-hidden />
-                )}
+                <MarketerIcon
+                  name={result.passed ? 'quiz-passed' : 'quiz-retry'}
+                  className={cn('size-7', result.passed ? 'animate-pop' : 'animate-shake')}
+                />
                 <span className="text-xl font-extrabold text-marketer-ink">
                   {faPercent(result.score)}
                 </span>
@@ -247,7 +246,8 @@ function QuizFlow({
           )}
         </Card>
         <section aria-labelledby="review" className="flex flex-col gap-2">
-          <h3 id="review" className="text-base font-bold">
+          <h3 id="review" className="flex items-center gap-2 text-base font-bold">
+            <MarketerIcon name="quiz-review" className="size-6" />
             مرور پاسخ‌ها
           </h3>
           <div className="stagger flex flex-col gap-2">
@@ -328,6 +328,7 @@ function QuizFlow({
             description={
               info.lastAttempt ? `نمره: ${faPercent(info.lastAttempt.score)}` : undefined
             }
+            illustration={<MarketerIcon name="quiz-passed" className="size-16" />}
           />
           <Button
             size="lg"
@@ -346,6 +347,7 @@ function QuizFlow({
           <EmptyState
             title="نمره‌ات زیر حد قبولی بود"
             description="یک بار ویدیو را ببین یا پادکست را گوش بده؛ بعد دوباره آزمون باز می‌شود."
+            illustration={<MarketerIcon name="quiz-retry" className="size-16" />}
           />
           <Button size="lg" block onClick={() => nav(`/packages/${d.quiz.packageId}`)}>
             رفتن به ویدیو و پادکست
@@ -357,6 +359,7 @@ function QuizFlow({
         <EmptyState
           title="در انتظار تأیید مدیر"
           description="درخواست آزمون مجددت ثبت شده است. بعد از تأیید، اینجا فعال می‌شود."
+          illustration={<MarketerIcon name="retake-pending" className="size-16" />}
         />
       );
     else if (!info.canAttempt)
@@ -365,6 +368,7 @@ function QuizFlow({
           <EmptyState
             title="فرصت‌های آزمون تمام شد"
             description="می‌توانی از مدیرت درخواست آزمون مجدد کنی."
+            illustration={<MarketerIcon name="quiz-retry" className="size-16" />}
           />
           <Button size="lg" block loading={retake.isPending} onClick={() => retake.mutate()}>
             درخواست آزمون مجدد از مدیر
@@ -376,6 +380,7 @@ function QuizFlow({
         <EmptyState
           title="آزمونی برای این قسمت تعریف نشده است"
           description="به مدیر اطلاع داده شد."
+          illustration={<MarketerIcon name="quiz-unavailable" className="size-16" />}
         />
       );
     else

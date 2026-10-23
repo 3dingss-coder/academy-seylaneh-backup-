@@ -405,7 +405,7 @@ describe('M7/M8 quiz', () => {
         };
       },
     });
-    renderApp('/quiz/seed-pkg-formi-s1');
+    const { container } = renderApp('/quiz/seed-pkg-formi-s1');
     fireEvent.click(await screen.findByTestId('quiz-start'));
     expect(await screen.findByText('این قسمت درباره کدام محصول است؟')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /بعدی/ })).toBeDisabled();
@@ -415,6 +415,8 @@ describe('M7/M8 quiz', () => {
     fireEvent.click(screen.getByTestId('quiz-submit'));
     fireEvent.click(await screen.findByTestId('quiz-confirm'));
     expect(await screen.findByTestId('quiz-result')).toHaveTextContent('قبول شدی');
+    expect(container.querySelector('img[src="/brand/m/icons/quiz-passed-3d.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/icons/quiz-review-3d.png"]')).not.toBeNull();
     expect(screen.getByText('+۲۰ امتیاز')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'بازگشت به بسته' })).toBeInTheDocument();
     // Wait for the invalidation refetch, then make sure the result is still shown.
@@ -426,6 +428,42 @@ describe('M7/M8 quiz', () => {
     expect(screen.getByTestId('quiz-result')).toBeInTheDocument();
     const submit = calls.find((c) => c.key === 'POST /v1/me/attempts/at1/submit');
     expect(submit?.body).toEqual({ answers: { q1: 'a', q2: 'a' } });
+  });
+
+  it('shows the dedicated image while a manager retake request is pending', async () => {
+    mockApi({
+      ...loggedIn(),
+      'GET /v1/me/sections/seed-pkg-formi-s1': () => ({ data: sectionDetail }),
+      'GET /v1/me/quizzes/seed-pkg-formi-s1-quiz': () => ({
+        data: {
+          ...quiz,
+          attemptInfo: {
+            ...quiz.attemptInfo,
+            pendingRetake: { id: 'retake-1', status: 'pending' },
+          },
+        },
+      }),
+    });
+    const { container } = renderApp('/quiz/seed-pkg-formi-s1');
+    expect(await screen.findByText('در انتظار تأیید مدیر')).toBeInTheDocument();
+    expect(
+      container.querySelector('img[src="/brand/m/icons/retake-pending-3d.png"]'),
+    ).not.toBeNull();
+  });
+
+  it('shows a neutral quiz illustration when the section has no configured questions', async () => {
+    mockApi({
+      ...loggedIn(),
+      'GET /v1/me/sections/seed-pkg-formi-s1': () => ({ data: sectionDetail }),
+      'GET /v1/me/quizzes/seed-pkg-formi-s1-quiz': () => ({
+        data: { ...quiz, quiz: { ...quiz.quiz, questionCount: 0 }, questions: [] },
+      }),
+    });
+    const { container } = renderApp('/quiz/seed-pkg-formi-s1');
+    expect(await screen.findByText('آزمونی برای این قسمت تعریف نشده است')).toBeInTheDocument();
+    expect(
+      container.querySelector('img[src="/brand/m/icons/quiz-unavailable-3d.png"]'),
+    ).not.toBeNull();
   });
 
   it('opens the quiz even before the media is completed', async () => {

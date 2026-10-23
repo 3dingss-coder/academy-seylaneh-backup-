@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BottomNav, type BottomNavItem } from '@/components/layout/BottomNav';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
+import { MentorLauncher } from '@/components/learning/MentorSheet';
 import {
   Button,
   Card,
@@ -208,12 +209,25 @@ describe('MarketerIcon', () => {
     'announcement',
     'manager-note',
     'weekly-summary',
+    'quiz-passed',
+    'quiz-retry',
+    'quiz-review',
+    'retake-pending',
+    'quiz-unavailable',
   ] as MarketerIconName[])('maps %s to its decorative image asset', (name) => {
     const { container } = render(<MarketerIcon name={name} className="size-8" />);
     const icon = container.querySelector('img');
     expect(icon).toHaveAttribute('src', `/brand/m/icons/${name}-3d.png`);
     expect(icon).toHaveAttribute('alt', '');
     expect(icon).toHaveAttribute('aria-hidden', 'true');
+  });
+});
+
+describe('MentorLauncher', () => {
+  it('keeps its accessible action label with the 3D marketer mentor icon', () => {
+    const { container } = render(<MentorLauncher packageId="p1" />);
+    expect(screen.getByRole('button', { name: 'از منتور بپرس' })).toBeInTheDocument();
+    expect(container.querySelector('img[src="/brand/m/icons/mentor-3d.png"]')).not.toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot } from 'lucide-react';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { Modal } from '@/components/ui';
 import { track } from '@/lib/telemetry';
 import { MentorChat } from './MentorChat';
@@ -22,7 +22,7 @@ export function MentorLauncher({ packageId }: { packageId: string }) {
             aria-hidden
             className="animate-pulse-dot absolute inset-0 rounded-full bg-primary"
           />
-          <Bot className="relative size-5" aria-hidden />
+          <MarketerIcon name="mentor" className="relative size-6" />
         </span>
         از منتور بپرس
       </button>

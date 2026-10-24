@@ -43,8 +43,11 @@
       #boot img {
         position: absolute;
         inset: 0;
-        width: 100%;
-        height: 100%;
+        /* !important: the app's Tailwind preflight (img, video { height: auto }) is boosted in
+           specificity and would otherwise win, stretching the frame to its intrinsic ratio. */
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
         object-fit: cover;
         object-position: 50% 45%;
       }
@@ -53,6 +56,21 @@
         #boot video,
         #boot img {
           object-fit: contain;
+          /* the portrait frame is 56.25vh wide; fade its side edges into the page colour so no box shows */
+          -webkit-mask-image: linear-gradient(
+            to right,
+            transparent calc(50% - 28.2vh),
+            #000 calc(50% - 19vh),
+            #000 calc(50% + 19vh),
+            transparent calc(50% + 28.2vh)
+          );
+          mask-image: linear-gradient(
+            to right,
+            transparent calc(50% - 28.2vh),
+            #000 calc(50% - 19vh),
+            #000 calc(50% + 19vh),
+            transparent calc(50% + 28.2vh)
+          );
         }
       }
     </style>
@@ -61,8 +79,8 @@
     <div id="boot" role="status" aria-label="آکادمی سیلانه سبز در حال بارگذاری">
       <img
         src="/brand/boot/boot-poster.webp"
-        width="540"
-        height="960"
+        width="720"
+        height="1280"
         alt=""
         fetchpriority="high"
       />
@@ -70,8 +88,8 @@
         id="boot-video"
         src="/brand/boot/boot-loading.mp4"
         poster="/brand/boot/boot-poster.webp"
-        width="540"
-        height="960"
+        width="720"
+        height="1280"
         muted
         playsinline
         preload="auto"

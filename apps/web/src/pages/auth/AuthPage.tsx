@@ -438,12 +438,10 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 یادگیری امروز، موفقیت فردا
               </p>
               <img
-                src="/brand/auth/auth-welcome-mascot-sit.webp"
+                src="/brand/auth/auth-welcome-mascot.png"
                 alt=""
                 aria-hidden
-                width={276}
-                height={322}
-                className="pointer-events-none mx-auto mt-auto w-[270px] max-w-[80%] select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
+                className="pointer-events-none mx-auto mt-auto w-[320px] max-w-[92%] select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"
               />
             </div>
           </section>

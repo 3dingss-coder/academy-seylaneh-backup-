@@ -1,4 +1,5 @@
 // Generic bottom navigation keeps the original Lucide icons; marketer pages opt into the 3D set.
+import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Award, Home, SquarePlay, UserRound, type LucideIcon } from 'lucide-react';
 import { MarketerIcon, type MarketerIconName } from '@/components/brand/MarketerIcon';
@@ -33,6 +34,24 @@ const inPath = (pathname: string, prefix: string) =>
 
 export function BottomNav({ items = DEFAULT_NAV }: { items?: BottomNavItem[] }) {
   const { pathname } = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+  // Publish the real nav height (incl. safe-area inset) so floating elements can sit just above it.
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const publish = () =>
+      root.style.setProperty('--bottom-nav-h', `${el.getBoundingClientRect().height}px`);
+    publish();
+    if (typeof ResizeObserver === 'undefined')
+      return () => root.style.removeProperty('--bottom-nav-h');
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--bottom-nav-h');
+    };
+  }, []);
   const activeIdx = items.findIndex((it) =>
     it.to === '/'
       ? pathname === '/'
@@ -41,6 +60,7 @@ export function BottomNav({ items = DEFAULT_NAV }: { items?: BottomNavItem[] }) 
 
   return (
     <nav
+      ref={navRef}
       aria-label="ناوبری اصلی"
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
     >

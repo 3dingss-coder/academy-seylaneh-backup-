@@ -33,7 +33,7 @@ export function PackagePage() {
           <div className="mx-auto w-full max-w-[1180px]">
             <Skeleton className="h-20 w-full rounded-hero" />
             <Skeleton className="mt-4 h-[390px] w-full rounded-hero" />
-            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_390px]">
+            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_390px]">
               <Skeleton className="h-[520px] w-full rounded-hero" />
               <Skeleton className="h-[520px] w-full rounded-hero" />
             </div>
@@ -150,7 +150,7 @@ export function PackagePage() {
                 </div>
 
                 <div
-                  className="relative grid gap-3 border-t border-marketer-border bg-marketer-surface-soft/95 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-stretch lg:px-5"
+                  className="relative grid grid-cols-1 gap-3 border-t border-marketer-border bg-marketer-surface-soft/95 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-stretch lg:px-5"
                   style={{ direction: 'ltr' }}
                 >
                   <div
@@ -232,7 +232,7 @@ export function PackagePage() {
                 </a>
               </nav>
 
-              <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
                 <section
                   id="package-sections"
                   aria-labelledby="sections-title"

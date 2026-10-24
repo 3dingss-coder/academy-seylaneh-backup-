@@ -292,7 +292,7 @@ function UnassignedPackages({ query }: { query: ReturnType<typeof usePackagesAdm
               </div>
             </div>
           </Card>
-          <ul className="grid gap-3 lg:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {list.map((pkg) => (
               <li key={pkg.id}>
                 <Link
@@ -380,7 +380,7 @@ function ArchivedPackages() {
               </span>
             </div>
           </Card>
-          <ul className="grid gap-3 lg:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {rows.map((pkg) => (
               <li key={pkg.id}>
                 <Card className="flex h-full flex-col justify-between gap-4 border-[#e8e2d8] bg-[#fffdf8] sm:flex-row sm:items-center">

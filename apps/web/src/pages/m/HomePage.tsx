@@ -223,7 +223,7 @@ export function HomePage() {
         {/* Live progress and counts: every figure is supplied by the home API. */}
         <section
           aria-label="پیشرفت و آمار یادگیری"
-          className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+          className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
         >
           <div className="flex min-h-[142px] items-center justify-between gap-4 rounded-card border border-marketer-border bg-marketer-surface p-4 shadow-sm sm:p-5">
             <div>
@@ -320,7 +320,7 @@ export function HomePage() {
             </Link>
           </div>
           {myPackages.length > 0 ? (
-            <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+            <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {myPackages.map((pkg) => (
                 <li key={pkg.id}>
                   <Link

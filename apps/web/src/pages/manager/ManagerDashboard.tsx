@@ -97,7 +97,7 @@ export function ManagerDashboard() {
                     tone={d.pendingRetakes ? 'warning' : 'primary'}
                   />
                 </div>
-                <section aria-label="دسترسی سریع" className="grid gap-3 sm:grid-cols-3">
+                <section aria-label="دسترسی سریع" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <QuickAction
                     to="/manager/members"
                     label="تیم من"

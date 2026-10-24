@@ -119,7 +119,7 @@ export function PushAutomationTracePage() {
 
       {userId && trace.isPending && <Skeleton className="h-40" />}
       {userId && trace.data && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card className="flex flex-col gap-2">
             <h2 className="text-sm font-extrabold text-text">
               {trace.data.name}

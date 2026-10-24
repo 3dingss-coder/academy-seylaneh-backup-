@@ -29,7 +29,7 @@ export function ArchivePage() {
         title="آرشیو"
         subtitle="کاربران و گزارش‌های حذف‌شده. حذف از آرشیو، اطلاعات را برای همیشه از دیتابیس پاک می‌کند."
       />
-      <section aria-label="خلاصهٔ آرشیو" className="grid gap-3 sm:grid-cols-2">
+      <section aria-label="خلاصهٔ آرشیو" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <KpiCard
           title="حساب‌های لیست سیاه"
           value={users.data ? toPersianDigits(users.data.length) : '—'}

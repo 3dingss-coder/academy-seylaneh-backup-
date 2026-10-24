@@ -170,7 +170,7 @@ export function AdminRetakeRequestsPage() {
         />
       </Card>
 
-      <section aria-label="خلاصهٔ درخواست‌ها" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="خلاصهٔ درخواست‌ها" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="در انتظار بررسی"
           value={queries[0]?.data ? faNumber(pending.length) : '—'}
@@ -535,7 +535,7 @@ function RequestDetails({
         </div>
         <StatusPill status={item.status} />
       </div>
-      <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_1fr_0.8fr]">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_1fr_0.8fr]">
         <div className="rounded-xl border border-border bg-white p-4">
           <h3 className="flex items-center gap-2 text-sm font-extrabold text-text">
             <UserRound className="size-4 text-primary-fg" aria-hidden /> اطلاعات عضو

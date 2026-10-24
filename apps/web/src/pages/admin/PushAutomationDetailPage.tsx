@@ -328,7 +328,7 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
         </Card>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-4">
           {editing && draft ? (
             <Wizard
@@ -358,7 +358,7 @@ function Existing({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }) 
           ) : (
             <Definition det={det} meta={meta} />
           )}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <RunsCard runs={runs.data} loading={runs.isPending} ruleKey={det.key} />
             <RevisionsCard
               revisions={revisions.data}
@@ -528,7 +528,7 @@ function Definition({ det, meta }: { det: DetailMeta; meta: CatalogMeta | null }
   const draft = draftFromDetail(det);
   const fields = TRIGGER_FIELDS[draft.triggerKind] ?? [];
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card className="flex flex-col gap-2">
         <h2 className="text-sm font-extrabold text-text">۱) چیست</h2>
         <p className="text-sm leading-7 text-text-secondary">{det.description}</p>
@@ -706,7 +706,7 @@ function Wizard({
       />
 
       {step === 'what' && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="کلید (لاتین، یکتا)"
             value={draft.key}
@@ -747,7 +747,7 @@ function Wizard({
       )}
 
       {step === 'when' && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="نوع تریگر"
             value={draft.triggerKind}
@@ -826,7 +826,7 @@ function Wizard({
             <div className="flex flex-col gap-2 sm:col-span-2">
               <p className="text-sm font-semibold text-text">شرط‌ها (همه باید برقرار باشند)</p>
               {draft.conditions.map((c, i) => (
-                <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]">
+                <div key={i} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]">
                   <Select
                     label={`داده ${toFa(i + 1)}`}
                     value={c.field}
@@ -890,7 +890,7 @@ function Wizard({
       )}
 
       {step === 'who' && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="مخاطب"
             value={draft.audienceType}
@@ -978,7 +978,7 @@ function Wizard({
       )}
 
       {step === 'wording' && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-3">
             <Textarea
               label="عنوان اعلان"
@@ -1050,7 +1050,7 @@ function Wizard({
           </div>
 
           <div className="flex min-w-0 flex-col gap-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Select
                 label="اولویت"
                 value={draft.priority}
@@ -1086,7 +1086,7 @@ function Wizard({
                 ltr
               />
             </div>
-            <div className="grid gap-1 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               <Bool label="پوش ارسال شود" checked={draft.push} onChange={set('push')} />
               <Bool
                 label="کارت داخل اپ ساخته شود"

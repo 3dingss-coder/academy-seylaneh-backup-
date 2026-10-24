@@ -130,7 +130,7 @@ export function ManagerProfileCompletionPage() {
               <h2 className="mb-3 flex items-center gap-2 font-extrabold text-[#143f36]">
                 <KeyRound className="size-5" aria-hidden /> رمز شخصی
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input
                   label="رمز جدید"
                   type="password"

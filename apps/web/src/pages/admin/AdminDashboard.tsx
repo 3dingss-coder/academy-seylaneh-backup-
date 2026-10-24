@@ -170,7 +170,7 @@ function DashboardContent({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(250px,1.32fr)_repeat(4,minmax(0,1fr))]">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(250px,1.32fr)_repeat(4,minmax(0,1fr))]">
         <WelcomeCard totalUsers={totalUsers} activeUsers={activeUsers} onCreate={onCreate} />
         <MetricCard
           title="کل کاربران"
@@ -426,16 +426,16 @@ function OverviewTab({
 }) {
   return (
     <div role="tabpanel" className="flex flex-col gap-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
         <ActivityChart data={data.insights?.activityTrend ?? []} period={period} />
         <RoleDistribution counts={roleCounts} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <RecentUsers data={data.insights?.users.recent ?? []} />
         <RecentPackages packages={packages} />
         <RecentActivity activities={activities.slice(0, 5)} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MiniStat
           label="نرخ فعال‌سازی"
           value={faPercent(data.kpis.activationRate)}
@@ -479,7 +479,7 @@ function UsersTab({
   roleCounts: Record<Role, number>;
 }) {
   return (
-    <div role="tabpanel" className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.5fr)]">
+    <div role="tabpanel" className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.5fr)]">
       <RoleDistribution counts={roleCounts} />
       <RecentUsers data={data.insights?.users.recent ?? []} expanded />
       <div className="xl:col-span-2">
@@ -525,7 +525,7 @@ function EngagementTab({
 }) {
   return (
     <div role="tabpanel" className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MiniStat
           label="WAU / MAU"
           value={faPercent(data.kpis.wauMau)}
@@ -583,7 +583,7 @@ function MessagesTab({
   );
   return (
     <div role="tabpanel" className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map(([label, value, note]) => (
           <Link
             key={label}
@@ -596,7 +596,7 @@ function MessagesTab({
           </Link>
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <RecentActivity activities={communicationEvents} title="آخرین اتفاقات پیام‌رسانی" />
         <Card className="flex flex-col justify-between gap-4 bg-gradient-to-br from-white to-[#f3faf5]">
           <div>
@@ -639,7 +639,7 @@ function ActivityTab({
   activities: AdminDashboardActivity[];
 }) {
   return (
-    <div role="tabpanel" className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)]">
+    <div role="tabpanel" className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)]">
       <RecentActivity activities={activities} expanded title="آخرین فعالیت‌های اپلیکیشن و پنل" />
       <div className="flex flex-col gap-3">
         <MiniStat
@@ -1260,18 +1260,18 @@ function relativeTime(value: string) {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-label="در حال بارگذاری داشبورد">
-      <div className="grid gap-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-40 rounded-2xl" />
         ))}
       </div>
       <Skeleton className="h-20 rounded-2xl" />
-      <div className="grid gap-4 xl:grid-cols-[1.5fr_0.9fr]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_0.9fr]">
         {Array.from({ length: 2 }, (_, i) => (
           <Skeleton key={i} className="h-80 rounded-2xl" />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-72 rounded-2xl" />
         ))}

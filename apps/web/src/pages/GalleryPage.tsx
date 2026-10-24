@@ -163,7 +163,7 @@ export function GalleryPage() {
           </Section>
 
           <Section title="فیلدهای ورودی">
-            <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 max-w-3xl gap-4 sm:grid-cols-2">
               <Input label="نام و نام خانوادگی" placeholder="مثلاً علی رضایی" autoComplete="name" />
               <Input
                 label="شماره موبایل"
@@ -180,7 +180,7 @@ export function GalleryPage() {
           </Section>
 
           <Section title="کارت، پیشرفت و مهلت">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Card className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-bold">آموزش نمونه</span>
@@ -223,7 +223,7 @@ export function GalleryPage() {
           </Section>
 
           <Section title="کارت‌های شاخص (پنل مدیر)">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <KpiCard title="درصد تکمیل تیم" value="۷۲٪" icon={Percent} subtitle="هفته جاری" />
               <KpiCard title="عقب‌مانده‌ها" value="۸ نفر" icon={UserX} tone="warning" />
               <KpiCard title="میانگین تأخیر" value="۲ روز" icon={Hourglass} tone="danger" />
@@ -231,7 +231,7 @@ export function GalleryPage() {
           </Section>
 
           <Section title="حالت‌های بارگذاری، خالی و خطا">
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <LoadingRegion>
                 <PackageCardSkeleton />
               </LoadingRegion>

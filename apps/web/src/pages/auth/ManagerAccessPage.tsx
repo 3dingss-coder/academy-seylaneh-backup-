@@ -413,7 +413,7 @@ export function ManagerAccessPage() {
                   <h2 className="mb-3 flex items-center gap-2 text-sm font-black text-[#174d3b]">
                     <UserRound className="size-4" aria-hidden /> اطلاعات هویتی
                   </h2>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Input
                       label="نام و نام خانوادگی"
                       autoComplete="name"
@@ -503,7 +503,7 @@ export function ManagerAccessPage() {
                   {errors.avatar && (
                     <p className="mt-2 text-xs font-semibold text-danger-fg">{errors.avatar}</p>
                   )}
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Input
                       label="رمز عبور برای ورود بعد از تأیید"
                       type="password"

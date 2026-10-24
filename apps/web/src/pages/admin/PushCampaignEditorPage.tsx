@@ -406,7 +406,7 @@ function Editor({
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-4" aria-label="اطلاعات کمپین">
             <h2 className="text-base font-extrabold text-text">۱. اطلاعات کمپین</h2>
@@ -520,7 +520,7 @@ function Editor({
               یا این صفحه روی اجرای آن اثری ندارد. سرور هر ۱۵ دقیقه کمپین‌های سررسیده را بررسی
               می‌کند.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <JalaliDateField
                 label="تاریخ ارسال"
                 mode="date"
@@ -752,7 +752,7 @@ function ReadOnlyResults({ detail }: { detail: CampaignDetail }) {
   const { campaign: c, batches } = detail;
   const s = c.summary;
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
       <Card className="flex flex-col gap-4" aria-label="نتیجه ارسال">
         <h2 className="text-base font-extrabold text-text">گزارش ارسال</h2>
         <div className="grid grid-cols-2 gap-3 text-sm">

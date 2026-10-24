@@ -402,7 +402,7 @@ function ManagerExecutiveReport() {
           }
         />
       </div>
-      <Card className="grid gap-3 border-[#dce8de] bg-white/90 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
+      <Card className="grid grid-cols-1 gap-3 border-[#dce8de] bg-white/90 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
         <Select
           label="بازه زمانی"
           value={filters.period}
@@ -533,7 +533,7 @@ function ManagerExecutiveReport() {
               tone="info"
             />
           </div>
-          <Card className="grid gap-4 border-[#dce8de] bg-white/95 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] print:break-inside-avoid">
+          <Card className="grid grid-cols-1 gap-4 border-[#dce8de] bg-white/95 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] print:break-inside-avoid">
             <section aria-labelledby="report-trend-title" className="flex min-w-0 flex-col gap-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -585,7 +585,7 @@ function ManagerExecutiveReport() {
               </div>
             </section>
           </Card>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <PerformanceTable products={snapshot.products} />
             <RegionTable regions={snapshot.regions} />
           </div>

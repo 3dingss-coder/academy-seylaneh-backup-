@@ -168,7 +168,7 @@ export function AdminProfilePage() {
       </div>
 
       {tab === 'profile' && (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
           <Card tone="brand" className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-4">
               <div className="relative">
@@ -211,7 +211,7 @@ export function AdminProfilePage() {
             </div>
             <form
               onSubmit={saveName}
-              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+              className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
             >
               <Input
                 label="نام نمایشی"
@@ -258,7 +258,7 @@ export function AdminProfilePage() {
       )}
 
       {tab === 'notifications' && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <PushOptIn />
           <NotificationPrefsCard />
         </div>

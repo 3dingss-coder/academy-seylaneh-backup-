@@ -96,7 +96,7 @@ export function PackageFormDialog({
           onChange={(e) => setDescription(e.target.value)}
           error={errors.description}
         />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="برند"
             value={brandId}
@@ -134,7 +134,7 @@ export function PackageFormDialog({
               ))}
           </Select>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="زمان تقریبی (دقیقه)"
             type="number"

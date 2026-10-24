@@ -81,7 +81,7 @@ function PolicyForm({ initial }: { initial: PolicyData }) {
   });
   return (
     <form
-      className="grid gap-4 lg:grid-cols-2"
+      className="grid grid-cols-1 gap-4 lg:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         m.mutate();

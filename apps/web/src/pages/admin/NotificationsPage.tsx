@@ -126,7 +126,7 @@ function Inbox() {
           return (
             <div className="flex flex-col gap-3">
               <Card className="flex flex-col gap-3 p-3">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_minmax(170px,0.65fr)_minmax(170px,0.65fr)]">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_minmax(170px,0.65fr)_minmax(170px,0.65fr)]">
                   <Input
                     label="جستجو در اعلان‌ها"
                     value={search}
@@ -240,7 +240,7 @@ function Templates() {
     <>
       <QueryState query={q} loading={<TableSkeleton rows={6} />}>
         {(list) => (
-          <ul className="grid gap-2 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {list.map((t) => (
               <li key={t.key}>
                 <Card className="flex h-full flex-col gap-1">
@@ -404,7 +404,7 @@ function ManualSend() {
         </div>
       </Card>
       <Card className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="مخاطب"
             value={audience}

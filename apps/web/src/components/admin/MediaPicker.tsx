@@ -71,7 +71,7 @@ export function MediaPicker({
         </Button>
       }
     >
-      <div className="mb-3 grid gap-3 sm:grid-cols-2">
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Select label="برند" value={brand} onChange={(e) => setBrand(e.target.value)}>
           <option value="">همه برندها</option>
           {(brands.data ?? [])

@@ -226,7 +226,7 @@ export function ManagerMembersPage() {
                 />
               </div>
 
-              <Card className="grid gap-3 lg:grid-cols-[minmax(15rem,1.5fr)_repeat(3,minmax(0,1fr))]">
+              <Card className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(15rem,1.5fr)_repeat(3,minmax(0,1fr))]">
                 <Input
                   label="جست‌وجوی عضو"
                   value={search}

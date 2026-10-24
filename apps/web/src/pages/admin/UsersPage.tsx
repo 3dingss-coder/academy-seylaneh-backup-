@@ -116,7 +116,7 @@ export function UsersPage() {
         <ManagerAccessRequestsPanel />
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             <Input
               label="جستجو"
               value={q}
@@ -420,7 +420,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label="نام"
               value={firstName}
@@ -449,7 +449,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             autoComplete="tel"
             disabled={create.isPending}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               label="نقش"
               value={role}
@@ -688,7 +688,7 @@ function UserDialog({
           onChange={(e) => setName(e.target.value)}
           error={errors.name}
         />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Select
             label="نقش"
             value={role}
@@ -911,7 +911,7 @@ function AdminUserWorkspace({ data }: { data: Timeline }) {
       />
 
       {tab === 'overview' ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
           <Card className="flex flex-col gap-3">
             <h3 className="flex items-center gap-2 font-extrabold text-[#143f36]">
               <UserRound className="size-5 text-primary-fg" aria-hidden /> اطلاعات حساب
@@ -988,7 +988,7 @@ function AdminUserWorkspace({ data }: { data: Timeline }) {
                 هنوز پیام یا یادداشتی ثبت نشده است.
               </p>
             ) : (
-              <ul className="mt-3 grid gap-2 md:grid-cols-2">
+              <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                 {[...messages]
                   .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
                   .slice(0, 4)
@@ -1049,7 +1049,7 @@ function UserMessageHistory({ data }: { data: Timeline }) {
       description="پیام‌ها و یادداشت‌های مرتبط با پرونده در این بخش نمایش داده می‌شوند."
     />
   ) : (
-    <ul className="grid gap-3 xl:grid-cols-2">
+    <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
       {[...data.messages]
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map((message) => (

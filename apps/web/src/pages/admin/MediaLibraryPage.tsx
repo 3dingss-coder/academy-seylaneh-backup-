@@ -157,7 +157,7 @@ export function MediaLibraryPage() {
       <div
         role="region"
         aria-label="مرور کتابخانه رسانه"
-        className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
+        className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
         dir="rtl"
       >
         <section className="order-2 min-w-0 lg:order-1" aria-labelledby="media-results-heading">
@@ -192,7 +192,7 @@ export function MediaLibraryPage() {
             }
           >
             {(items) => (
-              <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {items.map((it) => (
                   <li key={it.id}>
                     <MediaCard item={it} onOpen={() => setSelected(it)} />
@@ -334,7 +334,7 @@ function UploadPanel() {
           }}
         />
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Select
           label="اختصاص فایل‌های جدید به برند (اختیاری)"
           value={brandId}
@@ -756,7 +756,7 @@ function ItemModal({ item, onClose }: { item: LibraryItem; onClose: () => void }
             onChange={(e) => setTitle(e.target.value)}
             maxLength={160}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               label="برند"
               value={brandId}

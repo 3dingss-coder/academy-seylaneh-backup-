@@ -549,7 +549,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
         </Card>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)] xl:items-start">
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-4" aria-label="اطلاعات کمپین">
             <div className="flex items-center gap-2">
@@ -580,7 +580,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
               onChange={(event) => set('body', event.target.value)}
               error={errors.body}
             />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 label="تصویر اعلان (اختیاری)"
                 dir="ltr"
@@ -603,7 +603,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
                 <option value="/profile">پروفایل</option>
               </Select>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Select
                 label="مخاطبان"
                 value="team"

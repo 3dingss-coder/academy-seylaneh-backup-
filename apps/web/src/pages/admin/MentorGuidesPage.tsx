@@ -168,7 +168,7 @@ export function MentorGuidesPage() {
       ) : rest.length === 0 ? (
         <EmptyState title="موردی پیدا نشد" />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {rest.map((r) => (
             <GuideRowCard
               key={r.key}

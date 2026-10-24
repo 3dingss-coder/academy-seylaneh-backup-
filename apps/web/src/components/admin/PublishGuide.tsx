@@ -64,7 +64,7 @@ export function PublishGuide({
           هر آموزش همین مسیر را طی می‌کند. هر قدم دکمه خودش را دارد.
         </p>
       </div>
-      <ol className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ol className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((s, i) => (
           <li
             key={s.title}

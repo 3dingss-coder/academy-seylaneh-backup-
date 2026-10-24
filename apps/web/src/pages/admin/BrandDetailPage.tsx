@@ -548,7 +548,7 @@ function BrandOverview({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.1fr]">
         <Card className="min-w-0">
           <SectionHeading title="محصولات برند" action="مشاهده همه" onClick={onViewProducts} />
           {products.length ? (
@@ -580,7 +580,7 @@ function BrandOverview({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <BrandMembersCard
           members={members}
           teamNames={teamNames}
@@ -961,7 +961,7 @@ function ProductsSection({
         </div>
       </div>
       {pending ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }, (_, index) => (
             <Skeleton key={index} className="h-56" />
           ))}
@@ -973,7 +973,7 @@ function ProductsSection({
           onAction={onNewProduct}
         />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => (
             <li key={product.id}>
               <Card className={cn('flex h-full flex-col gap-3', product.archived && 'opacity-60')}>
@@ -1203,7 +1203,7 @@ function MembersSection({
         </Link>
       </div>
       {members.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {members.map((member) => (
             <li key={member.id}>
               <Link
@@ -1282,7 +1282,7 @@ function SettingsSection({
   onGuide: () => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <h2 className="font-bold text-[#173e35]">اطلاعات برند</h2>
         <dl className="mt-3 divide-y divide-border text-sm">
@@ -1529,7 +1529,7 @@ function ProductFormDialog({
           onChange={(e) => setName(e.target.value)}
           error={errors.name}
         />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="کد کالا"
             ltr

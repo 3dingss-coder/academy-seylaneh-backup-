@@ -356,7 +356,7 @@ function RequestCard({
         </span>
       </div>
 
-      <div className="grid gap-2 rounded-2xl bg-[#f8faf6] p-3 text-sm sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 rounded-2xl bg-[#f8faf6] p-3 text-sm sm:grid-cols-2">
         <InfoRow
           icon={<Phone className="size-4" />}
           label="شماره موبایل"

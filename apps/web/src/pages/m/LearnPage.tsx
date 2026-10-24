@@ -168,7 +168,7 @@ export function LearnPage() {
         <QueryState
           query={q}
           loading={
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <PackageCardSkeleton />
               <PackageCardSkeleton />
               <PackageCardSkeleton />
@@ -202,7 +202,7 @@ export function LearnPage() {
                     {items.length.toLocaleString('fa-IR')} آموزش
                   </p>
                 </div>
-                <div key={`${tab}-${brand}`} className="stagger grid gap-3 md:grid-cols-2">
+                <div key={`${tab}-${brand}`} className="stagger grid grid-cols-1 gap-3 md:grid-cols-2">
                   {items.map((p) => (
                     <PackageCard key={p.id} p={p} layout="education" />
                   ))}

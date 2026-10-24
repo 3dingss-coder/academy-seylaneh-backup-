@@ -384,7 +384,7 @@ function GuideForm({
               className="size-5 accent-primary"
             />
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               label="لحن گفتار منتور"
               value={g.tone}
@@ -556,7 +556,7 @@ function GuideForm({
             className="pressable flex min-h-12 items-center justify-between gap-2 text-sm font-bold text-text"
           >
             <span className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" aria-hidden />
+              <Sparkles className="size-4 text-primary-fg" aria-hidden />
               پیش‌نمایش: متنی که به منتور داده می‌شود
             </span>
             <span className="flex items-center gap-2 text-xs font-normal text-text-secondary">

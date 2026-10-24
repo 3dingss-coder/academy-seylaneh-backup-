@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Bot, Check, CircleDashed, Globe, Pencil, Search, Sparkles, Tags } from 'lucide-react';
-import { Button, Card, EmptyState, Input, Skeleton, StatusBadge } from '@/components/ui';
+import { Button, Card, EmptyState, Input, KpiCard, Skeleton, StatusBadge } from '@/components/ui';
 import { Tabs } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ProductImage } from '@/components/common/ProductImage';
@@ -44,10 +44,13 @@ export function MentorGuidesPage() {
   const globalRow = list.find((r) => r.kind === 'global');
   const rest = list.filter((r) => r.kind !== 'global');
   const definedCount = rest.filter((r) => r.defined).length;
+  const inheritedCount = rest.length - definedCount;
+  const enabledCount = rest.filter((r) => r.defined && r.enabled).length;
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="رفتار منتور"
         subtitle="برای هر برند و هر محصول تعریف کن منتور چطور حرف بزند و چه اطلاعاتی بدهد"
       />
@@ -56,7 +59,7 @@ export function MentorGuidesPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-light">
-              <Bot className="size-6 text-primary" aria-hidden />
+              <Bot className="size-6 text-primary-fg" aria-hidden />
             </span>
             <div className="min-w-0">
               <h2 className="font-bold">رفتار پیش‌فرض منتور</h2>
@@ -83,6 +86,39 @@ export function MentorGuidesPage() {
           </div>
         )}
       </Card>
+
+      <section
+        aria-label="خلاصهٔ رفتار منتور"
+        className="stagger grid grid-cols-2 gap-3 xl:grid-cols-4"
+      >
+        <KpiCard
+          title="راهنماهای برند و محصول"
+          value={rows.data ? toPersianDigits(rest.length) : '—'}
+          subtitle="در نتایج فیلترشده"
+          icon={Bot}
+        />
+        <KpiCard
+          title="تعریف‌شده"
+          value={rows.data ? toPersianDigits(definedCount) : '—'}
+          subtitle="از نتایج فیلترشده"
+          icon={Check}
+          tone="info"
+        />
+        <KpiCard
+          title="استفاده از پیش‌فرض"
+          value={rows.data ? toPersianDigits(inheritedCount) : '—'}
+          subtitle="از نتایج فیلترشده"
+          icon={CircleDashed}
+          tone="warning"
+        />
+        <KpiCard
+          title="روشن و فعال"
+          value={rows.data ? toPersianDigits(enabledCount) : '—'}
+          subtitle="از میان راهنماهای تعریف‌شده"
+          icon={Sparkles}
+          tone="primary"
+        />
+      </section>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
@@ -132,7 +168,7 @@ export function MentorGuidesPage() {
       ) : rest.length === 0 ? (
         <EmptyState title="موردی پیدا نشد" />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {rest.map((r) => (
             <GuideRowCard
               key={r.key}

@@ -21,6 +21,7 @@ export function PoliciesPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="سیاست‌ها"
         subtitle="تغییرات فقط روی تلاش‌ها و رویدادهای جدید اعمال می‌شود"
       />
@@ -80,7 +81,7 @@ function PolicyForm({ initial }: { initial: PolicyData }) {
   });
   return (
     <form
-      className="grid gap-4 lg:grid-cols-2"
+      className="grid grid-cols-1 gap-4 lg:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         m.mutate();

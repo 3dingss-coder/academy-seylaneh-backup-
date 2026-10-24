@@ -218,7 +218,7 @@ export function PushAutomationsPanel() {
             <div className="ms-auto flex flex-wrap items-center gap-2">
               <Link
                 to="/admin/push-campaigns/automations/new"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-input border border-primary/70 bg-surface px-3 text-sm font-bold text-primary hover:bg-primary-light"
+                className="inline-flex min-h-12 items-center gap-1.5 rounded-input border border-primary/70 bg-surface px-3 text-sm font-bold text-primary-fg hover:bg-primary-light"
               >
                 <Plus className="size-4" aria-hidden />
                 اتوماسیون دست‌ساز
@@ -258,14 +258,14 @@ export function PushAutomationsPanel() {
                   it do» and «why not for this person», so they live next to the switches. */}
               <Link
                 to="/admin/push-campaigns/automations/runs"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-input border border-border bg-surface px-3 text-sm font-bold text-text-secondary hover:bg-surface-2 hover:text-primary"
+                className="inline-flex min-h-12 items-center gap-1.5 rounded-input border border-border bg-surface px-3 text-sm font-bold text-text-secondary hover:bg-surface-2 hover:text-primary-fg"
               >
                 <History className="size-4" aria-hidden />
                 تاریخچه اجراها
               </Link>
               <Link
                 to="/admin/push-campaigns/automations/trace"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-input border border-border bg-surface px-3 text-sm font-bold text-text-secondary hover:bg-surface-2 hover:text-primary"
+                className="inline-flex min-h-12 items-center gap-1.5 rounded-input border border-border bg-surface px-3 text-sm font-bold text-text-secondary hover:bg-surface-2 hover:text-primary-fg"
               >
                 <UserSearch className="size-4" aria-hidden />
                 ردیابی کاربر
@@ -479,7 +479,7 @@ function HealthCard({
 }) {
   if (loading || !health)
     return (
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-24" />
         ))}
@@ -487,7 +487,10 @@ function HealthCard({
     );
   const items = healthItems(health, settings);
   return (
-    <section aria-label="سلامت اتوماسیون" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section
+      aria-label="سلامت اتوماسیون"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
       {items.map((it) => (
         <KpiCard
           key={it.id}
@@ -528,7 +531,7 @@ function AutomationTable({
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 to={`/admin/push-campaigns/automations/${r.key}`}
-                className="truncate text-sm font-extrabold text-text hover:text-primary hover:underline"
+                className="truncate text-sm font-extrabold text-text hover:text-primary-fg hover:underline"
               >
                 {r.name}
               </Link>
@@ -848,7 +851,7 @@ function CapsDialog({
           سه مقدار روزانه/هفتگی/فاصله برای سازگاری با نسخه‌های قبلی نگه داشته شده‌اند و دیگر گیت
           اجرای اتوماسیون نیستند. محدودیت ارسال را روی خودِ هر قانون تعریف کنید.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {field('maxPerUserPerDay', 'مقدار قدیمی سقف روزانه', 'در اجرای Rule اعمال نمی‌شود')}
           {field('maxPerUserPerWeek', 'مقدار قدیمی سقف هفتگی', 'در اجرای Rule اعمال نمی‌شود')}
           {field('gapMinutes', 'مقدار قدیمی فاصله سراسری (دقیقه)', 'در اجرای Rule اعمال نمی‌شود')}
@@ -990,7 +993,7 @@ function MigrateDialog({ onClose, onChanged }: { onClose: () => void; onChanged:
 function PanelSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-24" />
         ))}

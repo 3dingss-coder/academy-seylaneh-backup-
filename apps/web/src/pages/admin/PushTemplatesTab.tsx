@@ -38,7 +38,7 @@ export function PushTemplatesTab() {
           onAction={() => setCategory(ALL)}
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {shown.map((t) => (
             <li key={t.id}>
               <TemplateCard
@@ -82,9 +82,9 @@ export function CategoryFilter({
           aria-pressed={value === c.value}
           onClick={() => onChange(c.value)}
           className={cn(
-            'pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-bold whitespace-nowrap',
+            'pressable inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-bold whitespace-nowrap',
             value === c.value
-              ? 'border-primary bg-primary bg-brand-gradient text-on-primary shadow-sm'
+              ? 'border-primary bg-cta bg-brand-gradient text-on-cta shadow-sm'
               : 'border-border bg-surface text-text-secondary hover:bg-surface-2',
           )}
         >

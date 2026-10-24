@@ -144,7 +144,7 @@ export function PushCampaignsPage() {
       <QueryState
         query={dash}
         loading={
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }, (_, i) => (
               <Card key={i} className="h-24 animate-pulse" aria-hidden />
             ))}
@@ -152,7 +152,10 @@ export function PushCampaignsPage() {
         }
       >
         {(d) => (
-          <section aria-label="خلاصه کمپین‌ها" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section
+            aria-label="خلاصه کمپین‌ها"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
             <KpiCard title="کل کمپین‌ها" value={faNumber(d.counts.total)} icon={Megaphone} />
             <KpiCard
               title="پیش‌نویس"
@@ -266,6 +269,7 @@ export function PushCampaignsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        variant="admin"
         title="کمپین‌های اعلان (Push)"
         subtitle="ساخت، زمان‌بندی، ارسال و گزارش نتیجه اعلان‌های سیستمی"
         actions={

@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  PartyPopper,
   RotateCcw,
   Send,
   Sparkles,
@@ -22,6 +21,7 @@ import {
   Skeleton,
   useToast,
 } from '@/components/ui';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { PageHeader } from '@/components/common/PageHeader';
 import { RememberPage } from '@/lib/pageContext';
 import { QueryState } from '@/components/common/QueryState';
@@ -199,11 +199,11 @@ function QuizFlow({
   // ── M8 result ──
   if (result) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
         {header}
         <Card
           tone={result.passed ? 'brand' : 'default'}
-          className="relative flex flex-col items-center gap-2 overflow-hidden py-6 text-center"
+          className="relative flex flex-col items-center gap-2 overflow-hidden !rounded-hero border-marketer-border bg-marketer-surface py-7 text-center shadow-md"
           data-testid="quiz-result"
         >
           {result.passed && <Confetti />}
@@ -215,19 +215,20 @@ function QuizFlow({
             tone={result.passed ? 'success' : 'danger'}
             center={
               <span className="absolute flex flex-col items-center leading-tight">
-                {result.passed ? (
-                  <PartyPopper className="animate-pop size-7 text-primary" aria-hidden />
-                ) : (
-                  <XCircle className="animate-shake size-7 text-danger" aria-hidden />
-                )}
-                <span className="text-xl font-extrabold text-text">{faPercent(result.score)}</span>
+                <MarketerIcon
+                  name={result.passed ? 'quiz-passed' : 'quiz-retry'}
+                  className={cn('size-7', result.passed ? 'animate-pop' : 'animate-shake')}
+                />
+                <span className="text-xl font-extrabold text-marketer-ink">
+                  {faPercent(result.score)}
+                </span>
               </span>
             }
           />
-          <h2 className="mt-1 text-xl font-bold text-text">
+          <h2 className="mt-1 text-xl font-bold text-marketer-ink">
             {result.passed ? 'قبول شدی! 🎉' : 'این بار قبول نشدی'}
           </h2>
-          <p className="text-sm text-text-secondary">
+          <p className="text-sm text-marketer-muted">
             {toPersianDigits(result.correctCount)} پاسخ درست از {toPersianDigits(result.total)} •
             نمره قبولی {faPercent(result.passScore)}
           </p>
@@ -237,7 +238,7 @@ function QuizFlow({
             </p>
           )}
           {!result.passed && (
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-marketer-muted">
               برای تلاش بعدی، یک بار ویدیو را ببین یا پادکست را گوش بده.
               {result.remainingAttempts > 0 &&
                 ` (${toPersianDigits(result.remainingAttempts)} فرصت دیگر داری)`}
@@ -245,7 +246,8 @@ function QuizFlow({
           )}
         </Card>
         <section aria-labelledby="review" className="flex flex-col gap-2">
-          <h3 id="review" className="text-base font-bold">
+          <h3 id="review" className="flex items-center gap-2 text-base font-bold">
+            <MarketerIcon name="quiz-review" className="size-6" />
             مرور پاسخ‌ها
           </h3>
           <div className="stagger flex flex-col gap-2">
@@ -255,7 +257,7 @@ function QuizFlow({
                 <Card
                   key={r.questionId}
                   className={cn(
-                    'flex gap-3 border-s-4',
+                    'flex gap-3 !rounded-card border-s-4 bg-marketer-surface shadow-xs',
                     r.correct ? 'border-s-success' : 'border-s-danger',
                   )}
                 >
@@ -271,11 +273,11 @@ function QuizFlow({
                     />
                   )}
                   <div className="text-sm">
-                    <p className="font-bold text-text">
+                    <p className="font-bold text-marketer-ink">
                       {toPersianDigits(i + 1)}. {qq?.stem}
                     </p>
                     {r.explanation && (
-                      <p className="mt-1 leading-7 text-text-secondary">{r.explanation}</p>
+                      <p className="mt-1 leading-7 text-marketer-muted">{r.explanation}</p>
                     )}
                   </div>
                 </Card>
@@ -326,6 +328,7 @@ function QuizFlow({
             description={
               info.lastAttempt ? `نمره: ${faPercent(info.lastAttempt.score)}` : undefined
             }
+            illustration={<MarketerIcon name="quiz-passed" className="size-16" />}
           />
           <Button
             size="lg"
@@ -344,6 +347,7 @@ function QuizFlow({
           <EmptyState
             title="نمره‌ات زیر حد قبولی بود"
             description="یک بار ویدیو را ببین یا پادکست را گوش بده؛ بعد دوباره آزمون باز می‌شود."
+            illustration={<MarketerIcon name="quiz-retry" className="size-16" />}
           />
           <Button size="lg" block onClick={() => nav(`/packages/${d.quiz.packageId}`)}>
             رفتن به ویدیو و پادکست
@@ -355,6 +359,7 @@ function QuizFlow({
         <EmptyState
           title="در انتظار تأیید مدیر"
           description="درخواست آزمون مجددت ثبت شده است. بعد از تأیید، اینجا فعال می‌شود."
+          illustration={<MarketerIcon name="retake-pending" className="size-16" />}
         />
       );
     else if (!info.canAttempt)
@@ -363,6 +368,7 @@ function QuizFlow({
           <EmptyState
             title="فرصت‌های آزمون تمام شد"
             description="می‌توانی از مدیرت درخواست آزمون مجدد کنی."
+            illustration={<MarketerIcon name="quiz-retry" className="size-16" />}
           />
           <Button size="lg" block loading={retake.isPending} onClick={() => retake.mutate()}>
             درخواست آزمون مجدد از مدیر
@@ -374,12 +380,13 @@ function QuizFlow({
         <EmptyState
           title="آزمونی برای این قسمت تعریف نشده است"
           description="به مدیر اطلاع داده شد."
+          illustration={<MarketerIcon name="quiz-unavailable" className="size-16" />}
         />
       );
     else
       body = (
         <>
-          <Card className="flex flex-col gap-2 text-sm text-text">
+          <Card className="flex flex-col gap-2 !rounded-hero border-marketer-border bg-marketer-surface p-5 text-sm text-marketer-ink shadow-sm">
             <p>• {toPersianDigits(d.quiz.questionCount)} سؤال چهارگزینه‌ای</p>
             <p>• نمره قبولی: {faPercent(d.quiz.passScore)}</p>
             <p>
@@ -399,7 +406,7 @@ function QuizFlow({
         </>
       );
     return (
-      <div className="flex flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
         {header}
         {body}
       </div>
@@ -410,15 +417,15 @@ function QuizFlow({
   if (!q) return null;
   const last = idx === questions.length - 1;
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 rounded-hero bg-marketer-canvas p-1 sm:p-2">
       {header}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 rounded-card border border-marketer-border bg-marketer-surface p-3 shadow-xs">
         <ProgressBar
           value={((idx + 1) / questions.length) * 100}
           label="پیشرفت آزمون"
           className="flex-1"
         />
-        <span className="text-sm font-bold text-text-secondary">
+        <span className="text-sm font-bold text-marketer-muted">
           سؤال {toPersianDigits(idx + 1)} از {toPersianDigits(questions.length)}
         </span>
       </div>
@@ -427,18 +434,18 @@ function QuizFlow({
         className={dir === 'next' ? 'animate-slide-in-end' : 'animate-slide-in-start'}
       >
         <fieldset className="stagger flex flex-col gap-3">
-          <legend className="mb-3 text-lg font-bold leading-8 text-text">{q.stem}</legend>
+          <legend className="mb-3 text-lg font-bold leading-8 text-marketer-ink">{q.stem}</legend>
           {q.options.map((o) => {
             const checked = answers[q.id] === o.key;
             return (
               <label
                 key={o.key}
                 className={cn(
-                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-card border-2 bg-surface p-3 text-base',
+                  'pressable flex min-h-14 cursor-pointer items-center gap-3 rounded-card border-2 bg-marketer-surface p-3 text-base shadow-xs',
                   'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-info',
                   checked
-                    ? 'border-primary bg-primary-light shadow-sm'
-                    : 'border-border hover:border-primary/40 hover:shadow-xs',
+                    ? 'border-marketer-brand bg-marketer-brand-soft shadow-sm'
+                    : 'border-marketer-border hover:border-marketer-brand/40 hover:bg-marketer-surface-soft hover:shadow-xs',
                 )}
               >
                 <input
@@ -453,15 +460,15 @@ function QuizFlow({
                   className={cn(
                     'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-[transform,background-color] duration-200 ease-spring',
                     checked
-                      ? 'scale-110 bg-primary text-on-primary'
-                      : 'bg-surface-2 text-text-secondary',
+                      ? 'scale-110 bg-cta text-on-cta'
+                      : 'bg-marketer-surface-muted text-marketer-muted',
                   )}
                 >
                   {OPTION_LABEL[o.key] ?? o.key}
                 </span>
-                <span className="flex-1 text-text">{o.text}</span>
+                <span className="flex-1 text-marketer-ink">{o.text}</span>
                 {checked && (
-                  <CheckCircle2 className="animate-pop size-5 text-primary" aria-hidden />
+                  <CheckCircle2 className="animate-pop size-5 text-marketer-brand" aria-hidden />
                 )}
               </label>
             );
@@ -527,7 +534,7 @@ function QuizFlow({
           </>
         }
       >
-        <p className="text-sm text-text-secondary">بعد از ارسال نمی‌توانی پاسخ‌ها را تغییر بدهی.</p>
+        <p className="text-sm text-marketer-muted">بعد از ارسال نمی‌توانی پاسخ‌ها را تغییر بدهی.</p>
       </Modal>
     </div>
   );

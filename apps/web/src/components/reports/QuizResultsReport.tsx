@@ -434,6 +434,7 @@ export function QuizResultsReport({
             rows={accounts}
             rowKey={(a) => a.id}
             onRowClick={(a) => nav(memberLink(a.id))}
+            rowActionLabel={(a) => `نمایش نتایج آزمون ${a.first.userName}`}
             columns={[
               {
                 key: 'u',
@@ -526,6 +527,7 @@ export function QuizResultsReport({
           rows={attempts}
           rowKey={(r) => r.attemptId}
           onRowClick={(r) => nav(memberLink(r.userId))}
+          rowActionLabel={(r) => `نمایش تلاش آزمون ${r.userName}`}
           columns={[
             {
               key: 'u',

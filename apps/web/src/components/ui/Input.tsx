@@ -9,10 +9,22 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   icon?: ReactNode;
   /** Force LTR for phone/email/password while keeping the RTL layout. */
   ltr?: boolean;
+  /** Keep the label for screen readers only (placeholder stands in visually). */
+  hideLabel?: boolean;
   id?: string;
 }
 
-export function Input({ label, error, hint, icon, ltr, id, className, ...rest }: InputProps) {
+export function Input({
+  label,
+  error,
+  hint,
+  icon,
+  ltr,
+  hideLabel,
+  id,
+  className,
+  ...rest
+}: InputProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const errorId = `${inputId}-error`;
@@ -21,7 +33,10 @@ export function Input({ label, error, hint, icon, ltr, id, className, ...rest }:
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-semibold text-text">
+      <label
+        htmlFor={inputId}
+        className={hideLabel ? 'sr-only' : 'text-sm font-semibold text-text'}
+      >
         {label}
       </label>
       <div className="relative">

@@ -1,19 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Bot,
-  FileText,
-  ImagePlus,
-  Link2,
-  Mic,
-  PhoneCall,
-  Plus,
-  Send,
-  ThumbsDown,
-  ThumbsUp,
-  X,
-} from 'lucide-react';
+import { FileText, ImagePlus, Link2, PhoneCall, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { MarketerIcon } from '@/components/brand/MarketerIcon';
 import { Button, Skeleton, useToast } from '@/components/ui';
+import { Mascot } from '@/components/brand/Mascot';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { errMsg } from '@/lib/errors';
@@ -288,15 +278,19 @@ export function MentorChat({
   };
   const msgs = history.data ?? [];
   return (
-    <div className={cn('flex min-h-0 flex-col', className)}>
+    <div
+      className={cn(
+        'flex min-h-0 flex-col rounded-[24px] border border-marketer-border bg-marketer-surface p-3 shadow-[0_14px_34px_-30px_rgba(32,60,52,.38)]',
+        className,
+      )}
+    >
       <div className="flex-1 space-y-3 overflow-y-auto p-1" aria-live="polite">
         {history.isPending && <Skeleton className="h-16 w-3/4" />}
         {!history.isPending && msgs.length === 0 && !pending && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <span className="animate-float flex size-16 items-center justify-center rounded-full bg-hero shadow-md">
-              <Bot className="size-8 text-white" aria-hidden />
-            </span>
-            <p className="text-sm text-text-secondary">
+            {/* mentor state: the provided mascot greets, secondary to the suggestions */}
+            <Mascot mood="welcome" className="animate-float h-20 w-auto" />
+            <p className="text-sm text-marketer-muted">
               سؤالت درباره محصولات و آموزش‌ها را بپرس. فقط از محتوای تأییدشده جواب می‌دهم.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -305,7 +299,7 @@ export function MentorChat({
                   key={s}
                   type="button"
                   onClick={() => submit(undefined, s)}
-                  className="pressable min-h-12 rounded-full border border-border bg-surface px-4 text-sm text-text shadow-xs hover:border-primary/40 hover:bg-primary-light"
+                  className="pressable min-h-12 rounded-full border border-marketer-border bg-marketer-surface-soft px-4 text-sm text-marketer-ink shadow-xs hover:border-marketer-brand/40 hover:bg-marketer-brand-soft"
                 >
                   {s}
                 </button>
@@ -325,16 +319,16 @@ export function MentorChat({
               className={cn(
                 'max-w-[85%] whitespace-pre-line rounded-[18px] px-3.5 py-2 text-sm leading-7 shadow-xs',
                 m.role === 'user'
-                  ? 'rounded-se-md bg-primary bg-brand-gradient text-on-primary'
-                  : 'rounded-ee-md border border-border bg-surface text-text',
+                  ? 'rounded-se-md bg-cta bg-brand-gradient text-on-cta'
+                  : 'rounded-ee-md border border-marketer-border bg-marketer-surface text-marketer-ink',
               )}
             >
               {m.text}
               {m.mode === 'voice' && (
-                <span className="mt-1 block text-xs text-text-secondary">تماس صوتی</span>
+                <span className="mt-1 block text-xs text-marketer-muted">تماس صوتی</span>
               )}
               {(m.sources?.length ?? 0) > 0 && (
-                <p className="mt-1 text-xs text-text-secondary">
+                <p className="mt-1 text-xs text-marketer-muted">
                   منبع: {(m.sources ?? []).map((s) => s.title).join('، ')}
                 </p>
               )}
@@ -348,7 +342,7 @@ export function MentorChat({
                   onClick={() => fb.mutate({ messageId: m.id, feedback: 'up' })}
                   className={cn(
                     'flex size-12 items-center justify-center',
-                    m.feedback === 'up' ? 'text-primary' : 'text-muted-fg',
+                    m.feedback === 'up' ? 'text-marketer-brand' : 'text-marketer-muted',
                   )}
                 >
                   <ThumbsUp className="size-4" />
@@ -360,7 +354,7 @@ export function MentorChat({
                   onClick={() => fb.mutate({ messageId: m.id, feedback: 'down' })}
                   className={cn(
                     'flex size-12 items-center justify-center',
-                    m.feedback === 'down' ? 'text-danger' : 'text-muted-fg',
+                    m.feedback === 'down' ? 'text-danger' : 'text-marketer-muted',
                   )}
                 >
                   <ThumbsDown className="size-4" />
@@ -372,21 +366,21 @@ export function MentorChat({
         {pending && (
           <>
             <div className="animate-fade-up flex justify-start">
-              <div className="max-w-[85%] rounded-[18px] rounded-se-md bg-primary px-3.5 py-2 text-sm text-on-primary">
+              <div className="max-w-[85%] rounded-[18px] rounded-se-md bg-cta px-3.5 py-2 text-sm text-on-cta">
                 {pending}
               </div>
             </div>
             <div className="animate-fade-up flex justify-end">
               <div
                 role="status"
-                className="flex items-center gap-1 rounded-[18px] rounded-ee-md border border-border bg-surface px-4 py-3 text-text-secondary"
+                className="flex items-center gap-1 rounded-[18px] rounded-ee-md border border-marketer-border bg-marketer-surface px-4 py-3 text-marketer-muted"
               >
                 <span className="sr-only">در حال فکر کردن…</span>
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
                     aria-hidden
-                    className="animate-blink size-2 rounded-full bg-primary"
+                    className="animate-blink size-2 rounded-full bg-marketer-brand"
                     style={{ animationDelay: `${i * 160}ms` }}
                   />
                 ))}
@@ -401,7 +395,7 @@ export function MentorChat({
           {attachments.map((a, i) => (
             <span
               key={`${a.kind}-${i}`}
-              className="flex max-w-full items-center gap-1 rounded-full border border-border bg-surface px-2 py-1 text-xs text-text"
+              className="flex max-w-full items-center gap-1 rounded-full border border-marketer-border bg-marketer-surface px-2 py-1 text-xs text-marketer-ink"
             >
               {a.preview ? (
                 <img src={a.preview} alt="" className="size-8 rounded-full object-cover" />
@@ -410,7 +404,7 @@ export function MentorChat({
               <button
                 type="button"
                 aria-label="حذف پیوست"
-                className="flex size-8 items-center justify-center text-muted-fg"
+                className="flex size-12 items-center justify-center rounded-full text-marketer-muted hover:bg-marketer-surface-muted"
                 onClick={() => setAttachments((old) => old.filter((_, idx) => idx !== i))}
               >
                 <X className="size-3.5" />
@@ -421,7 +415,7 @@ export function MentorChat({
       )}
       <form
         onSubmit={submit}
-        className="mt-2 flex w-full min-w-0 items-center gap-1 border-t border-border pt-2"
+        className="mt-3 flex w-full min-w-0 items-center gap-1 rounded-[22px] border border-marketer-border bg-marketer-surface-soft p-2 shadow-inner"
       >
         <label htmlFor="mentor-input" className="sr-only">
           سؤال شما
@@ -432,7 +426,7 @@ export function MentorChat({
           maxLength={4000}
           onChange={(e) => setText(e.target.value)}
           placeholder={listening ? 'در حال شنیدن… بعد از سکوت ارسال می‌شود' : 'سؤالت را بنویس…'}
-          className="min-h-12 min-w-0 flex-1 rounded-full border border-border bg-surface px-3 text-base shadow-xs transition-[border-color,box-shadow] focus:border-info focus:outline-none focus:ring-4 focus:ring-info/15"
+          className="min-h-12 min-w-0 flex-1 rounded-full border border-marketer-border bg-marketer-surface px-3 text-base shadow-xs transition-[border-color,box-shadow] focus:border-info focus:outline-none focus:ring-4 focus:ring-info/15"
         />
         <div className="relative shrink-0">
           <Button
@@ -442,20 +436,20 @@ export function MentorChat({
             aria-expanded={plusOpen}
             onClick={() => setPlusOpen((v) => !v)}
             className="!size-12 !min-h-12 !px-0"
-            icon={<Plus className="size-5" aria-hidden />}
+            icon={<MarketerIcon name="mentor-plus" className="size-6" />}
           />
           {plusOpen && (
-            <div className="absolute bottom-full z-20 mb-2 flex w-56 max-w-[70vw] flex-col gap-1 rounded-card border border-border bg-surface p-2 shadow-md end-0">
+            <div className="absolute bottom-full z-20 mb-2 flex w-56 max-w-[70vw] flex-col gap-1 rounded-card border border-marketer-border bg-marketer-surface p-2 shadow-md end-0">
               <button
                 type="button"
-                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-surface-2"
+                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-marketer-surface-muted"
                 onClick={() => imageRef.current?.click()}
               >
                 <ImagePlus className="size-4" aria-hidden /> تصویر
               </button>
               <button
                 type="button"
-                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-surface-2"
+                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-marketer-surface-muted"
                 onClick={() => textRef.current?.click()}
               >
                 <FileText className="size-4" aria-hidden /> متن
@@ -466,7 +460,7 @@ export function MentorChat({
                   onChange={(e) => setLinkDraft(e.target.value)}
                   placeholder="لینک سایت"
                   aria-label="لینک سایت"
-                  className="min-h-12 flex-1 rounded-input border border-border px-2 text-sm"
+                  className="min-h-12 flex-1 rounded-input border border-marketer-border px-2 text-sm"
                 />
                 <button
                   type="button"
@@ -492,7 +486,7 @@ export function MentorChat({
               </div>
               <button
                 type="button"
-                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-surface-2"
+                className="flex min-h-12 items-center gap-2 rounded-input px-2 text-sm hover:bg-marketer-surface-muted"
                 onClick={() => {
                   setPlusOpen(false);
                   setCallOpen(true);
@@ -511,7 +505,11 @@ export function MentorChat({
           aria-pressed={listening}
           onClick={startMic}
           className="!size-12 !min-h-12 !px-0"
-          icon={<Mic className="size-5" aria-hidden />}
+          icon={
+            <span className="grid size-8 place-items-center rounded-full bg-white">
+              <MarketerIcon name="mentor-mic" className="size-6" />
+            </span>
+          }
         />
         <Button
           type="submit"
@@ -519,7 +517,11 @@ export function MentorChat({
           aria-label="ارسال"
           loading={send.isPending}
           disabled={!text.trim() && attachments.length === 0}
-          icon={<Send className="size-5" aria-hidden />}
+          icon={
+            <span className="grid size-8 place-items-center rounded-full bg-white">
+              <MarketerIcon name="mentor-send" className="size-6" />
+            </span>
+          }
         />
         <input
           ref={imageRef}

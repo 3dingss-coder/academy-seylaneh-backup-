@@ -170,7 +170,10 @@ export function AdminRetakeRequestsPage() {
         />
       </Card>
 
-      <section aria-label="خلاصهٔ درخواست‌ها" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="خلاصهٔ درخواست‌ها"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           title="در انتظار بررسی"
           value={queries[0]?.data ? faNumber(pending.length) : '—'}

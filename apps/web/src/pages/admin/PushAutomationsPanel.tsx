@@ -487,7 +487,10 @@ function HealthCard({
     );
   const items = healthItems(health, settings);
   return (
-    <section aria-label="سلامت اتوماسیون" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section
+      aria-label="سلامت اتوماسیون"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
       {items.map((it) => (
         <KpiCard
           key={it.id}

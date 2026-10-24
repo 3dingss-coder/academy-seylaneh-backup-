@@ -826,7 +826,10 @@ function Wizard({
             <div className="flex flex-col gap-2 sm:col-span-2">
               <p className="text-sm font-semibold text-text">شرط‌ها (همه باید برقرار باشند)</p>
               {draft.conditions.map((c, i) => (
-                <div key={i} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]">
+                <div
+                  key={i}
+                  className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]"
+                >
                   <Select
                     label={`داده ${toFa(i + 1)}`}
                     value={c.field}

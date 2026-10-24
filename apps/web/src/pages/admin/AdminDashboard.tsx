@@ -479,7 +479,10 @@ function UsersTab({
   roleCounts: Record<Role, number>;
 }) {
   return (
-    <div role="tabpanel" className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.5fr)]">
+    <div
+      role="tabpanel"
+      className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.5fr)]"
+    >
       <RoleDistribution counts={roleCounts} />
       <RecentUsers data={data.insights?.users.recent ?? []} expanded />
       <div className="xl:col-span-2">
@@ -639,7 +642,10 @@ function ActivityTab({
   activities: AdminDashboardActivity[];
 }) {
   return (
-    <div role="tabpanel" className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)]">
+    <div
+      role="tabpanel"
+      className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.8fr)]"
+    >
       <RecentActivity activities={activities} expanded title="آخرین فعالیت‌های اپلیکیشن و پنل" />
       <div className="flex flex-col gap-3">
         <MiniStat

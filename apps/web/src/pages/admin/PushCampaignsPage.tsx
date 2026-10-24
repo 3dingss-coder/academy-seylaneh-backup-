@@ -152,7 +152,10 @@ export function PushCampaignsPage() {
         }
       >
         {(d) => (
-          <section aria-label="خلاصه کمپین‌ها" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section
+            aria-label="خلاصه کمپین‌ها"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
             <KpiCard title="کل کمپین‌ها" value={faNumber(d.counts.total)} icon={Megaphone} />
             <KpiCard
               title="پیش‌نویس"

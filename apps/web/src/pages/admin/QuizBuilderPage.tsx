@@ -105,7 +105,10 @@ function Builder({ d }: { d: AdminQuiz }) {
           </Button>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[19rem_minmax(0,1fr)_19rem]" dir="rtl">
+      <div
+        className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[19rem_minmax(0,1fr)_19rem]"
+        dir="rtl"
+      >
         <aside className="order-3 xl:order-1" aria-labelledby="quiz-settings-heading">
           <Card className="flex flex-col gap-3">
             <div>

@@ -127,7 +127,7 @@ describe('AuthPage (must-preserve marketer flow)', () => {
 
   it('shows the welcome mascot illustration as a decorative presence', () => {
     const { container } = renderAuth();
-    const mascot = container.querySelector('img[src="/brand/auth/auth-welcome-mascot.png"]');
+    const mascot = container.querySelector('img[src="/brand/auth/auth-welcome-mascot-sit.webp"]');
     expect(mascot).not.toBeNull();
     expect(mascot).toHaveAttribute('alt', '');
   });

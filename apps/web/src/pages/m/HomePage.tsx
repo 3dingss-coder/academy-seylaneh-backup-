@@ -140,15 +140,23 @@ export function HomePage() {
           }`}
         >
           <img
-            src="/brand/m/m-home-hero.png"
+            src="/brand/m/m-home-hero-bg.webp"
             alt=""
             aria-hidden
-            width={1536}
+            width={776}
             height={1024}
             fetchPriority="high"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
+          />
+          <img
+            src="/brand/m/m-home-mascot-sit.webp"
+            alt=""
+            aria-hidden
+            width={276}
+            height={322}
+            decoding="async"
+            className="pointer-events-none absolute right-3 top-1 h-[80%] w-auto select-none [-webkit-mask-image:linear-gradient(to_bottom,#000_62%,transparent)] [mask-image:linear-gradient(to_bottom,#000_62%,transparent)]"
           />
           <div
             className="absolute bottom-4 left-4 w-[82%] max-w-[420px] rounded-card border border-marketer-border bg-marketer-surface/95 p-4 shadow-lg backdrop-blur-sm lg:w-[48%]"

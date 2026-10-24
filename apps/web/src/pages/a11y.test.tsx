@@ -34,6 +34,33 @@ const signedIn = () => {
     'GET /v1/me/home': () => ({ data: home }),
     'GET /v1/me/notifications': () => ({ data: { unread: 1, items: [] } }),
     'GET /v1/me/mentor/nudges': () => ({ data: [] }),
+    // «تنظیمات اعلان» on the profile screen: two protected rows, two switches, one optional push.
+    'GET /v1/me/notification-prefs': () => ({
+      data: {
+        prefs: { mutedCategories: [], preferredHour: null, optIns: {}, updatedAt: null },
+        protectedCategories: ['deadlines', 'health'],
+        categories: [
+          {
+            key: 'deadlines',
+            label: 'تکالیف و مهلت‌ها',
+            hint: 'انتصاب تکلیف، یادآوری و عبور از مهلت.',
+            mutable: false,
+          },
+          { key: 'quizzes', label: 'آزمون‌ها', hint: 'نتیجه آزمون و نمره.', mutable: true },
+          { key: 'health', label: 'وضعیت دوره', hint: 'پرونده‌ی یادگیری شما.', mutable: false },
+        ],
+        optInOptions: [
+          {
+            key: 'evening_nudge',
+            name: 'یادآوری عصرگاهی',
+            description: 'هر روز ۱۸:۰۰، فقط اگر خودتان بخواهید.',
+          },
+        ],
+      },
+    }),
+    'PUT /v1/me/notification-prefs': (body: unknown) => ({
+      data: { ...(body as object), updatedAt: 'now' },
+    }),
     'GET /v1/me/sections/seed-pkg-formi-s1': () => ({ data: sectionDetail }),
     'GET /v1/me/quizzes/seed-pkg-formi-s1-quiz': () => ({ data: quiz }),
   };
@@ -80,6 +107,18 @@ describe('a11y (axe, jsdom)', () => {
     mockApi(signedIn());
     const { container } = renderApp('/profile');
     await screen.findByRole('button', { name: /خروج/ });
+    // The preference card is the newest part of this screen: a locked switch must still announce its
+    // state and its reason, so wait for it before axe looks at the tree.
+    await screen.findByRole('switch', { name: 'اعلان‌های تکالیف و مهلت‌ها' });
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('profile, with a category switch clicked', async () => {
+    mockApi(signedIn());
+    const { container } = renderApp('/profile');
+    const quizzes = await screen.findByRole('switch', { name: 'اعلان‌های آزمون‌ها' });
+    fireEvent.click(quizzes);
+    await screen.findByRole('switch', { name: 'اعلان‌های آزمون‌ها', checked: false });
     expect(await violations(container)).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { waitAtMost } from '../lib/hang-safe';
+import { withTimeout } from '../lib/bounded';
 import type { User } from '../domain/types';
 import type { Doc } from '../store/types';
 import { aiHub } from '../ai/hub';
@@ -184,6 +184,8 @@ const indexCache = new WeakMap<Deps, { at: number; items: KnowledgeItem[] }>();
  */
 const bootstrapState = new WeakMap<Deps, { at: number; running: Promise<void> | null }>();
 export const BOOTSTRAP_COOLDOWN_MS = 10 * 60_000;
+/** A waiter gives up on another request's rebuild after this long (that request may have been cancelled). */
+const BOOTSTRAP_WAIT_MS = 8_000;
 
 async function bootstrapIndex(d: Deps): Promise<void> {
   const now = d.clock().getTime();
@@ -192,7 +194,9 @@ async function bootstrapIndex(d: Deps): Promise<void> {
   // Another request is rebuilding: wait for it, but never longer than a deadline — if that
   // request was cancelled its promise never settles (see lib/hang-safe.ts).
   if (state.running) {
-    await waitAtMost(state.running, 8_000);
+    await withTimeout(state.running, BOOTSTRAP_WAIT_MS, 'knowledge index bootstrap').catch(
+      () => undefined,
+    );
     return;
   }
   if (now - state.at < BOOTSTRAP_COOLDOWN_MS) return;

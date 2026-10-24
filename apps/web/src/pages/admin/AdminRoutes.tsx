@@ -1,11 +1,13 @@
 import { Route, Routes } from 'react-router-dom';
 import {
+  Archive,
   BarChart3,
   Bell,
   Bot,
   FolderTree,
   Library,
   LayoutDashboard,
+  Megaphone,
   ScrollText,
   Settings2,
   Share2,
@@ -22,6 +24,12 @@ import { AuditPage } from './AuditPage';
 import { BrandDetailPage } from './BrandDetailPage';
 import { ContentPage } from './ContentPage';
 import { NotificationsPage } from './NotificationsPage';
+import { PushCampaignEditorPage } from './PushCampaignEditorPage';
+import { PushAutomationDetailPage, PushAutomationNewPage } from './PushAutomationDetailPage';
+import { PushAutomationsPage } from './PushAutomationsPage';
+import { PushAutomationRunsPage } from './PushAutomationRunsPage';
+import { PushAutomationTracePage } from './PushAutomationTracePage';
+import { PushCampaignsPage } from './PushCampaignsPage';
 import { MediaLibraryPage } from './MediaLibraryPage';
 import { MentorGuidesPage } from './MentorGuidesPage';
 import { PackageEditorPage } from './PackageEditorPage';
@@ -30,6 +38,7 @@ import { QuizBuilderPage } from './QuizBuilderPage';
 import { ReportsPage } from './ReportsPage';
 import { TeamsPage } from './TeamsPage';
 import { AdminUserDetail, UsersPage } from './UsersPage';
+import { ArchivePage } from './ArchivePage';
 
 const NAV = [
   { to: '/admin', label: 'داشبورد', icon: LayoutDashboard },
@@ -45,7 +54,9 @@ const NAV = [
   { to: '/admin/users', label: 'کاربران', icon: Users },
   { to: '/admin/teams', label: 'تیم‌ها', icon: UsersRound },
   { to: '/admin/reports', label: 'گزارش‌ها', icon: BarChart3 },
+  { to: '/admin/archive', label: 'آرشیو', icon: Archive },
   { to: '/admin/notifications', label: 'اعلان‌ها', icon: Bell },
+  { to: '/admin/push-campaigns', label: 'کمپین‌های Push', icon: Megaphone },
   { to: '/admin/policies', label: 'سیاست‌ها', icon: Settings2 },
   { to: '/admin/audit', label: 'لاگ تغییرات', icon: ScrollText },
   { to: '/admin/profile', label: 'پروفایل', icon: UserRound },
@@ -67,7 +78,22 @@ export default function AdminRoutes() {
         <Route path="users/:id" element={<AdminUserDetail />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="archive" element={<ArchivePage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="push-campaigns" element={<PushCampaignsPage />} />
+        {/* The automation engine lives inside the same section: one URL namespace, one mental model
+            («کمپین‌های Push» = دستی + خودکار). Registered before `:id` for readability only — React
+            Router already prefers a static segment over a param. */}
+        <Route path="push-campaigns/automations" element={<PushAutomationsPage />} />
+        {/* `new` is its own page, registered before `:key`. */}
+        <Route path="push-campaigns/automations/new" element={<PushAutomationNewPage />} />
+        {/* The read-only half: `runs` and `trace` are static segments, so they win over `:key` —
+            and they are registered first anyway, for the same reason `new` is. */}
+        <Route path="push-campaigns/automations/runs" element={<PushAutomationRunsPage />} />
+        <Route path="push-campaigns/automations/trace" element={<PushAutomationTracePage />} />
+        <Route path="push-campaigns/automations/:key" element={<PushAutomationDetailPage />} />
+        <Route path="push-campaigns/new" element={<PushCampaignEditorPage />} />
+        <Route path="push-campaigns/:id" element={<PushCampaignEditorPage />} />
         <Route path="policies" element={<PoliciesPage />} />
         <Route path="audit" element={<AuditPage />} />
         <Route path="profile" element={<ProfilePage />} />

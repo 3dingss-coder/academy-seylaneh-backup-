@@ -2,8 +2,10 @@
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/push-icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/push-icons/push-icon-192.png" />
+    <link rel="preload" as="image" href="/brand/mascot.webp" type="image/webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/push-icons/apple-touch-icon-180.png" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="سیلانه‌سبز" />
@@ -12,10 +14,95 @@
     <meta name="theme-color" content="#177A50" />
     <meta name="description" content="آکادمی سیلانه — آموزش محصولات برای بازاریاب‌ها" />
     <title>آکادمی سیلانه</title>
+    <style>
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: radial-gradient(circle at 50% 38%, #177a50 0, #0f5338 62%, #0a3d29 100%);
+        color: #fff;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Tahoma,
+          sans-serif;
+        transition:
+          opacity 0.45s ease,
+          visibility 0.45s;
+      }
+      #boot.boot-out {
+        opacity: 0;
+        visibility: hidden;
+      }
+      #boot img {
+        width: min(52vw, 250px);
+        height: auto;
+        filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.35));
+        animation: boot-pop 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+      }
+      #boot-text {
+        min-height: 2.2em;
+        font-size: clamp(1.35rem, 5.4vw, 1.9rem);
+        font-weight: 800;
+        letter-spacing: 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #boot-text::after {
+        content: '';
+        width: 3px;
+        height: 1.2em;
+        background: #7ee2b0;
+        border-radius: 2px;
+        animation: boot-caret 0.8s steps(1) infinite;
+      }
+      @keyframes boot-pop {
+        0% {
+          opacity: 0;
+          transform: translateY(24px) scale(0.82);
+        }
+        100% {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes boot-caret {
+        50% {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot img {
+          animation: none;
+        }
+        #boot-text::after {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status" aria-label="آکادمی سیلانه سبز در حال بارگذاری">
+      <img
+        src="/brand/mascot.webp"
+        width="250"
+        height="324"
+        alt=""
+        decoding="async"
+        fetchpriority="high"
+      />
+      <div id="boot-text" aria-hidden="true"></div>
+    </div>
     <div id="root"></div>
     <noscript>برای استفاده از این برنامه، جاوااسکریپت مرورگر را فعال کنید.</noscript>
+    <script src="/boot.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

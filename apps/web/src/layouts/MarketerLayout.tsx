@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Bell, BookOpen, Bot, Home, Mail, Trophy, UserRound, WifiOff } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,9 +6,11 @@ import { AppLogo } from '@/components/brand/AppLogo';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { PageTransition } from '@/components/layout/PageTransition';
 import { CountBadge } from '@/components/ui/CountBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
 import { toPersianDigits } from '@/lib/digits';
 import { clearSubject, isSubjectRoute } from '@/lib/pageContext';
+import { prefetchMarketerPages } from '@/lib/marketerPages';
 import { flushBeats } from '@/lib/offline-queue';
 import { useOnline } from '@/lib/online';
 import { useMessages, useNotifications } from '@/lib/queries';
@@ -30,6 +32,8 @@ export function MarketerLayout() {
   const online = useOnline();
   const unreadMessages = messages.data?.filter((m) => !m.readAt).length ?? 0;
   const unread = (notifications.data?.unread ?? 0) + unreadMessages;
+
+  useEffect(() => prefetchMarketerPages(), []);
 
   useEffect(() => {
     if (!isSubjectRoute(pathname)) clearSubject();
@@ -106,7 +110,17 @@ export function MarketerLayout() {
       )}
       <main className="mx-auto max-w-[960px] px-4 py-4">
         <PageTransition>
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex flex-col gap-3" aria-busy>
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </PageTransition>
       </main>
       <BottomNav

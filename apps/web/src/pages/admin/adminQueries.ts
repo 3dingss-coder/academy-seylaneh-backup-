@@ -5,6 +5,8 @@ import type {
   AdminPackage,
   AdminProduct,
   AdminTeam,
+  ArchivedReportRow,
+  ArchivedUser,
   Me,
   MentorGuideDetail,
   MentorGuideRow,
@@ -19,6 +21,8 @@ export const ak = {
   quiz: (id: string) => ['admin', 'quiz', id] as const,
   users: ['admin', 'users'] as const,
   teams: ['admin', 'teams'] as const,
+  archiveUsers: ['admin', 'archive', 'users'] as const,
+  archiveReports: ['admin', 'archive', 'reports'] as const,
   guides: ['admin', 'mentor-guides'] as const,
   guide: (key: string) => ['admin', 'mentor-guide', key] as const,
 };
@@ -78,4 +82,15 @@ export const useMentorGuide = (kind: MentorGuideRow['kind'], targetId: string | 
         signal,
       ),
     staleTime: 30_000,
+  });
+
+export const useArchivedUsers = () =>
+  useQuery({
+    queryKey: ak.archiveUsers,
+    queryFn: ({ signal }) => api.get<ArchivedUser[]>('/admin/archive/users', signal),
+  });
+export const useArchivedReports = () =>
+  useQuery({
+    queryKey: ak.archiveReports,
+    queryFn: ({ signal }) => api.get<ArchivedReportRow[]>('/admin/archive/reports', signal),
   });

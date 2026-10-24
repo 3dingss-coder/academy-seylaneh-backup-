@@ -184,6 +184,24 @@ describe('D1 -> R2 media move', () => {
     expect(Array.from(rng)).toEqual(Array.from(bytesOf(5000, 9).subarray(10, 20)));
   });
 
+  it('stat hits R2 once for repeated Range lookups and sees a later overwrite or delete', async () => {
+    const r2 = new FakeR2();
+    let heads = 0;
+    const origHead = r2.head.bind(r2);
+    r2.head = async (k: string) => {
+      heads++;
+      return origHead(k);
+    };
+    const store = new CloudflareBlobStore('secret', { db: createSqliteD1(), r2 });
+    await store.put('media/video/a.mp4', bytesOf(100, 1), 'video/mp4');
+    for (let i = 0; i < 5; i++) expect((await store.stat('media/video/a.mp4'))?.size).toBe(100);
+    expect(heads).toBe(1);
+    await store.put('media/video/a.mp4', bytesOf(200, 1), 'video/mp4');
+    expect((await store.stat('media/video/a.mp4'))?.size).toBe(200);
+    await store.delete('media/video/a.mp4');
+    expect(await store.stat('media/video/a.mp4')).toBeNull();
+  });
+
   it('keeps serving not-yet-moved files from D1 while R2 is bound', async () => {
     const { store, small } = await setup(false);
     expect((await store.stat('media/audio/small.mp4'))?.size).toBe(small.byteLength);

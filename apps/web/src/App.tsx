@@ -6,23 +6,26 @@ import { ApiError } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isNative, registerPush } from '@/lib/native';
 import { resumeWebPush } from '@/lib/webPush';
+import { PushOptInBanner } from '@/components/common/PushOptInBanner';
 import { setCrashUser, track } from '@/lib/telemetry';
 import { MarketerLayout } from '@/layouts/MarketerLayout';
 import { FullPageSpinner, RequireAuth } from '@/layouts/RequireAuth';
 import { AuthPage } from '@/pages/auth/AuthPage';
 import { OnboardingPage } from '@/pages/auth/OnboardingPage';
-import { CardsPage } from '@/pages/m/CardsPage';
 import { HomePage } from '@/pages/m/HomePage';
-import { LearnPage } from '@/pages/m/LearnPage';
-import { MentorPage } from '@/pages/m/MentorPage';
-import { MessagesPage } from '@/pages/m/MessagesPage';
-import { PackagePage } from '@/pages/m/PackagePage';
-import { ProfilePage } from '@/pages/m/ProfilePage';
-import { QuizPage } from '@/pages/m/QuizPage';
-import { SectionPage } from '@/pages/m/SectionPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { marketerPages } from '@/lib/marketerPages';
 
 // Panels are code-split: marketers (mobile, weak networks) never download admin code.
+// Marketer sub-pages load on demand; only Home and the sign-in screens ship in the first bundle.
+const CardsPage = lazy(marketerPages.CardsPage);
+const LearnPage = lazy(marketerPages.LearnPage);
+const MentorPage = lazy(marketerPages.MentorPage);
+const MessagesPage = lazy(marketerPages.MessagesPage);
+const PackagePage = lazy(marketerPages.PackagePage);
+const ProfilePage = lazy(marketerPages.ProfilePage);
+const QuizPage = lazy(marketerPages.QuizPage);
+const SectionPage = lazy(marketerPages.SectionPage);
 const ManagerRoutes = lazy(() => import('@/pages/manager/ManagerRoutes'));
 const AdminRoutes = lazy(() => import('@/pages/admin/AdminRoutes'));
 const GalleryPage = lazy(() =>
@@ -137,6 +140,7 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <NativeBridge />
+            <PushOptInBanner />
             <RouteGuard />
           </AuthProvider>
         </BrowserRouter>

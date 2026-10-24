@@ -90,7 +90,11 @@ function concatBytes(arrays: Uint8Array[]): Uint8Array {
  * (100% free tier without requiring a credit card on Cloudflare), with an in-memory fallback.
  */
 export class CloudflareBlobStore implements BlobStore {
+  private initPromise: Promise<void> | null = null;
   private mem = new Map<string, { data: Uint8Array; contentType: string }>();
+  /** Short-lived R2 size/type cache: a player sends many Range requests for one file, and each used
+   *  to cost an R2 HEAD. Only positive results are kept; any write or delete clears it. */
+  private statCache = new Map<string, { at: number; v: { size: number; contentType: string } }>();
 
   constructor(
     private readonly secret: string,
@@ -115,9 +119,13 @@ export class CloudflareBlobStore implements BlobStore {
   private async ensureD1(): Promise<D1Database | null> {
     const db = this.opts.db;
     if (!db) return null;
-    // Settled-only: concurrent first calls each run the (idempotent) DDL rather than awaiting a
-    // promise that only the first request could settle (see lib/hang-safe.ts).
-    await ensureD1Schema(db);
+    if (!this.initPromise) {
+      this.initPromise = ensureD1Schema(db).catch((err) => {
+        this.initPromise = null;
+        throw err;
+      });
+    }
+    await this.initPromise;
     return db;
   }
 
@@ -142,6 +150,7 @@ export class CloudflareBlobStore implements BlobStore {
   }
 
   async put(p: string, data: Uint8Array, contentType: string): Promise<void> {
+    this.statCache.clear();
     const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     if (this.opts.r2 && this.useR2(p)) {
       await this.opts.r2.put(p, bytes, { httpMetadata: { contentType } });
@@ -239,12 +248,17 @@ export class CloudflareBlobStore implements BlobStore {
 
   async stat(p: string): Promise<{ size: number; contentType: string } | null> {
     if (this.opts.r2 && this.useR2(p)) {
+      const hit = this.statCache.get(p);
+      if (hit && this.now() - hit.at < 60_000) return hit.v;
       const head = await this.opts.r2.head(p);
       if (head) {
-        return {
+        const v = {
           size: head.size,
           contentType: head.httpMetadata?.contentType ?? 'application/octet-stream',
         };
+        if (this.statCache.size > 500) this.statCache.clear();
+        this.statCache.set(p, { at: this.now(), v });
+        return v;
       }
     }
     const db = await this.ensureD1();
@@ -442,6 +456,7 @@ export class CloudflareBlobStore implements BlobStore {
   }
 
   async deletePrefix(prefix: string): Promise<boolean | null> {
+    this.statCache.clear();
     const db = await this.ensureD1();
     if (!db) return null;
     const like = CloudflareBlobStore.likePrefix(prefix);
@@ -633,6 +648,7 @@ export class CloudflareBlobStore implements BlobStore {
   }
 
   async delete(p: string): Promise<void> {
+    this.statCache.clear();
     if (this.opts.r2 && this.useR2(p)) await this.opts.r2.delete(p);
     const db = await this.ensureD1();
     if (db) {

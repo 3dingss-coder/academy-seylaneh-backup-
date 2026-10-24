@@ -1,12 +1,18 @@
 /** Firestore data model (spec §20). All timestamps are ISO strings (UTC). */
 export type Role = 'marketer' | 'manager' | 'admin' | 'superadmin';
 export const ROLES: Role[] = ['marketer', 'manager', 'admin', 'superadmin'];
-export type UserStatus = 'active' | 'inactive';
+/**
+ * `blacklisted` = deleted by an admin: the number can no longer sign in or register, and the
+ * account sits in the admin archive until it is restored (→ active) or permanently purged.
+ */
+export type UserStatus = 'active' | 'inactive' | 'blacklisted';
 
 export interface User {
   name: string;
   phone: string | null;
   email: string | null;
+  /** HMAC lookup value for passwordless national-code accounts; never returned by publicUser. */
+  nationalCodeHash?: string | null;
   /** Residence («محل سکونت»), captured at sign-up; null on accounts created before it existed. */
   province: string | null;
   city: string | null;
@@ -20,6 +26,28 @@ export interface User {
   lastActiveAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set while status is `blacklisted` (archive tab «لیست سیاه»). */
+  blacklistedAt?: string | null;
+  blacklistedBy?: string | null;
+}
+
+/**
+ * A report row (one marketer × one training package) an admin removed from the reports.
+ * `purged` rows keep only ids (no names/phones): they exist solely so the row does not reappear.
+ */
+export interface ArchivedReport {
+  userId: string;
+  packageId: string;
+  userName?: string;
+  phone?: string | null;
+  packageTitle?: string;
+  brandName?: string | null;
+  productName?: string | null;
+  percent?: number;
+  status?: string;
+  archivedAt: string;
+  archivedBy: string;
+  purged: boolean;
 }
 
 export interface Team {
@@ -293,7 +321,9 @@ export type NotificationType =
   | 'weekly_digest'
   | 'badge_earned'
   | 'escalation'
-  | 'manual';
+  | 'manual'
+  /** Push automation engine (see services/push-automations.ts). Never used by a template editor. */
+  | 'automation';
 
 export interface Notification {
   userId: string;
@@ -301,6 +331,14 @@ export interface Notification {
   title: string;
   body: string;
   actionRef: string | null;
+  /** Optional rich-push image; absent on legacy notifications. */
+  imageUrl?: string | null;
+  /** Set when the notification was created by a push campaign (see services/push-campaigns.ts). */
+  campaignId?: string | null;
+  /** Automation key when the notification came from the push-automation engine (data.push too). */
+  automationKey?: string | null;
+  /** An admin test-send: shown in the panel, never counted in automation stats (see governor). */
+  isTest?: boolean | null;
   readAt: string | null;
   pushStatus: 'none' | 'sent' | 'deferred' | 'skipped' | 'failed';
   deliverAfter: string | null;
@@ -507,4 +545,361 @@ export interface MediaAsset {
   partSize?: number;
   totalParts?: number;
   archived?: boolean;
+}
+
+// ─── Push campaigns (admin studio) ──────────────────────────────────────────
+/**
+ * One status model for campaigns. Transitions:
+ *   draft → scheduled (scheduledAt set) → queued (claimed by a send or by the cron) → sending
+ *   → sent | sent_with_errors | failed        draft/scheduled → cancelled
+ * `queued`/`sending` are never edited or cancelled; `archivedAt` hides a finished or unused campaign.
+ */
+export type PushCampaignStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'sent_with_errors'
+  | 'failed'
+  | 'cancelled';
+
+export interface PushCampaignAudience {
+  type: 'all' | 'team' | 'role' | 'user';
+  targetId: string | null;
+  /** any = every matching active user; web/android = only users with an active token of that platform. */
+  channel: 'any' | 'web' | 'android';
+}
+
+export type PushBatchStatus =
+  'pending' | 'sending' | 'sent' | 'sent_with_errors' | 'failed' | 'interrupted';
+
+export interface PushCampaignSummary {
+  batchesTotal: number;
+  batchesDone: number;
+  /** Users in the audience snapshot that were processed. */
+  users: number;
+  /** Device tokens sent to the provider (provider requests). */
+  attempted: number;
+  /** Provider accepted the request. NOT a delivery or view confirmation. */
+  accepted: number;
+  /** attempted - accepted (includes invalid tokens). */
+  failed: number;
+  /** Tokens the provider reported as permanently invalid (removed from device_tokens). */
+  invalid: number;
+  /** Users with no device token for the selected channel (in-app only). */
+  noDevice: number;
+  /** Batches whose previous run crashed mid-send; they are never re-sent automatically. */
+  interrupted: number;
+}
+
+export interface PushCampaign {
+  name: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  /** Internal route in the app, e.g. /messages. Never an external URL. */
+  actionRef: string;
+  audience: PushCampaignAudience;
+  status: PushCampaignStatus;
+  scheduledAt: string | null;
+  /** Audience size at the moment the campaign was started (snapshot). */
+  targetCount: number | null;
+  /** Users with a matching device token when the campaign was started (snapshot, approximate). */
+  pushReachable: number | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  /** Idempotency key of the request that started the campaign (replays return the same result). */
+  sendRequestId: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  summary: PushCampaignSummary;
+  /** Last sanitised error (never contains tokens or user data). */
+  lastError: string | null;
+  archivedAt: string | null;
+}
+
+export interface PushCampaignBatch {
+  campaignId: string;
+  index: number;
+  userIds: string[];
+  status: PushBatchStatus;
+  /** Number of started attempts; a failed batch is retried only if no provider request was made. */
+  attempts: number;
+  attempted: number;
+  accepted: number;
+  failed: number;
+  invalid: number;
+  noDevice: number;
+  lastError: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+// ─── Push automation engine (موتور اتوماسیون پوش) ─────────────────────────────
+/**
+ * One rule the admin can turn on/off and edit from the panel. Everything is stored in the generic
+ * document store (`push_automations/<key>`), so no SQL migration is required.
+ *
+ * Triggers:
+ *  • `event`         — fired inline by `fireAutomationEvent` at the hook site.
+ *  • `event_delay`   — same, but parked in `push_automation_queue/<dayKey>` until `dueAt`.
+ *  • `inactivity`    — evaluated in the daily window against `users.lastActiveAt` (ladder-aware).
+ *  • `schedule_daily`/`schedule_weekly` — evaluated once per matching Tehran window.
+ *  • `condition`     — evaluated in its window from the behaviour signals (B-rules reuse).
+ */
+export type AutomationTriggerKind =
+  'event' | 'event_delay' | 'inactivity' | 'schedule_daily' | 'schedule_weekly' | 'condition';
+
+export interface AutomationCondition {
+  field: string;
+  op: 'gte' | 'lte' | 'eq' | 'neq';
+  value: number | string | boolean;
+}
+
+/**
+ * The v2 condition tree (`when`, and `audience.filter`). Persisted data, never code: every `field`
+ * and `operator` id is resolved against the registries in `services/automation/{fields,operators}.ts`
+ * and every `value` is a scalar compared by that registry, so nothing stored here is ever executed.
+ * `expr.ts` owns the budgets, validation and evaluation; this file owns the shape.
+ */
+export interface RuleLeaf {
+  type: 'leaf';
+  /** A field id from the field registry, e.g. `progress`, `streakDays`, `user.city`, `event.score`. */
+  field: string;
+  /** An operator id from the operator registry, e.g. `gte`, `in`, `daysAgoGte`. */
+  operator: string;
+  value: number | string | boolean | null;
+  /** Second operand, only for `between`. */
+  value2?: number | string | boolean | null;
+}
+
+export interface RuleGroup {
+  type: 'group';
+  op: 'and' | 'or' | 'not';
+  children: RuleNode[];
+}
+
+export type RuleNode = RuleLeaf | RuleGroup;
+
+/** The name the panel and `docs/admin-push-automation-rules-engine.md` use for the same tree. */
+export type RuleExpr = RuleNode;
+
+/**
+ * How often one rule (or one step of it) may send. Cadence used to live only in the global settings,
+ * which made it a cap imposed on every rule at once; it is a property of the rule now. `0` means
+ * "unlimited in this window". Bounds and the decision itself live in `services/automation/repeat.ts`.
+ */
+export interface RepeatPolicy {
+  minIntervalMs: number;
+  perDay: number;
+  perWeek: number;
+  perMonth: number;
+  oncePerEventInstance: boolean;
+  allowSameDayMultiple: boolean;
+  onceInLivespan: boolean;
+  perRule?: { maxPerDay?: number; minIntervalMs?: number };
+  perStep?: Record<string, { minIntervalMs?: number; maxPerDay?: number }>;
+  respectQuietHoursAlways?: boolean;
+}
+
+export interface PushAutomationTrigger {
+  kind: AutomationTriggerKind;
+  /** Event name for `event`/`event_delay`, e.g. `quiz.failed`. */
+  event?: string | null;
+  delayMinutes?: number | null;
+  inactivityDays?: number | null;
+  /** Ladder members share one «inactivity episode»: only the highest matched step is sent. */
+  ladderGroup?: string | null;
+  /** 'HH:mm' in the policy timezone — the daily/evaluation window. Weekly: also needs `weekday`. */
+  time?: string | null;
+  /** 0=Sunday … 6=Saturday (same convention as `Policy.weeklyDigestDay`). */
+  weekday?: number | null;
+  conditions?: AutomationCondition[] | null;
+}
+
+export interface PushAutomationAudience {
+  type: 'all' | 'team' | 'role' | 'user';
+  targetId: string | null;
+  channel: 'any' | 'web' | 'android';
+  /**
+   * v2: an extra filter on the user row, evaluated again at the moment of sending (not at pick time),
+   * so a user who left the team or changed role between the sweep and the send is not reached.
+   * Only fields the user record itself carries are allowed — see `FieldDef.audience`.
+   */
+  filter?: RuleExpr | null;
+}
+
+export type AutomationPriority = 'urgent' | 'high' | 'normal' | 'low';
+
+export interface PushAutomationMessage {
+  title: string;
+  body: string;
+  /** Internal route, validated by `isSafeAutomationPath`. */
+  actionRef: string;
+  imageUrl: string | null;
+}
+
+/**
+ * One step of a rule's workflow (§2.2 of `docs/admin-push-automation-rules-engine.md`).
+ *
+ * Three effects only — say something, wait, stop — because those are the only things the engine can
+ * perform without becoming a script interpreter: `eval` and stored code are absent by construction.
+ * A new *action* is a registry entry in `services/automation/steps.ts` (label, validation, explanation)
+ * plus, when it needs a new primitive, one branch in the flow runner — never a new scenario list.
+ *
+ * `wait` is the only step that outlives its run: it writes one row into `push_automation_queue/<day>`
+ * and the drain resumes after it, re-reading the rule, the audience and its own condition. A rule
+ * edited or switched off meanwhile cancels the pending step instead of continuing on a stale promise.
+ */
+export type AutomationStep =
+  | {
+      type: 'notify';
+      id: string;
+      message: PushAutomationMessage;
+      /** Overrides the rule's channel for this one message. */
+      channel?: 'any' | 'web' | 'android' | null;
+      /** Branch: when this tree does not hold, the flow stops here (it is not "skip this step"). */
+      when?: RuleExpr | null;
+    }
+  | { type: 'wait'; id: string; minutes: number; recheckWhen?: RuleExpr | null }
+  | { type: 'stop'; id: string; when: RuleExpr; reason: string };
+
+export interface PushAutomationDelivery {
+  priority: AutomationPriority;
+  push: boolean;
+  inApp: boolean;
+  respectQuietHours: boolean;
+  /** Minimum distance between two sends of THIS automation to the SAME user. */
+  cooldownMs: number;
+  maxPerUserPerDay?: number | null;
+  /** At most once per user lifetime (e.g. first_course_done). */
+  sendOnce?: boolean | null;
+  /** Managers receive one summary message instead of N per-member messages. */
+  aggregateForManager?: boolean | null;
+}
+
+export interface PushAutomationStats {
+  lastRunAt: string | null;
+  sent7d: number;
+  accepted7d: number;
+  skipped7d: number;
+}
+
+export interface PushAutomation {
+  key: string;
+  name: string;
+  description: string;
+  category: string;
+  audienceRole: 'marketer' | 'manager' | 'admin' | 'all';
+  enabled: boolean;
+  /** Seeded by the catalog: cannot be deleted, only disabled. */
+  isSystem: boolean;
+  /**
+   * System automation = the gate in front of an existing template. Text stays in
+   * `DEFAULT_TEMPLATES`/the template editor; the panel only owns enable/priority/caps/stats.
+   */
+  templateKey?: string | null;
+  /** Template keys whose Push must stand down for a user while this automation is enabled. */
+  supersedes?: string[] | null;
+  trigger: PushAutomationTrigger;
+  audience: PushAutomationAudience;
+  message: PushAutomationMessage;
+  delivery: PushAutomationDelivery;
+  /**
+   * Which shape this row is written in. `1` (or absent) = the flat `trigger.conditions` era; `2` = the
+   * rule engine (`when`, `audience.filter`, `repeatPolicy`). Read-time `withDefaults()` upgrades v1 rows,
+   * so nothing has to be rewritten in the store and no rule changes behaviour just by being read.
+   */
+  schemaVersion?: 1 | 2 | null;
+  /** v2: the whole condition tree. Derived from `trigger.conditions` for a v1 row, never both at once. */
+  when?: RuleExpr | null;
+  /** v2: cadence of this rule. Absent on a v1 row means "the legacy global caps", exactly as before. */
+  repeatPolicy?: RepeatPolicy | null;
+  /**
+   * v2: the workflow. Absent/empty means "the single message in `message`", which is every v1 rule and
+   * the behaviour `withDefaults()` preserves — a rule with one `notify` step is deliberately NOT
+   * rewritten into a flow, so no claim key or counter bucket moves under an existing rule's feet.
+   */
+  steps?: AutomationStep[] | null;
+  /** Seeded but needing data that v1 does not compute (Q3): never enable-able, explained in UI. */
+  requiresFeature?: string | null;
+  /** Only for users who explicitly opted in (`notification_prefs`) — e.g. the evening nudge. */
+  optInOnly?: boolean | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  stats?: PushAutomationStats | null;
+  /**
+   * Set when an operator takes a rule out of service (D6). Archive is *not* a pause: a paused rule can be
+   * resumed and its parked workflow steps still fire, while an archived rule is skipped by `loadRunnable`
+   * and its pending steps are cancelled. `enabled` is forced off when archiving and is NOT restored when
+   * un-archiving — bringing a retired rule back is a deliberate act, never a side effect.
+   */
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+}
+
+/** Global rules of the engine (`push_automation_settings/global`). Never cached (kill-switch). */
+export interface PushAutomationSettings {
+  /** Emergency kill-switch: every send stands down while true. */
+  paused: boolean;
+  maxPerUserPerDay: number;
+  maxPerUserPerWeek: number;
+  /** Minimum distance between ANY two pushes of one user (urgent is exempt). */
+  minGapMs: number;
+  /** Default Tehran hour for windows the admin did not choose explicitly. */
+  defaultHourTehran: number;
+  /** Days a «why nothing was sent» decision stays readable. */
+  decisionTtlDays: number;
+  /** Alert the admins when the 24h push failure rate exceeds this percentage. */
+  failureAlertPct: number;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/** One processed window of one automation (`push_automation_runs/<id>`). */
+export interface PushAutomationRun {
+  key: string;
+  kind: 'sweep' | 'event' | 'queue' | 'manual';
+  windowKey: string;
+  startedAt: string;
+  finishedAt: string | null;
+  evaluated: number;
+  matched: number;
+  sent: number;
+  skipped: Record<string, number>;
+  failed: number;
+  error: string | null;
+}
+
+/** Per-user decision log (`push_automation_decisions/<dayKey>`): one doc per user per day. */
+export interface PushAutomationDecisionItem {
+  at: string;
+  key: string;
+  reason: string;
+  detail?: string | null;
+}
+
+export interface PushAutomationDecisions {
+  userId: string;
+  dayKey: string;
+  items: PushAutomationDecisionItem[];
+  expireAt: string;
+}
+
+/** `notification_prefs/<userId>` — what the marketer may switch off. Deadline types are always on. */
+export interface NotificationPrefs {
+  /** Categories the user switched OFF (push only; in-app is always created). */
+  mutedCategories: string[];
+  /** Optional preferred hour (Tehran) used by `preferred_time` once that feature exists. */
+  preferredHour: number | null;
+  /** Opt-in extras (e.g. the evening nudge) — off by default. */
+  optIns: Record<string, boolean>;
+  updatedAt: string;
 }

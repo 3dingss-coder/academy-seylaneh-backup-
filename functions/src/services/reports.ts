@@ -5,6 +5,7 @@ import type { Doc } from '../store/types';
 import type { Attempt, Message, RetakeRequest, Team, User } from '../domain/types';
 import { audit, track, type Actor, type Deps } from './context';
 import { loadLearningForUsers, loadUserLearning, type PackageView } from './learning-state';
+import { archivedReportKeys } from './archive';
 import { notifyTemplate } from './notify';
 import { publicUser } from './users';
 
@@ -21,8 +22,15 @@ export interface MemberLearning {
 }
 
 export async function loadMembers(d: Deps, users: Array<Doc<User>>): Promise<MemberLearning[]> {
-  const learning = await loadLearningForUsers(d, users);
-  return users.map((u) => ({ user: u, packages: learning.get(u.id)?.packages ?? [] }));
+  const [learning, hidden] = await Promise.all([
+    loadLearningForUsers(d, users),
+    archivedReportKeys(d),
+  ]);
+  // Report rows an admin deleted (archive) stay out of every report and KPI.
+  return users.map((u) => ({
+    user: u,
+    packages: (learning.get(u.id)?.packages ?? []).filter((p) => !hidden.has(`${u.id}_${p.id}`)),
+  }));
 }
 
 export function summarize(members: MemberLearning[], now: Date) {
@@ -195,6 +203,7 @@ export function completionRows(
       rows.push({
         userId: m.user.id,
         userName: m.user.name,
+        phone: m.user.phone,
         teamId: m.user.teamId,
         province: m.user.province,
         city: m.user.city,
@@ -236,6 +245,7 @@ export interface QuizAttemptRow {
   attemptId: string;
   userId: string;
   userName: string;
+  phone: string | null;
   teamId: string | null;
   province: string | null;
   city: string | null;
@@ -262,6 +272,7 @@ export interface QuizAttemptRow {
 export interface QuizSummaryRow {
   userId: string;
   userName: string;
+  phone: string | null;
   teamId: string | null;
   province: string | null;
   city: string | null;
@@ -292,17 +303,22 @@ export interface QuizSummaryRow {
 async function attemptsForUsers(d: Deps, users: Array<Doc<User>>): Promise<Array<Doc<Attempt>>> {
   if (users.length === 0) return [];
   const ids = new Set(users.map((u) => u.id));
+  let all: Array<Doc<Attempt>>;
   if (users.length <= 30) {
     const lists = await Promise.all(
       users.map((u) =>
         d.store.query<Attempt>({ collection: 'attempts', where: [['userId', '==', u.id]] }),
       ),
     );
-    return lists.flat();
+    all = lists.flat();
+  } else {
+    all = (await d.store.query<Attempt>({ collection: 'attempts' })).filter((a) =>
+      ids.has(a.userId),
+    );
   }
-  return (await d.store.query<Attempt>({ collection: 'attempts' })).filter((a) =>
-    ids.has(a.userId),
-  );
+  // Attempts of report rows an admin deleted (archive) are not part of the reports.
+  const hidden = await archivedReportKeys(d);
+  return hidden.size ? all.filter((a) => !hidden.has(`${a.userId}_${a.packageId}`)) : all;
 }
 
 export function quizResultRows(
@@ -371,6 +387,7 @@ export function quizResultRows(
       attemptId: a.id,
       userId: u.id,
       userName: u.name,
+      phone: u.phone,
       teamId: u.teamId,
       province: u.province,
       city: u.city,
@@ -418,6 +435,7 @@ export function quizResultRows(
     summary.push({
       userId: first.userId,
       userName: first.userName,
+      phone: first.phone,
       teamId: first.teamId,
       province: first.province,
       city: first.city,

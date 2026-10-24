@@ -56,6 +56,23 @@ describe('session survives transient failures', () => {
     expect(n).toBe(2);
   });
 
+  it('retries national-code login on a transient Worker error', async () => {
+    const { request } = await load();
+    let n = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      ++n === 1
+        ? json(503, { error: { code: 'INTERNAL', message: 'x' } })
+        : json(200, { data: { ok: 1 } }),
+    );
+    await expect(
+      request(
+        '/auth/national-code-login',
+        { method: 'POST', body: { nationalCode: '1234567891' }, anonymous: true },
+      ),
+    ).resolves.toEqual({ ok: 1 });
+    expect(n).toBe(2);
+  });
+
   it('shows a clear message for Cloudflare edge JSON errors (no `error` field)', async () => {
     const { request } = await load();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
@@ -64,5 +81,25 @@ describe('session survives transient failures', () => {
     await expect(
       request('/auth/phone-login', { method: 'POST', body: { phone: '0912' }, anonymous: true }),
     ).rejects.toMatchObject({ code: 'INTERNAL', status: 503, message: expect.stringContaining('شلوغ') });
+  });
+});
+
+describe('stored access token', () => {
+  it('lets a returning visitor call the API without a refresh round trip', async () => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    const first = await load();
+    first.session.setAccess('stored-access-token', 3600);
+    // New page load: module state is gone, localStorage remains.
+    vi.resetModules();
+    const { request } = await import('./api');
+    const calls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      calls.push(String(url));
+      return json(200, { data: { ok: true } });
+    });
+    await request('/me');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('/v1/me');
   });
 });

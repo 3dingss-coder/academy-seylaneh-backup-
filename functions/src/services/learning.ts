@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { ApiError } from '../http/errors';
 import { ids } from '../lib/ids';
 import { DAY, HOUR } from '../lib/time';
-import type { Doc } from '../store/types';
+import { Deadline, DeadlineError } from '../lib/bounded';
+import { StoreBusyError } from '../store/d1';
+import { newOpTrace, type Doc, type OpTrace } from '../store/types';
 import type {
   Attempt,
   AttemptSnapshotItem,
@@ -19,6 +21,7 @@ import { getPolicy, track, type Deps } from './context';
 import {
   computeNextItem,
   effectiveDeadlineAt,
+  loadSharedCached,
   loadUserLearning,
   type PackageCompletion,
   type PackageView,
@@ -27,6 +30,9 @@ import {
 import { createNudge } from './mentor-rules';
 import { notifyTemplate } from './notify';
 import { awardPoints, evaluateBadges } from './rewards';
+// The outbox of the automation engine (prompt §5.2): a request records what happened and carries
+// on. `emitAutomationEvent` never throws and writes nothing while no rule listens for the event.
+import { emitAutomationEvent } from './push-automation-events';
 
 const LOCKED = 'این قسمت هنوز قفل است. ابتدا قسمت قبل را کامل کنید و در آزمون آن قبول شوید.';
 
@@ -71,8 +77,13 @@ export async function listMyPackages(
   return packages.filter((p) => !status || p.status === status).map(stripSections);
 }
 
-async function packageForUser(d: Deps, user: Doc<User>, packageId: string): Promise<PackageView> {
-  const { packages } = await loadUserLearning(d, user);
+async function packageForUser(
+  d: Deps,
+  user: Doc<User>,
+  packageId: string,
+  hot = false,
+): Promise<PackageView> {
+  const { packages } = await loadUserLearning(d, user, hot ? await loadSharedCached(d) : undefined);
   const p = packages.find((x) => x.id === packageId);
   if (!p) throw new ApiError('NOT_FOUND', 'این آموزش برای شما فعال نیست.');
   return p;
@@ -122,9 +133,9 @@ export async function sectionIndex(
   return { section, pkg };
 }
 
-async function sectionForUser(d: Deps, user: Doc<User>, sectionId: string) {
+async function sectionForUser(d: Deps, user: Doc<User>, sectionId: string, hot = false) {
   const { section, pkg } = await sectionIndex(d, sectionId);
-  const view = await packageForUser(d, user, pkg.id);
+  const view = await packageForUser(d, user, pkg.id, hot);
   const sv = view.sections.find((s) => s.id === sectionId);
   if (!sv) throw new ApiError('NOT_FOUND', 'این قسمت پیدا نشد.');
   return { section, pkg, view, sv };
@@ -272,61 +283,251 @@ export async function getProgress(d: Deps, user: Doc<User>, sectionId: string) {
   };
 }
 
+/** Log a progress request when it failed, hit a limit, or was slow; healthy fast beats stay silent. */
+const PROGRESS_SLOW_LOG_MS = 1_500;
+const ACTIVITY_PING_MS = 5 * 60_000;
+
+export interface ProgressOptions {
+  skipBudget?: boolean;
+  requestId?: string;
+  /** Epoch-ms after which this request must not START any new read or write. */
+  deadlineAtMs?: number | null;
+}
+
+/** Did the durable write happen? `unknown` = the commit was sent but its outcome was never seen. */
+type Committed = 'no' | 'yes' | 'unknown';
+
+function classifyFailure(e: unknown): string {
+  if (e instanceof ApiError) return e.status < 500 ? 'client_error' : 'server_error';
+  if (e instanceof DeadlineError) return e.kind === 'deadline' ? 'request_deadline' : 'd1_timeout';
+  if (e instanceof StoreBusyError) return 'tx_conflict_exhausted';
+  return 'server_error';
+}
+
+/**
+ * Progress heartbeat.
+ *
+ * WHAT IS AUTHORITATIVE. `section_progress` (position, played seconds, completion and the
+ * `recentKeys` idempotency list) and the `playback_events` row that describes the same accepted
+ * delta are written in ONE atomic, compare-and-swap commit (see D1Store.runTransaction). They exist
+ * together or not at all, and the same Idempotency-Key is applied at most once, also across Worker
+ * isolates, because the key list lives in the document the commit guards.
+ *
+ * WHAT IS BEST-EFFORT. `users.lastActiveAt`, analytics events and the first-play nudge run after the
+ * commit. If one fails or the deadline has passed it is skipped and logged
+ * (`progress_side_effect_failed` / `_skipped`); the beat itself stays successful, because turning a
+ * committed beat into an error would only make the client replay it.
+ *
+ * DEADLINE SEMANTICS. `deadlineAtMs` stops the request from STARTING new work. It cannot recall a
+ * call already sent to D1. So a request that fails on the deadline BEFORE the commit has provably
+ * written nothing, and the only way to answer an error after a write is a commit whose result was
+ * never seen (`committed: "unknown"` in the log). That case is safe to retry: replaying the same
+ * Idempotency-Key is a no-op if the commit landed and applies once if it did not.
+ *
+ * One structured log line is written for failed, slow, limited or retried requests, carrying the
+ * request ID (the `X-Request-Id` response header). No token, password or request body is logged.
+ */
 export async function recordProgress(
   d: Deps,
   user: Doc<User>,
   sectionId: string,
   input: z.infer<typeof heartbeatSchema>,
   idempotencyKey: string | undefined,
-  opts: { skipBudget?: boolean } = {},
+  opts: ProgressOptions = {},
 ) {
-  const { section, pkg, sv } = await sectionForUser(d, user, sectionId);
+  const trace = newOpTrace(opts.requestId ?? 'none', opts.deadlineAtMs ?? null);
+  const store = d.store.scoped?.(trace) ?? d.store;
+  const started = Date.now();
+  const state: { committed: Committed; sideEffectFailures: number } = {
+    committed: 'no',
+    sideEffectFailures: 0,
+  };
+  let outcome: 'success' | 'duplicate' | 'failure' = 'failure';
+  let failure: string | undefined;
+  let errorName: string | undefined;
+  try {
+    const res = await recordProgressInner(
+      d,
+      store,
+      trace,
+      state,
+      user,
+      sectionId,
+      input,
+      idempotencyKey,
+      opts,
+    );
+    outcome = res.duplicate ? 'duplicate' : 'success';
+    return res;
+  } catch (e) {
+    errorName = e instanceof Error ? e.name : 'unknown';
+    failure = classifyFailure(e);
+    throw e;
+  } finally {
+    const totalDurationMs = Date.now() - started;
+    const limited =
+      trace.d1Timeouts + trace.queueTimeouts + trace.txRetries + trace.lateCompletions > 0 ||
+      state.sideEffectFailures > 0;
+    const incident = outcome === 'failure' && failure !== 'client_error';
+    if (incident || limited || totalDurationMs >= PROGRESS_SLOW_LOG_MS) {
+      console.warn(
+        JSON.stringify({
+          level: failure === 'server_error' ? 'error' : 'warn',
+          msg: 'progress',
+          operationName: 'recordProgress',
+          requestId: trace.requestId,
+          userId: user.id,
+          sectionId,
+          outcome,
+          success: outcome !== 'failure',
+          failure: failure ?? null,
+          error: errorName,
+          committed: state.committed,
+          timeout: failure === 'd1_timeout' || failure === 'request_deadline',
+          totalDurationMs,
+          queueWaitMs: trace.queueWaitMs,
+          d1DurationMs: trace.d1DurationMs,
+          d1Calls: trace.d1Calls,
+          d1Timeouts: trace.d1Timeouts,
+          queueTimeouts: trace.queueTimeouts,
+          txRetries: trace.txRetries,
+          lateCompletions: trace.lateCompletions,
+          sideEffectFailures: state.sideEffectFailures,
+        }),
+      );
+    }
+  }
+}
+
+/** Runs one post-commit step. Never throws; skips (and logs) once the deadline has passed. */
+async function bestEffort(
+  name: string,
+  trace: OpTrace,
+  state: { sideEffectFailures: number },
+  deadline: Deadline,
+  fn: () => Promise<unknown>,
+): Promise<boolean> {
+  if (state.sideEffectFailures > 0) return false; // a stalled store: do not stack more waits
+  if (deadline.expired()) {
+    state.sideEffectFailures++;
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        msg: 'progress_side_effect_skipped',
+        step: name,
+        reason: 'deadline',
+        requestId: trace.requestId,
+      }),
+    );
+    return false;
+  }
+  try {
+    await fn();
+    return true;
+  } catch (e) {
+    state.sideEffectFailures++;
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        msg: 'progress_side_effect_failed',
+        step: name,
+        requestId: trace.requestId,
+        error: e instanceof Error ? e.name : 'unknown',
+        message: e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200),
+      }),
+    );
+    return false;
+  }
+}
+
+async function recordProgressInner(
+  d: Deps,
+  store: Deps['store'],
+  trace: OpTrace,
+  state: { committed: Committed; sideEffectFailures: number },
+  user: Doc<User>,
+  sectionId: string,
+  input: z.infer<typeof heartbeatSchema>,
+  idempotencyKey: string | undefined,
+  opts: ProgressOptions,
+) {
+  const deadline = new Deadline(opts.deadlineAtMs ?? null);
+  const { section, pkg, sv } = await sectionForUser(d, user, sectionId, true);
   if (sv.state === 'locked') throw new ApiError('FORBIDDEN', LOCKED);
   const policy = await getPolicy(d);
+  // Everything above is read-only. From here on a deadline failure still means "nothing written".
+  deadline.check('progress commit');
   const now = d.clock().toISOString();
   const path = `section_progress/${ids.progress(user.id, sectionId)}`;
   const key = idempotencyKey?.slice(0, 80);
-  const result = await d.store.runTransaction(async (tx) => {
-    const prev = await tx.get<SectionProgress>(path);
-    if (key && prev?.recentKeys?.includes(key)) return { duplicate: true, prev, next: null };
-    let playedDeltaSec = input.playedDeltaSec;
-    if (!opts.skipBudget) {
-      const budgetPath = `playback_budgets/${user.id}`;
-      const spent = spendBudget(
-        await tx.get<PlaybackBudget>(budgetPath),
-        d.clock().getTime(),
-        Math.min(MAX_DELTA, playedDeltaSec),
+  // Fixed once per request so a conflict retry rewrites the same event row instead of adding one.
+  const eventId = store.newId();
+  let result;
+  try {
+    result = await store.runTransaction(async (tx) => {
+      // The callback may run again after a conflict; it only reads through `tx` and writes through `tx`.
+      const prev = await tx.get<SectionProgress>(path);
+      if (key && prev?.recentKeys?.includes(key))
+        return { duplicate: true as const, prev, next: null };
+      let playedDeltaSec = input.playedDeltaSec;
+      if (!opts.skipBudget) {
+        const budgetPath = `playback_budgets/${user.id}`;
+        const spent = spendBudget(
+          await tx.get<PlaybackBudget>(budgetPath),
+          d.clock().getTime(),
+          Math.min(MAX_DELTA, playedDeltaSec),
+        );
+        playedDeltaSec = spent.acceptedSec;
+        tx.set(budgetPath, spent.next as unknown as Record<string, unknown>);
+      }
+      const next = applyHeartbeat(
+        prev,
+        { ...input, playedDeltaSec },
+        section.durationSec,
+        policy.completionThreshold,
       );
-      playedDeltaSec = spent.acceptedSec;
-      tx.set(budgetPath, spent.next as unknown as Record<string, unknown>);
-    }
-    const next = applyHeartbeat(
-      prev,
-      { ...input, playedDeltaSec },
-      section.durationSec,
-      policy.completionThreshold,
-    );
-    const recentKeys = key
-      ? [...(prev?.recentKeys ?? []), key].slice(-30)
-      : (prev?.recentKeys ?? []);
-    const doc: SectionProgress = {
-      userId: user.id,
-      sectionId,
-      packageId: pkg.id,
-      playedSeconds: next.playedSeconds,
-      percent: next.percent,
-      completed: next.completed,
-      completedAt: prev?.completedAt ?? (next.justCompleted ? now : null),
-      lastPositionSec: next.lastPositionSec,
-      quizPassed: prev?.quizPassed ?? false,
-      quizPassedAt: prev?.quizPassedAt ?? null,
-      recentKeys,
-      startedAt: prev?.startedAt ?? now,
-      updatedAt: now,
-    };
-    tx.set(path, doc as unknown as Record<string, unknown>);
-    return { duplicate: false, prev, next: doc, justCompleted: next.justCompleted };
-  });
+      const recentKeys = key
+        ? [...(prev?.recentKeys ?? []), key].slice(-30)
+        : (prev?.recentKeys ?? []);
+      const doc: SectionProgress = {
+        userId: user.id,
+        sectionId,
+        packageId: pkg.id,
+        playedSeconds: next.playedSeconds,
+        percent: next.percent,
+        completed: next.completed,
+        completedAt: prev?.completedAt ?? (next.justCompleted ? now : null),
+        lastPositionSec: next.lastPositionSec,
+        quizPassed: prev?.quizPassed ?? false,
+        quizPassedAt: prev?.quizPassedAt ?? null,
+        recentKeys,
+        startedAt: prev?.startedAt ?? now,
+        updatedAt: now,
+      };
+      tx.set(path, doc as unknown as Record<string, unknown>);
+      tx.set(`playback_events/${eventId}`, {
+        userId: user.id,
+        sectionId,
+        positionSec: input.positionSec,
+        playedDeltaSec: input.playedDeltaSec,
+        acceptedDeltaSec: Math.round((doc.playedSeconds - (prev?.playedSeconds ?? 0)) * 10) / 10,
+        clientTs: input.ts ?? null,
+        ts: now,
+        deviceId: input.deviceId ?? null,
+        expireAt: new Date(d.clock().getTime() + 90 * DAY),
+      });
+      return { duplicate: false as const, prev, next: doc, justCompleted: next.justCompleted };
+    });
+  } catch (e) {
+    // Only a commit whose outcome was never seen can have written something.
+    const knownNotCommitted =
+      e instanceof ApiError ||
+      e instanceof StoreBusyError ||
+      (e instanceof DeadlineError && e.kind === 'deadline');
+    state.committed = knownNotCommitted ? 'no' : 'unknown';
+    throw e;
+  }
+  state.committed = 'yes';
   if (result.duplicate || !result.next) {
     const p = result.prev;
     return {
@@ -337,45 +538,58 @@ export async function recordProgress(
       duplicate: true,
     };
   }
-  const nowD = d.clock();
-  await d.store.set(`playback_events/${d.store.newId()}`, {
-    userId: user.id,
-    sectionId,
-    positionSec: input.positionSec,
-    playedDeltaSec: input.playedDeltaSec,
-    acceptedDeltaSec:
-      Math.round((result.next.playedSeconds - (result.prev?.playedSeconds ?? 0)) * 10) / 10,
-    clientTs: input.ts ?? null,
-    ts: now,
-    deviceId: input.deviceId ?? null,
-    expireAt: new Date(nowD.getTime() + 90 * DAY),
-  });
-  await d.store.update(`users/${user.id}`, { lastActiveAt: now });
+  const next = result.next;
+  const step = (name: string, fn: () => Promise<unknown>) =>
+    bestEffort(name, trace, state, deadline, fn);
+  // Presence only needs minute-level resolution (inactivity jobs count days, KPIs count users), so the
+  // user touch and the presence event are written at most once per ACTIVITY_PING_MS per section instead
+  // of on every 10 s heartbeat. Section start and completion are always recorded.
+  const lastWrite = result.prev ? Date.parse(result.prev.updatedAt) : NaN;
+  const pingDue =
+    !Number.isFinite(lastWrite) || d.clock().getTime() - lastWrite >= ACTIVITY_PING_MS;
+  if (pingDue)
+    await step('touch_user', () => store.update(`users/${user.id}`, { lastActiveAt: now }));
   if (!result.prev) {
-    await track(d, 'section_played', user.id, { sectionId, mediaType: section.mediaType });
-    const minutes = Math.max(1, Math.round(section.durationSec / 60));
-    await createNudge(
-      d,
-      user.id,
-      'R5',
-      `این قسمت حدود ${minutes} دقیقه است — می‌توانی در مسیر گوش بدهی.`,
-      `/sections/${sectionId}`,
-      sectionId,
+    await step('section_played', () =>
+      track(d, 'section_played', user.id, { sectionId, mediaType: section.mediaType }),
     );
-    await maybeReengaged(d, user.id);
-  }
-  await track(d, 'playback_heartbeat', user.id, { sectionId, deltaSec: input.playedDeltaSec });
-  if ('justCompleted' in result && result.justCompleted) {
-    await track(d, 'section_completed', user.id, {
-      sectionId,
-      elapsedSec: result.next.playedSeconds,
+    await step('first_play_nudge', async () => {
+      const minutes = Math.max(1, Math.round(section.durationSec / 60));
+      await createNudge(
+        d,
+        user.id,
+        'R5',
+        `این قسمت حدود ${minutes} دقیقه است — می‌توانی در مسیر گوش بدهی.`,
+        `/sections/${sectionId}`,
+        sectionId,
+      );
+      await maybeReengaged(d, user.id);
     });
   }
+  if (pingDue)
+    await step('heartbeat_event', () =>
+      track(d, 'playback_heartbeat', user.id, { sectionId, deltaSec: input.playedDeltaSec }),
+    );
+  if (result.justCompleted) {
+    await step('section_completed', () =>
+      track(d, 'section_completed', user.id, { sectionId, elapsedSec: next.playedSeconds }),
+    );
+    // «قسمت تمام شد، آزمون یادت نرود». `sectionId` is what `stillValid()` re-checks before the
+    // delayed push goes out, so the nudge dies as soon as the quiz is passed.
+    await step('section_completed_event', () =>
+      emitAutomationEvent(d, 'section.completed', user.id, {
+        sectionId,
+        section: section.title,
+        title: section.title,
+        packageId: pkg.id,
+      }),
+    );
+  }
   return {
-    percent: result.next.percent,
-    completed: result.next.completed,
-    lastPositionSec: result.next.lastPositionSec,
-    playedSeconds: result.next.playedSeconds,
+    percent: next.percent,
+    completed: next.completed,
+    lastPositionSec: next.lastPositionSec,
+    playedSeconds: next.playedSeconds,
     duplicate: false,
   };
 }
@@ -596,8 +810,17 @@ export async function startAttempt(d: Deps, user: Doc<User>, quizId: string) {
     tx.create(`attempts/${id}`, attempt as unknown as Record<string, unknown>);
     return { attemptId: id, attemptNumber: n, resumed: false };
   });
-  if (!res.resumed)
+  if (!res.resumed) {
     await track(d, 'quiz_started', user.id, { quizId, attemptNumber: res.attemptNumber });
+    // Prompt §8 «شروع آزمون و رها کردنش»: only a fresh attempt starts the timer — resuming an open
+    // one must not push the delayed nudge further away.
+    await emitAutomationEvent(d, 'attempt.started', user.id, {
+      quizId,
+      sectionId: quiz.sectionId,
+      packageId: view.id,
+      title: view.title,
+    });
+  }
   return res;
 }
 
@@ -723,6 +946,14 @@ export async function submitAttempt(
         score: g.score,
         attemptNumber: a.attemptNumber,
       });
+      await emitAutomationEvent(d, 'quiz.passed', user.id, {
+        sectionId: a.sectionId,
+        packageId: pkg.id,
+        quizId: a.quizId,
+        title: pkg.title,
+        section: section.title,
+        score: Math.round(g.score),
+      });
       const policy = await getPolicy(d);
       if (
         a.attemptNumber === 1 &&
@@ -774,6 +1005,19 @@ export async function submitAttempt(
         { title: pkg.title },
         { actionRef: `/packages/${pkg.id}` },
       );
+      // The 2-hour follow-up (`quiz_failed_nudge`) and the retry offer start here. `attemptNumber`
+      // counts every attempt on this quiz, so the second failure is what feeds the mentor ladder.
+      const failVars = {
+        sectionId: a.sectionId,
+        packageId: pkg.id,
+        quizId: a.quizId,
+        title: pkg.title,
+        section: section.title,
+        score: Math.round(g.score),
+      };
+      await emitAutomationEvent(d, 'quiz.failed', user.id, failVars);
+      if (a.attemptNumber >= 2)
+        await emitAutomationEvent(d, 'quiz.failed_twice', user.id, failVars);
     }
   }
   if (outcome.fresh)
@@ -827,6 +1071,10 @@ async function onPackageCompleted(d: Deps, user: Doc<User>, pkg: Doc<Package>): 
     return 0; // already recorded (idempotent)
   }
   const policy = await getPolicy(d);
+  await emitAutomationEvent(d, 'package.completed', user.id, {
+    title: pkg.title,
+    packageId: pkg.id,
+  });
   let pts = 0;
   if (
     await awardPoints(

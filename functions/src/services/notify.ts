@@ -12,6 +12,10 @@ import type {
   User,
 } from '../domain/types';
 import { audit, getPolicy, track, type Actor, type Deps } from './context';
+import { recordPushOutcome } from './system-health';
+import { isSafeImageUrl, isSafeInternalPath } from './push-campaigns';
+import { categoryOfType, isCategory, isMutable } from '../domain/notification-categories';
+import { prefsForNotify, templateGate } from './push-automation-governor';
 
 /** Persian templates (spec §26). Variables in {braces}. Editable by admin. */
 export const DEFAULT_TEMPLATES: Record<
@@ -93,7 +97,19 @@ export const DEFAULT_TEMPLATES: Record<
   },
   escalation: { title: 'نیاز به بررسی', body: '{body}', push: true, vars: ['body'] },
   manual: { title: '{title}', body: '{body}', push: true, vars: ['title', 'body'] },
+  /**
+   * The push-automation engine renders its own message (from `push_automations/<key>`); this entry
+   * only exists so the exhaustive template map keeps type-safety. It is deliberately NOT offered in
+   * the template editor (see `getTemplates`), and `push:false` keeps `notifyUsers` from inventing a
+   * default: every automation says explicitly whether it pushes.
+   */
+  automation: { title: '', body: '', push: false, vars: [] },
 };
+
+/** Template keys shown/editable in the admin UI (the automation carrier is not a template). */
+export const EDITABLE_TEMPLATE_KEYS = (Object.keys(DEFAULT_TEMPLATES) as NotificationType[]).filter(
+  (k) => k !== 'automation',
+);
 
 /** Push bodies never carry message contents (spec §26: no sensitive data in Push). */
 const GENERIC_PUSH: Partial<Record<NotificationType, { title: string; body: string }>> = {
@@ -112,7 +128,7 @@ export async function getTemplates(d: Deps) {
     collection: 'notification_templates',
   });
   const byKey = new Map(stored.map((s) => [s.id, s]));
-  return (Object.keys(DEFAULT_TEMPLATES) as NotificationType[]).map((key) => {
+  return EDITABLE_TEMPLATE_KEYS.map((key) => {
     const def = DEFAULT_TEMPLATES[key];
     const s = byKey.get(key);
     return {
@@ -170,6 +186,21 @@ export interface NotifyOptions {
   throttleKey?: string;
   throttleMs?: number;
   push?: boolean;
+  imageUrl?: string | null;
+  /** Marks the notification (and the push payload) with the automation that produced it. */
+  automationKey?: string | null;
+  /**
+   * Which preference category this message belongs to. Only the automation engine sets it: one
+   * `automation` type carries many categories, and muting «quiz» must not silence a deadline nudge.
+   */
+  category?: string | null;
+  /** True for the panel's «ارسال آزمایشی»: never counted in automation stats. */
+  isTest?: boolean;
+  /**
+   * Pre-resolved `userId → tokens` map (the campaign studio builds one per run). When absent,
+   * `sendPush` falls back to a per-user lookup — identical behaviour, one query per user more.
+   */
+  tokenIndex?: Map<string, DeviceToken[]>;
 }
 
 async function throttled(d: Deps, userId: string, key: string, windowMs: number): Promise<boolean> {
@@ -189,68 +220,134 @@ async function throttled(d: Deps, userId: string, key: string, windowMs: number)
   });
 }
 
+interface PushAttemptResult {
+  status: Notification['pushStatus'];
+  invalid: number;
+}
+
 async function sendPush(
   d: Deps,
   n: Doc<Notification>,
   type: NotificationType,
-): Promise<Notification['pushStatus']> {
-  const tokens = await d.store.query<DeviceToken>({
-    collection: 'device_tokens',
-    where: [['userId', '==', n.userId]],
-  });
-  if (!tokens.length) return 'skipped';
+  tokenIndex?: Map<string, DeviceToken[]>,
+): Promise<PushAttemptResult> {
+  const tokens =
+    tokenIndex?.get(n.userId) ??
+    (await d.store.query<DeviceToken>({
+      collection: 'device_tokens',
+      where: [['userId', '==', n.userId]],
+    }));
+  if (!tokens.length) return { status: 'skipped', invalid: 0 };
   const g = GENERIC_PUSH[type];
   try {
     const res = await d.push.send(
       tokens.map((t) => t.token),
       {
-        title: g?.title ?? n.title,
-        body: g?.body ?? n.body,
-        data: { notificationId: n.id, link: n.actionRef ?? '/messages', type },
+        title: type === 'manual' ? n.title : (g?.title ?? n.title),
+        body: type === 'manual' ? n.body : (g?.body ?? n.body),
+        data: {
+          notificationId: n.id,
+          link: n.actionRef ?? '/messages',
+          type,
+          ...(n.automationKey ? { automationKey: n.automationKey } : {}),
+          ...(n.imageUrl ? { imageUrl: n.imageUrl } : {}),
+        },
+        imageUrl: n.imageUrl ?? undefined,
       },
     );
     for (const bad of res.invalidTokens) await d.store.delete(`device_tokens/${ids.hash(bad)}`);
-    return res.sent > 0 ? 'sent' : 'failed';
+    return {
+      status: res.sent > 0 ? 'sent' : 'failed',
+      invalid: res.invalidTokens.length,
+    };
   } catch (e) {
     console.warn('push failed', (e as Error).message);
-    return 'failed'; // In-App remains (fallback) and deferred retry picks up 'failed' once.
+    return { status: 'failed', invalid: 0 }; // In-App remains; the provider failure is reported below.
   }
 }
 
-/** Creates In-App notifications (always) and Push (per type, quiet-hours aware). Batched. */
-export async function notifyUsers(
+/**
+ * Which of these users muted this notification type's category. ONE store read for the whole call
+ * (never one per user), and an empty result is the common case, so the fast path stays a single read.
+ * Protected categories (`deadlines`) are never returned: muting them is refused at write time.
+ */
+async function mutedForUsers(
+  d: Deps,
+  userIds: string[],
+  typeOrCategory: NotificationType | string,
+): Promise<Set<string>> {
+  const category = isCategory(typeOrCategory)
+    ? typeOrCategory
+    : categoryOfType(typeOrCategory as NotificationType);
+  if (!isMutable(category)) return new Set();
+  return prefsForNotify(d, userIds, category);
+}
+
+export interface NotifyUsersResult {
+  created: number;
+  push: {
+    sent: number;
+    failed: number;
+    skipped: number;
+    deferred: number;
+    notRequested: number;
+    invalid: number;
+  };
+}
+
+/**
+ * Creates In-App notifications and returns the provider-facing result as well as the row count.
+ * Automation uses this form because creating an inbox row is not proof that FCM accepted a message.
+ */
+export async function notifyUsersDetailed(
   d: Deps,
   userIds: string[],
   type: NotificationType,
   content: { title: string; body: string },
   opts: NotifyOptions = {},
-): Promise<number> {
+): Promise<NotifyUsersResult> {
   const policy = await getPolicy(d);
   const def = DEFAULT_TEMPLATES[type];
   const wantPush = opts.push ?? def.push;
+  // A marketer may mute a category (push only; the in-app notification is ALWAYS created — spec §6).
+  const muted =
+    wantPush && !opts.isTest ? await mutedForUsers(d, userIds, opts.category ?? type) : null;
   const now = d.clock();
   const quiet = inQuietHours(now, policy.quietHours, policy.timezone);
   const bypassQuiet = opts.priority === 'high' && !!opts.urgent;
   let created = 0;
+  const pushResult: NotifyUsersResult['push'] = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    deferred: 0,
+    notRequested: 0,
+    invalid: 0,
+  };
   const uniq = [...new Set(userIds)];
   for (let i = 0; i < uniq.length; i += 50) {
-    await Promise.all(
-      uniq.slice(i, i + 50).map(async (userId) => {
+    const statuses = await Promise.all(
+      uniq.slice(i, i + 50).map(async (userId): Promise<Notification['pushStatus'] | null> => {
         if (
           opts.throttleKey &&
           (await throttled(d, userId, opts.throttleKey, opts.throttleMs ?? DAY))
         )
-          return;
+          return null;
+        const optedOut = muted?.has(userId) ?? false;
         const id = d.store.newId();
-        const deferred = wantPush && quiet && !bypassQuiet;
+        const push = wantPush && !optedOut;
+        const deferred = push && quiet && !bypassQuiet;
         const n: Notification = {
           userId,
           type,
           title: content.title,
           body: content.body,
           actionRef: opts.actionRef ?? null,
+          imageUrl: opts.imageUrl ?? null,
+          automationKey: opts.automationKey ?? null,
+          ...(opts.isTest ? { isTest: true } : {}),
           readAt: null,
-          pushStatus: wantPush ? (deferred ? 'deferred' : 'none') : 'none',
+          pushStatus: push ? (deferred ? 'deferred' : 'none') : optedOut ? 'skipped' : 'none',
           deliverAfter: deferred
             ? quietHoursEnd(now, policy.quietHours, policy.timezone).toISOString()
             : null,
@@ -258,14 +355,44 @@ export async function notifyUsers(
         };
         await d.store.set(`notifications/${id}`, n as unknown as Record<string, unknown>);
         created++;
-        if (wantPush && !deferred) {
-          const status = await sendPush(d, { ...n, id }, type);
-          await d.store.update(`notifications/${id}`, { pushStatus: status });
+        if (push && !deferred) {
+          const attempt = await sendPush(d, { ...n, id }, type, opts.tokenIndex);
+          pushResult.invalid += attempt.invalid;
+          await d.store.update(`notifications/${id}`, { pushStatus: attempt.status });
+          return attempt.status;
         }
+        return n.pushStatus;
       }),
     );
+    for (const status of statuses) {
+      if (status === null) continue;
+      if (status === 'sent') pushResult.sent++;
+      else if (status === 'failed') pushResult.failed++;
+      else if (status === 'skipped') pushResult.skipped++;
+      else if (status === 'deferred') pushResult.deferred++;
+      else pushResult.notRequested++;
+    }
   }
-  return created;
+  if (pushResult.sent + pushResult.failed > 0) {
+    await recordPushOutcome(d, {
+      sent: pushResult.sent,
+      failed: pushResult.failed,
+      invalid: pushResult.invalid,
+      ...(pushResult.failed ? { error: 'یک یا چند ارسال فوری Push ناموفق بود.' } : {}),
+    });
+  }
+  return { created, push: pushResult };
+}
+
+/** Backwards-compatible notification API for existing callers that only need the created row count. */
+export async function notifyUsers(
+  d: Deps,
+  userIds: string[],
+  type: NotificationType,
+  content: { title: string; body: string },
+  opts: NotifyOptions = {},
+): Promise<number> {
+  return (await notifyUsersDetailed(d, userIds, type, content, opts)).created;
 }
 
 export async function notifyTemplate(
@@ -276,6 +403,15 @@ export async function notifyTemplate(
   opts: NotifyOptions = {},
 ) {
   if (!userIds.length) return 0;
+  // The automation panel owns the on/off switch of every system template (prompt §5.2). No gate
+  // document yet (catalogue not seeded) → today's behaviour is kept exactly as it was.
+  const gate = await templateGate(d, type);
+  if (gate && !gate.enabled) return 0;
+  if (gate?.superseded) {
+    // An automation replaced this template's Push (e.g. inactive_1d replaces `reminder`): the
+    // in-app notification is still created, only the provider call stands down.
+    opts = { ...opts, push: false };
+  }
   const stored = await d.store.get<NotificationTemplate>(`notification_templates/${type}`);
   const def = DEFAULT_TEMPLATES[type];
   return notifyUsers(
@@ -300,11 +436,31 @@ export async function flushDeferredPush(d: Deps): Promise<number> {
     ],
     limit: 500,
   });
+  const deadline = Date.now() + 20_000;
+  let done = 0;
+  let sent = 0;
+  let failed = 0;
+  let invalid = 0;
   for (const n of due) {
-    const status = await sendPush(d, n, n.type);
-    await d.store.update(`notifications/${n.id}`, { pushStatus: status });
+    if (Date.now() > deadline) break;
+    const attempt = await sendPush(d, n, n.type);
+    await d.store.update(`notifications/${n.id}`, { pushStatus: attempt.status });
+    if (attempt.status === 'sent') sent++;
+    else if (attempt.status === 'failed') failed++;
+    invalid += attempt.invalid;
+    done++;
   }
-  return due.length;
+  if (done) {
+    // One aggregated health write per run (not per notification): the admin panel shows the
+    // failure rate and whether Push is configured at all (see services/system-health.ts).
+    await recordPushOutcome(d, {
+      sent,
+      failed,
+      invalid,
+      ...(failed ? { error: 'بخشی از ارسال‌های موکول‌شده ناموفق بود.' } : {}),
+    });
+  }
+  return done;
 }
 
 // ─── Marketer inbox ─────────────────────────────────────────────────────────
@@ -381,6 +537,20 @@ export const manualSendSchema = z
     targetId: z.string().max(80).nullable().optional(),
     title: text(2, 80, 'عنوان'),
     body: text(2, 300, 'متن'),
+    imageUrl: z
+      .string()
+      .trim()
+      .max(2048)
+      .refine((v) => isSafeImageUrl(v), 'آدرس تصویر باید یک لینک عمومی و معتبر با HTTPS باشد.')
+      .nullable()
+      .optional(),
+    actionRef: z
+      .string()
+      .trim()
+      .max(300)
+      .refine(isSafeInternalPath, 'لینک باید یک مسیر داخلی معتبر اپلیکیشن باشد؛ مثل /messages.')
+      .nullable()
+      .optional(),
   })
   .refine((v) => v.audience === 'all' || !!v.targetId, {
     message: 'مخاطب را انتخاب کنید.',
@@ -394,13 +564,39 @@ export async function manualSend(d: Deps, actor: Actor, input: z.infer<typeof ma
   let users = await d.store.query<User>({ collection: 'users', where });
   if (input.audience === 'user') users = users.filter((u) => u.id === input.targetId);
   if (!users.length) throw new ApiError('VALIDATION', 'هیچ کاربری در این مخاطب نیست.');
-  const count = await notifyUsers(
-    d,
-    users.map((u) => u.id),
-    'manual',
-    { title: input.title, body: input.body },
-    { priority: 'normal' },
+  // Fast path: ONE token read + ONE bulk write. Push delivery is left to flushDeferredPush
+  // (kicked in the background right after this response, and by the 15-minute cron), so the
+  // admin request never waits on FCM or on per-user database round trips.
+  const policy = await getPolicy(d);
+  const now = d.clock();
+  const quiet = inQuietHours(now, policy.quietHours, policy.timezone);
+  const deliverAfter = quiet
+    ? quietHoursEnd(now, policy.quietHours, policy.timezone).toISOString()
+    : now.toISOString();
+  const withDevice = new Set(
+    (await d.store.query<DeviceToken>({ collection: 'device_tokens' })).map((t) => t.userId),
   );
+  const items = [...new Set(users.map((u) => u.id))].map((userId) => {
+    const hasDevice = withDevice.has(userId);
+    const n: Notification = {
+      userId,
+      type: 'manual',
+      title: input.title,
+      body: input.body,
+      actionRef: input.actionRef ?? '/',
+      imageUrl: input.imageUrl ?? null,
+      readAt: null,
+      pushStatus: hasDevice ? 'deferred' : 'skipped',
+      deliverAfter: hasDevice ? deliverAfter : null,
+      createdAt: now.toISOString(),
+    };
+    return {
+      path: `notifications/${d.store.newId()}`,
+      data: n as unknown as Record<string, unknown>,
+    };
+  });
+  await d.store.batchSet(items);
+  const count = items.length;
   await audit(d, actor, 'notification.manual_sent', 'notifications', input.audience, null, {
     ...input,
     count,

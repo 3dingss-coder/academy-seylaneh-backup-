@@ -12,13 +12,14 @@ import {
   Send,
   UserCheck,
   UserX,
+  Ban,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export type SectionStatus = 'locked' | 'open' | 'in_progress' | 'quiz' | 'completed';
 export type PublishStatus = 'draft' | 'published' | 'archived';
-export type UserStatus = 'active' | 'inactive';
+export type UserStatus = 'active' | 'inactive' | 'blacklisted';
 export type BadgeStatus = SectionStatus | PublishStatus | UserStatus;
 
 const MAP: Record<BadgeStatus, { label: string; icon: LucideIcon; cls: string }> = {
@@ -56,6 +57,11 @@ const MAP: Record<BadgeStatus, { label: string; icon: LucideIcon; cls: string }>
     cls: 'bg-success-light text-success-fg border-success/30',
   },
   inactive: { label: 'غیرفعال', icon: UserX, cls: 'bg-background text-muted-fg border-border' },
+  blacklisted: {
+    label: 'لیست سیاه',
+    icon: Ban,
+    cls: 'bg-danger-light text-danger border-danger/30',
+  },
 };
 
 /** Anything the API may send that the map does not know yet — never let a badge crash the page. */

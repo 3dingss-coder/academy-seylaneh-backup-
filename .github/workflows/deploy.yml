@@ -23,9 +23,9 @@ concurrency:
 jobs:
   deploy:
     name: Build & Deploy to Cloudflare + D1
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check Cloudflare credentials
         id: cf
@@ -54,7 +54,7 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.cf.outputs.configured == 'true'
         with:
           node-version: 22
@@ -63,11 +63,58 @@ jobs:
       - if: steps.cf.outputs.configured == 'true'
         run: npm ci
 
+      - name: Validate push notification configuration
+        if: steps.cf.outputs.configured == 'true'
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
+          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -e
+          missing=""
+          for name in VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_MESSAGING_SENDER_ID VITE_FIREBASE_APP_ID VITE_FIREBASE_VAPID_KEY FCM_SERVICE_ACCOUNT_JSON; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Push notifications are not configured. Missing GitHub Actions values:$missing"
+            {
+              echo "### Push notification deployment blocked"
+              echo "Add the following missing values under Settings → Secrets and variables → Actions. Firebase web config values belong in **Variables**; service account JSON belongs in **Secrets**."
+              echo "`$missing`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          printf '%s' "$FCM_SERVICE_ACCOUNT_JSON" | node -e '
+            let raw = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              try {
+                const account = JSON.parse(raw);
+                if (!account.project_id || !account.client_email || !account.private_key) throw new Error();
+              } catch {
+                console.error("::error::FCM_SERVICE_ACCOUNT_JSON is not valid service-account JSON or is missing project_id/client_email/private_key.");
+                process.exit(1);
+              }
+            });
+          '
+          echo "Push notification configuration presence and service-account structure validated."
+
       - name: Build Functions + Seed Snapshot + Web PWA
         if: steps.cf.outputs.configured == 'true'
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
         run: npm run build
 
       - name: Provision Cloudflare D1 Database & Deploy Full-Stack Worker
@@ -77,6 +124,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DB_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME || 'seylane-sabz-db' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          # `wrangler deploy` re-runs `[build] command = "npm run build"` (wrangler.toml) and that
+          # rebuild overwrites apps/web/dist, so the build-time VITE_* values must be present here
+          # too, otherwise the deployed site silently loses them (no web push, no API base).
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
         run: |
           set -e
           echo "Checking Cloudflare D1 database: $DB_NAME ..."
@@ -114,6 +172,11 @@ jobs:
           if [ -n "$GEMINI_API_KEY" ]; then
             echo "Syncing GEMINI_API_KEY to the Worker ..."
             printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@4 secret put GEMINI_API_KEY
+          fi
+
+          if [ -n "$FCM_SERVICE_ACCOUNT_JSON" ]; then
+            echo "Syncing FCM_SERVICE_ACCOUNT_JSON to the Worker ..."
+            printf '%s' "$FCM_SERVICE_ACCOUNT_JSON" | npx --yes wrangler@4 secret put FCM_SERVICE_ACCOUNT_JSON
           fi
 
       - name: Optional Deploy to Cloudflare Pages (if CLOUDFLARE_PAGES_PROJECT is set)

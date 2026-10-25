@@ -172,6 +172,29 @@ function jsonResponse(body: unknown, status: number, baseHeaders: Headers): Resp
   return new Response(JSON.stringify(body), { status, headers: h });
 }
 
+const MEDIA_TYPES: Record<string, string> = {
+  m4a: 'audio/mp4',
+  mp4: 'video/mp4',
+  mp3: 'audio/mpeg',
+  aac: 'audio/aac',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+};
+
+/**
+ * Safari (and every browser under `nosniff`) refuses audio/video served as octet-stream, so a file
+ * stored without a proper type is served by its extension instead.
+ */
+export function mediaContentType(stored: string | undefined, path: string): string {
+  const ct = (stored ?? '').trim().toLowerCase();
+  if (ct && ct !== 'application/octet-stream' && ct !== 'binary/octet-stream')
+    return stored as string;
+  const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? '';
+  return MEDIA_TYPES[ext] ?? stored ?? 'application/octet-stream';
+}
+
 function serveBytes(
   request: Request,
   data: Uint8Array,
@@ -311,7 +334,7 @@ export function createFetchHandler(
             end = Math.min(meta.size - 1, end, start + MAX_WINDOW - 1);
             start = Math.max(0, start);
             const h = new Headers(baseHeaders);
-            h.set('Content-Type', meta.contentType);
+            h.set('Content-Type', mediaContentType(meta.contentType, t.p));
             h.set('Cache-Control', 'private, max-age=3600');
             h.set('Accept-Ranges', 'bytes');
             if (start > end) {
@@ -331,7 +354,7 @@ export function createFetchHandler(
           const err = new ApiError('NOT_FOUND');
           return jsonResponse(toErrorBody(err), err.status, baseHeaders);
         }
-        return serveBytes(request, file.data, file.contentType, baseHeaders);
+        return serveBytes(request, file.data, mediaContentType(file.contentType, t.p), baseHeaders);
       }
 
       const pubMatch = /^\/files\/public\/((?:brands|products|branding|avatars)\/.+)$/.exec(

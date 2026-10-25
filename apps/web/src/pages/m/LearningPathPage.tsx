@@ -141,7 +141,7 @@ export function LearningPathPage() {
                         >
                           <div dir="ltr" className="relative w-full select-none overflow-hidden">
                             <img
-                              src="/brand/m/m-learning-path-scene.png"
+                              src="/brand/m/m-learning-path-scene.webp"
                               alt=""
                               aria-hidden="true"
                               className={cn(

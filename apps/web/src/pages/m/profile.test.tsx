@@ -56,7 +56,9 @@ describe('ProfilePage — real account management', () => {
     await screen.findByRole('heading', { name: 'پروفایل من' }, { timeout: 15000 });
 
     const toolbarProfile = screen.getByRole('link', { name: 'پروفایل' });
-    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.png"]')).not.toBeNull();
+    expect(
+      toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.webp"]'),
+    ).not.toBeNull();
     for (const name of [
       'profile-settings',
       'notification',
@@ -66,20 +68,20 @@ describe('ProfilePage — real account management', () => {
       'badge-medal',
       'profile-logout',
     ]) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'ویرایش اطلاعات شخصی' }));
     await screen.findByText('شماره موبایل');
     for (const name of ['profile-camera', 'profile-security', 'profile-location']) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
 
     fireEvent.click(screen.getByRole('button', { name: 'بازگشت' }));
     fireEvent.click(screen.getByRole('button', { name: /تنظیمات اعلان‌ها/ }));
     const prefsHeading = await screen.findByRole('heading', { name: 'تنظیمات اعلان' });
     expect(
-      prefsHeading.querySelector('img[src="/brand/m/icons/notification-3d.png"]'),
+      prefsHeading.querySelector('img[src="/brand/m/icons/notification-3d.webp"]'),
     ).not.toBeNull();
   }, 20000);
 
@@ -97,7 +99,7 @@ describe('ProfilePage — real account management', () => {
     await waitFor(() =>
       expect(toolbarProfile.querySelector(`img[src="${avatarUrl}"]`)).not.toBeNull(),
     );
-    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.png"]')).toBeNull();
+    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.webp"]')).toBeNull();
   }, 20000);
 
   it('saves the display name through PATCH /me and shows the real toast', async () => {

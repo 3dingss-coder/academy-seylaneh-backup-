@@ -45,7 +45,7 @@ export function StaffLoginPage({ panel }: { panel: 'admin' | 'manager' }) {
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#013021]">
       <img
-        src="/brand/auth/auth-welcome-bg.png"
+        src="/brand/auth/auth-welcome-bg.webp"
         alt=""
         aria-hidden
         className="absolute inset-0 size-full object-cover"

@@ -415,8 +415,8 @@ describe('M7/M8 quiz', () => {
     fireEvent.click(screen.getByTestId('quiz-submit'));
     fireEvent.click(await screen.findByTestId('quiz-confirm'));
     expect(await screen.findByTestId('quiz-result')).toHaveTextContent('قبول شدی');
-    expect(container.querySelector('img[src="/brand/m/icons/quiz-passed-3d.png"]')).not.toBeNull();
-    expect(container.querySelector('img[src="/brand/m/icons/quiz-review-3d.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/icons/quiz-passed-3d.webp"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/icons/quiz-review-3d.webp"]')).not.toBeNull();
     expect(screen.getByText('+۲۰ امتیاز')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'بازگشت به بسته' })).toBeInTheDocument();
     // Wait for the invalidation refetch, then make sure the result is still shown.
@@ -447,7 +447,7 @@ describe('M7/M8 quiz', () => {
     const { container } = renderApp('/quiz/seed-pkg-formi-s1');
     expect(await screen.findByText('در انتظار تأیید مدیر')).toBeInTheDocument();
     expect(
-      container.querySelector('img[src="/brand/m/icons/retake-pending-3d.png"]'),
+      container.querySelector('img[src="/brand/m/icons/retake-pending-3d.webp"]'),
     ).not.toBeNull();
   });
 
@@ -462,7 +462,7 @@ describe('M7/M8 quiz', () => {
     const { container } = renderApp('/quiz/seed-pkg-formi-s1');
     expect(await screen.findByText('آزمونی برای این قسمت تعریف نشده است')).toBeInTheDocument();
     expect(
-      container.querySelector('img[src="/brand/m/icons/quiz-unavailable-3d.png"]'),
+      container.querySelector('img[src="/brand/m/icons/quiz-unavailable-3d.webp"]'),
     ).not.toBeNull();
   });
 

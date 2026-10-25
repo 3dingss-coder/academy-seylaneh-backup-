@@ -32,28 +32,28 @@ const STEP_DEFS = [
   {
     title: 'نام و نام خانوادگی',
     desc: 'لطفاً نام و نام خانوادگی خود را وارد کنید تا حساب شما ایجاد شود.',
-    art: '/brand/auth/auth-step-name.png',
+    art: '/brand/auth/auth-step-name.webp',
     bubble: 'اول با هم آشنا بشیم 😊',
     bubbleSide: 'right' as const,
   },
   {
     title: 'محل فعالیت شما',
     desc: 'لطفاً محل فعالیت خود را مشخص کنید تا محتوای مناسب‌تری به شما ارائه دهیم.',
-    art: '/brand/auth/auth-step-area.png',
+    art: '/brand/auth/auth-step-area.webp',
     bubble: '',
     bubbleSide: 'right' as const,
   },
   {
     title: 'استان و شهر',
     desc: 'استان و شهر محل فعالیت خود را انتخاب کنید.',
-    art: '/brand/auth/auth-step-city.png',
+    art: '/brand/auth/auth-step-city.webp',
     bubble: 'این اطلاعات به ما کمک می‌کند تا محتوای منطقه‌ای مرتبط با شهر شما را پیشنهاد دهیم.',
     bubbleSide: 'left' as const,
   },
   {
     title: 'کد ملی یا شماره موبایل',
     desc: 'با توجه به محل فعالیت شما، لطفاً کد ملی یا شماره موبایل خود را وارد کنید.',
-    art: '/brand/auth/auth-step-id.png',
+    art: '/brand/auth/auth-step-id.webp',
     bubble: 'با این اطلاعات حساب شما ایجاد می‌شود و می‌توانید وارد شوید.',
     bubbleSide: 'left' as const,
   },
@@ -366,7 +366,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
         <div className="mt-14 overflow-hidden rounded-[30px] border border-[#E9E1D5] bg-[#FFFDF8] p-7 text-center shadow-[0_18px_44px_-34px_rgba(22,66,53,0.42)]">
           {phase === 'loading' && (
             <>
-              <img src="/brand/auth/auth-loading.png" alt="" className="mx-auto w-52 max-w-full" />
+              <img src="/brand/auth/auth-loading.webp" alt="" className="mx-auto w-52 max-w-full" />
               <h1 className="mt-2 text-[22px] font-extrabold text-[#061a13]">
                 در حال ایجاد حساب شما...
               </h1>
@@ -378,7 +378,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
           )}
           {phase === 'success' && (
             <>
-              <img src="/brand/auth/auth-success.png" alt="" className="mx-auto w-56 max-w-full" />
+              <img src="/brand/auth/auth-success.webp" alt="" className="mx-auto w-56 max-w-full" />
               <h1 className="mt-2 text-[26px] font-extrabold text-[#061a13]">خوش اومدی!</h1>
               <p className="mt-2 text-sm leading-7 text-[#7a756a]">
                 حساب شما با موفقیت ایجاد شد. در حال انتقال به داشبورد...
@@ -387,7 +387,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
           )}
           {phase === 'error' && (
             <>
-              <img src="/brand/auth/auth-error.png" alt="" className="mx-auto w-56 max-w-full" />
+              <img src="/brand/auth/auth-error.webp" alt="" className="mx-auto w-56 max-w-full" />
               <h1 className="mt-2 text-[22px] font-extrabold text-[#b53c34]">
                 اطلاعات وارد شده صحیح نیست
               </h1>
@@ -418,7 +418,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
         <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-2.75rem)] w-full max-w-[460px] flex-col justify-center">
           <section className="relative overflow-hidden rounded-[32px] bg-[#075A46] shadow-[0_22px_52px_-34px_rgba(4,78,59,0.58)]">
             <img
-              src="/brand/auth/auth-welcome-bg.png"
+              src="/brand/auth/auth-welcome-bg.webp"
               alt=""
               aria-hidden
               className="absolute inset-0 size-full object-cover opacity-90"
@@ -438,7 +438,7 @@ export function AuthPage({ initial = 'login' }: { initial?: Mode }) {
                 یادگیری امروز، موفقیت فردا
               </p>
               <img
-                src="/brand/auth/auth-welcome-mascot.png"
+                src="/brand/auth/auth-welcome-mascot.webp"
                 alt=""
                 aria-hidden
                 className="pointer-events-none mx-auto mt-auto w-[320px] max-w-[92%] select-none object-contain drop-shadow-[0_20px_24px_rgba(0,0,0,.18)]"

@@ -40,7 +40,7 @@ import { MemberTimeline } from '@/components/reports/MemberTimeline';
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { groupByPerson, type PersonGroup } from '@/lib/people';
-import { toPersianDigits } from '@/lib/digits';
+import { toLatinDigits, toPersianDigits } from '@/lib/digits';
 import { errMsg } from '@/lib/errors';
 import { ROLE_LABEL, faDateTime, faNumber, faPercent, faRelative } from '@/lib/format';
 import type { Me, Role, Timeline } from '@/lib/types';
@@ -629,6 +629,7 @@ function UserDialog({
   const [role, setRole] = useState<Role>(user.role);
   const [teamId, setTeamId] = useState(user.teamId ?? '');
   const [managerProvinces, setManagerProvinces] = useState<string[]>(user.managerProvinces ?? []);
+  const [telegramChatId, setTelegramChatId] = useState(user.telegramChatId ?? '');
   const [createdManager, setCreatedManager] = useState<{
     user: Me;
     temporaryPassword: string;
@@ -655,7 +656,9 @@ function UserDialog({
         name: name.trim(),
         role,
         teamId: teamId || null,
-        ...(role === 'manager' ? { managerProvinces } : {}),
+        ...(role === 'manager'
+          ? { managerProvinces, telegramChatId: toLatinDigits(telegramChatId).trim() || null }
+          : {}),
         status,
         brandIds,
         // null clears the pair (the API rejects a stray city without its province).
@@ -844,6 +847,18 @@ function UserDialog({
             onChange={setManagerProvinces}
             error={errors.managerProvinces}
             hint="گزارش‌های همهٔ بازاریاب‌های این استان‌ها در پنل مدیر دیده می‌شود؛ نیازی به ساخت تیم نیست."
+          />
+        )}
+        {role === 'manager' && (
+          <Input
+            label="شناسهٔ گفت‌وگوی تلگرام (گزارش روزانهٔ ساعت ۹)"
+            value={telegramChatId}
+            onChange={(e) => setTelegramChatId(e.target.value)}
+            error={errors.telegramChatId}
+            ltr
+            inputMode="numeric"
+            placeholder="123456789"
+            hint="مدیر از ربات تلگرام با دستور /start این شناسه را می‌گیرد؛ خالی = بدون گزارش تلگرامی."
           />
         )}
         <ResidencePicker

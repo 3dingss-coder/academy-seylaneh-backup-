@@ -13,6 +13,7 @@ import { RateLimiter } from '../../src/http/rateLimit';
 import type { AiHub } from '../../src/ai/hub';
 import { FakeLlm, type LlmClient } from '../../src/llm/types';
 import { RecordingPushSender } from '../../src/push/types';
+import { RecordingTelegramSender } from '../../src/telegram/types';
 import { SYSTEM, type Deps } from '../../src/services/context';
 import * as content from '../../src/services/content';
 import { register } from '../../src/services/users';
@@ -64,7 +65,11 @@ function withQueryLog(store: DocStore, file: string): DocStore {
 }
 
 export interface TestCtx {
-  deps: Deps & { push: RecordingPushSender; mail: RecordingMailer };
+  deps: Deps & {
+    push: RecordingPushSender;
+    mail: RecordingMailer;
+    telegram: RecordingTelegramSender;
+  };
   app: Express;
   limiter: RateLimiter;
   now: { value: Date };
@@ -111,6 +116,7 @@ export async function createCtx(
     auth: new MemoryAuthProvider(store, 'test-secret', () => clock().getTime()),
     blob: new LocalBlobStore(blobRoot, 'test-secret', () => clock().getTime()),
     push: new RecordingPushSender(),
+    telegram: new RecordingTelegramSender(),
     mail: new RecordingMailer(),
     llm: opts.llm === undefined ? new FakeLlm() : opts.llm,
     ...(opts.ai ? { ai: opts.ai } : {}),

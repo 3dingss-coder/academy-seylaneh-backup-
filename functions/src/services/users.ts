@@ -23,6 +23,8 @@ import {
 } from '../domain/iranLocations';
 import type { Role, Team, User } from '../domain/types';
 import { audit, nowIso, SYSTEM, track, type Actor, type Deps } from './context';
+import { transferLearningHistory } from './history-transfer';
+import { normalizeTelegramChatId } from '../telegram/types';
 import { canonicalManagerProvinces, effectiveManagerProvinces, isTeamMarketer } from './team-scope';
 
 // ─── Validation (PROMPT 002) ────────────────────────────────────────────────
@@ -266,6 +268,7 @@ export function publicUser(u: Doc<User>) {
     onboardedAt: u.onboardedAt,
     ...(u.role === 'manager'
       ? {
+          telegramChatId: u.telegramChatId ?? null,
           managerProvinces: effectiveManagerProvinces(u),
           managerProfileRequired: Boolean(u.managerProfileRequired),
           managerProfileCompletedAt: u.managerProfileCompletedAt ?? null,
@@ -339,24 +342,28 @@ async function announceTeamJoin(
  * can hold a marketer account on the same number again. Returns false when the phone is not
  * a clean legacy-Manager case (a marketer already exists, or another Manager holds the key).
  */
-async function freeLegacyManagerPhone(d: Deps, phone: string, owner: Doc<User>): Promise<boolean> {
+async function freeLegacyManagerPhone(
+  d: Deps,
+  phone: string,
+  owner: Doc<User>,
+): Promise<string | null> {
   const samePhone = await d.store.query<User>({
     collection: 'users',
     where: [['phone', '==', phone]],
   });
   if (samePhone.some((user) => user.role === 'marketer' && user.status !== 'blacklisted'))
-    return false;
+    return null;
   const legacyKeyPath = `unique_keys/${ids.uniqueKey('phone', phone)}`;
   const managerKeyPath = `unique_keys/${identityUniqueKey('phone', phone, 'manager')}`;
   const managerKey = await d.store.get<{ uid: string | null }>(managerKeyPath);
-  if (managerKey?.uid && managerKey.uid !== owner.id) return false;
+  if (managerKey?.uid && managerKey.uid !== owner.id) return null;
   const now = nowIso(d);
   if (!managerKey)
     await d.store.create(managerKeyPath, { kind: 'phone', createdAt: now, uid: owner.id });
   else if (!managerKey.uid) await d.store.update(managerKeyPath, { uid: owner.id });
   await d.auth.setEmail(owner.id, managerPhoneToAuthEmail(phone));
   await d.store.delete(legacyKeyPath);
-  return true;
+  return owner.id;
 }
 
 export async function register(
@@ -376,6 +383,9 @@ export async function register(
     ? identityUniqueKey('phone', idf.value, 'manager')
     : ids.uniqueKey(idf.kind, idf.value);
   const now = nowIso(d);
+  // Set when this phone's pre-split Manager account was just migrated to the manager identity
+  // namespace: its marketer learning history moves to the new account below.
+  let legacyHistoryFrom: string | null = null;
   // Reserve the unique key first (handles concurrent sign-ups deterministically).
   const reserveKey = async (): Promise<boolean> => {
     try {
@@ -397,11 +407,12 @@ export async function register(
     // Phones granted Manager access before the identity split still hold the phone in the
     // legacy namespace. Move that Manager account to the manager namespace on the fly so the
     // same phone can register as a marketer again (the bug this split exists to fix).
-    const migrated =
+    const migratedFrom =
       !managerPhone && role !== 'manager' && idf.kind === 'phone' && owner?.role === 'manager'
-        ? await freeLegacyManagerPhone(d, idf.phone, owner).catch(() => false)
-        : false;
-    if (!migrated || !(await reserveKey()))
+        ? await freeLegacyManagerPhone(d, idf.phone, owner).catch(() => null)
+        : null;
+    legacyHistoryFrom = migratedFrom;
+    if (!migratedFrom || !(await reserveKey()))
       throw new ApiError(
         'CONFLICT',
         managerPhone
@@ -454,6 +465,22 @@ export async function register(
   await d.auth.setClaims(uid, { role: user.role });
   await track(d, 'signup_completed', uid, { method: idf.kind });
   const created = { ...user, id: uid } as Doc<User>;
+  // The pre-split Manager account on this phone started life as this person's marketer
+  // account: hand its learning history (progress, attempts, badges, points) back to the new
+  // marketer account so nobody loses their training record over an old role conversion.
+  if (legacyHistoryFrom) {
+    try {
+      const result = await transferLearningHistory(d, legacyHistoryFrom, uid);
+      created.pointsBalance = (created.pointsBalance ?? 0) + result.pointsMoved;
+      await audit(d, SYSTEM, 'user.history_transferred', 'users', uid, null, {
+        fromUserId: legacyHistoryFrom,
+        moved: result.moved,
+        pointsMoved: result.pointsMoved,
+      });
+    } catch {
+      console.warn('[register] legacy learning-history transfer failed; it can be re-run safely.');
+    }
+  }
   // A self sign-up lands in the default sales team when it exists (routes/auth.ts), and that is a new
   // member for its managers — the same hook an admin's team move fires. Province Managers of the
   // joiner's province hear about it too, whichever team the joiner landed in.
@@ -644,6 +671,7 @@ export const patchMeSchema = z
     province: provinceSchema.optional(),
     city: citySchema.optional(),
     workplace: z.string().trim().max(80, 'محل فعالیت خیلی طولانی است.').nullable().optional(),
+    telegramChatId: z.string().trim().max(24).nullable().optional(),
   })
   .superRefine(checkResidence)
   .refine((v) => Object.keys(v).length > 0, 'هیچ تغییری ارسال نشده است.');
@@ -672,6 +700,8 @@ export async function updateMe(d: Deps, user: Doc<User>, input: z.infer<typeof p
   const patch: Partial<User> = { updatedAt: nowIso(d) };
   if (input.name !== undefined) patch.name = input.name;
   if (input.workplace !== undefined) patch.workplace = input.workplace;
+  if (input.telegramChatId !== undefined)
+    patch.telegramChatId = normalizeTelegramChatId(input.telegramChatId);
   if (input.province !== undefined || input.city !== undefined)
     Object.assign(patch, residence(input));
   await d.store.update(`users/${user.id}`, patch as Record<string, unknown>);
@@ -930,6 +960,7 @@ export const adminPatchUserSchema = z
     managerProvinces: managerProvincesSchema.optional(),
     status: z.enum(['active', 'inactive']).optional(),
     brandIds: z.array(z.string().max(80)).max(50).optional(),
+    telegramChatId: z.string().trim().max(24).nullable().optional(),
     // Admins may correct the residence captured at sign-up (also for accounts that predate it).
     province: provinceSchema.nullable().optional(),
     city: citySchema.nullable().optional(),
@@ -996,6 +1027,8 @@ export async function adminUpdateUser(
     patch.managerProvinces !== undefined
       ? canonicalManagerProvinces(patch.managerProvinces)
       : undefined;
+  const patchedTelegramChatId =
+    patch.telegramChatId !== undefined ? normalizeTelegramChatId(patch.telegramChatId) : undefined;
   const nextRole = patch.role ?? target.role;
   const nextTeamId = patch.teamId === undefined ? target.teamId : patch.teamId;
   const nextProvinces = patchedProvinces ?? effectiveManagerProvinces(target);
@@ -1113,6 +1146,7 @@ export async function adminUpdateUser(
   // Store the canonical spellings, not whatever the picker/search box sent.
   if (patch.province) Object.assign(update, residence(patch));
   if (patchedProvinces !== undefined) update.managerProvinces = patchedProvinces;
+  if (patchedTelegramChatId !== undefined) update.telegramChatId = patchedTelegramChatId;
   await d.store.update(`users/${userId}`, update as Record<string, unknown>);
   if (roleChanged) await d.auth.setClaims(userId, { role: patch.role });
   if (roleChanged || patch.status === 'inactive') await d.auth.revoke(userId);

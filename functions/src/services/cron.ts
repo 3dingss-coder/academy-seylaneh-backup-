@@ -11,6 +11,7 @@ import { drainAutomationEvents } from './push-automation-events';
 import { recordCronRun } from './system-health';
 import type { Deps } from './context';
 import { archiveOldEvents } from './retention';
+import { runDailyTelegramReports } from './telegram-reports';
 
 export type JobName =
   | 'flush-push'
@@ -22,7 +23,8 @@ export type JobName =
   | 'migrate-blobs'
   | 'push-campaigns'
   | 'push-automations'
-  | 'archive-events';
+  | 'archive-events'
+  | 'telegram-daily-reports';
 
 export interface JobOptions {
   /** Manual triggers ignore the "only at this weekday/hour" gates (the weekly digest). */
@@ -90,6 +92,7 @@ export const JOBS: Record<JobName, (d: Deps, o?: JobOptions) => Promise<unknown>
   // Copies event-log rows older than 30 days to R2 (verified), and only when EVENT_ARCHIVE_PRUNE=on
   // removes them from D1. Nothing is ever deleted without a verified copy.
   'archive-events': (d, o) => archiveOldEvents(d, o?.deadlineAtMs ?? null),
+  'telegram-daily-reports': (d, o) => runDailyTelegramReports(d, Boolean(o?.force)),
 };
 
 export const JOB_NAMES = Object.keys(JOBS) as JobName[];
@@ -117,6 +120,7 @@ export const CRON_JOBS: Record<string, JobName[]> = {
   '0 * * * *': ['deadline-sweep', 'weekly-digest', 'knowledge-reindex'],
   '30 4 * * *': ['mentor-daily'],
   '30 6 * * *': ['daily-reminders'],
+  '30 5 * * *': ['telegram-daily-reports'], // 09:00 Tehran — daily Excel per Manager
   '0 22 * * *': ['archive-events'], // 01:30 Tehran, the quietest hour
 };
 

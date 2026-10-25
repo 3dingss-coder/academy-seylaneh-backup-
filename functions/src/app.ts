@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth';
 import { localFilesRouter } from './routes/files';
 import { healthRouter } from './routes/health';
 import { managerRouter } from './routes/manager';
+import { telegramRouter } from './routes/telegram';
 import { meRouter } from './routes/me';
 import type { Deps } from './services/context';
 
@@ -62,6 +63,7 @@ export function createApp(deps: Deps, handles: Partial<AppHandles> = {}): Expres
   v1.use(express.json({ limit: '1mb' }));
   v1.use(healthRouter(config));
   v1.use(authRouter(deps, limiter));
+  v1.use(telegramRouter(deps));
   v1.use(
     ['/me', '/manager', '/admin'],
     authenticate(deps),

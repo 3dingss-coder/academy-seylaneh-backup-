@@ -13,6 +13,7 @@ import { ROLE_LABEL } from '@/lib/format';
 import { mimeOf } from '@/lib/upload';
 import { toPersianDigits } from '@/lib/digits';
 import type { ManagerProfileView, Me } from '@/lib/types';
+import { TelegramReportCard } from './TelegramReportCard';
 
 type ProfileTab = 'profile' | 'notifications' | 'security';
 
@@ -266,6 +267,7 @@ export function ManagerProfilePage() {
               هماهنگ کنید.
             </div>
           </Card>
+          <TelegramReportCard />
         </div>
       )}
 

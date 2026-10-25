@@ -19,6 +19,8 @@ export interface Me {
   teamId: string | null;
   /** «استان‌های تحت مدیریت» — Managers only: provinces whose marketers they supervise. */
   managerProvinces?: string[];
+  /** Telegram chat id for the daily 09:00 Excel report (Managers only). */
+  telegramChatId?: string | null;
   brandIds: string[];
   status: 'active' | 'inactive' | 'blacklisted';
   pointsBalance: number;

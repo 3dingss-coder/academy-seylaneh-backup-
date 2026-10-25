@@ -83,6 +83,39 @@ describe('Province-based Manager scope', () => {
     expect(shiraz).toBeTruthy();
   });
 
+  it('covers the whole manager panel (reports, quizzes, timeline, messages) with province scope', async () => {
+    const tehran = await marketerIn('تهران', 'تهران');
+    const outsider = await marketerIn('فارس', 'شیراز');
+    const manager = await ctx.user('manager', { managerProvinces: ['تهران'] });
+
+    const completion = await ctx.api(manager.token).get('/v1/manager/reports/completion');
+    expect(completion.status).toBe(200);
+    expect(completion.body.data.members.map((m: { id: string }) => m.id)).toEqual([tehran.id]);
+
+    const quizzes = await ctx.api(manager.token).get('/v1/manager/reports/quizzes');
+    expect(quizzes.status).toBe(200);
+    expect(quizzes.body.data.members.map((m: { id: string }) => m.id)).toEqual([tehran.id]);
+
+    expect(
+      (await ctx.api(manager.token).get(`/v1/manager/users/${tehran.id}/progress`)).status,
+    ).toBe(200);
+    expect(
+      (await ctx.api(manager.token).get(`/v1/manager/users/${outsider.id}/progress`)).status,
+    ).toBe(403);
+
+    const message = await ctx
+      .api(manager.token)
+      .post(`/v1/manager/users/${tehran.id}/messages`, {
+        body: 'سلام، آموزش این هفته را شروع کنید.',
+      });
+    expect(message.status).toBeLessThan(300);
+    const blocked = await ctx
+      .api(manager.token)
+      .post(`/v1/manager/users/${outsider.id}/messages`, { body: 'نباید برسد.' });
+    expect(blocked.status).toBe(403);
+    expect(outsider).toBeTruthy();
+  });
+
   it('merges manual team members with province marketers without duplicates', async () => {
     await ctx.deps.store.set('teams/team-x', {
       name: 'تیم ویژه',
@@ -250,6 +283,59 @@ describe('Province-based Manager scope', () => {
       createdAt: now,
       uid: legacyUid,
     });
+    // The converted account carries the person's whole marketer learning history.
+    await ctx.deps.store.update(`users/${legacyUid}`, { pointsBalance: 40 });
+    await ctx.deps.store.set(`section_progress/${legacyUid}_sec-1`, {
+      userId: legacyUid,
+      sectionId: 'sec-1',
+      packageId: 'pkg-1',
+      playedSeconds: 120,
+      percent: 100,
+      completed: true,
+      completedAt: now,
+      lastPositionSec: 120,
+      quizPassed: true,
+      quizPassedAt: now,
+      recentKeys: [],
+      startedAt: now,
+      updatedAt: now,
+    });
+    await ctx.deps.store.set(`package_completions/${legacyUid}_pkg-1`, {
+      userId: legacyUid,
+      packageId: 'pkg-1',
+      teamId: null,
+      completedAt: now,
+      onTime: true,
+      delayHours: 0,
+    });
+    await ctx.deps.store.set('attempts/att-1', {
+      quizId: 'q-1',
+      userId: legacyUid,
+      sectionId: 'sec-1',
+      packageId: 'pkg-1',
+      attemptNumber: 1,
+      status: 'submitted',
+      answers: {},
+      score: 90,
+      passed: true,
+      passScore: 60,
+      quizVersion: 1,
+      snapshot: [],
+      startedAt: now,
+      submittedAt: now,
+    });
+    await ctx.deps.store.set(`points_ledger/${legacyUid}_package_completion_pkg-1`, {
+      userId: legacyUid,
+      amount: 40,
+      reason: 'package_completion',
+      refId: 'pkg-1',
+      createdAt: now,
+    });
+    await ctx.deps.store.set(`user_badges/${legacyUid}_first-step`, {
+      userId: legacyUid,
+      badgeId: 'first-step',
+      earnedAt: now,
+    });
 
     const registered = await ctx.api().post('/v1/auth/register', {
       name: 'بازاریاب تازه',
@@ -271,7 +357,25 @@ describe('Province-based Manager scope', () => {
       state: 'active',
       user: { id: legacyUid, role: 'manager' },
     });
-    // …and now sees the new marketer through the province fallback.
+    // The learning history followed the person to the new marketer account.
+    const newMarketerId = registered.body.data.user.id as string;
+    expect(registered.body.data.user.pointsBalance).toBe(40);
+    const movedProgress = await ctx.deps.store.get(`section_progress/${newMarketerId}_sec-1`);
+    expect(movedProgress).toMatchObject({ userId: newMarketerId, percent: 100, completed: true });
+    expect(await ctx.deps.store.get(`section_progress/${legacyUid}_sec-1`)).toBeNull();
+    expect(await ctx.deps.store.get(`package_completions/${newMarketerId}_pkg-1`)).toMatchObject({
+      userId: newMarketerId,
+    });
+    expect(await ctx.deps.store.get('attempts/att-1')).toMatchObject({ userId: newMarketerId });
+    expect(
+      await ctx.deps.store.get(`points_ledger/${newMarketerId}_package_completion_pkg-1`),
+    ).toMatchObject({ userId: newMarketerId, amount: 40 });
+    expect(await ctx.deps.store.get(`user_badges/${newMarketerId}_first-step`)).toMatchObject({
+      userId: newMarketerId,
+    });
+    const legacyAfter = await ctx.deps.store.get<User>(`users/${legacyUid}`);
+    expect(legacyAfter?.pointsBalance).toBe(0);
+    // …and the Manager now sees the new marketer through the province fallback.
     const members = await ctx
       .api(managerLogin.body.data.idToken as string)
       .get('/v1/manager/members');

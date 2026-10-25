@@ -30,6 +30,8 @@ export interface User {
    * to the Manager's own `province` (see `effectiveManagerProvinces` in services/team-scope).
    * An explicit array — even an empty one — is authoritative.
    */
+  /** Telegram chat id for the daily Manager report (Managers opt in from their profile). */
+  telegramChatId?: string | null;
   managerProvinces?: string[];
   brandIds: string[];
   status: UserStatus;
@@ -491,6 +493,8 @@ export interface Policy {
   timezone: string;
   weeklyDigestDay: number; // 0=Sunday … 6=Saturday
   weeklyDigestHour: number;
+  /** Hour (policy timezone) of the daily Telegram Excel report to Managers. Default 9. */
+  managerDailyReportHour: number;
   reminderInactiveDays: number;
   mentorChatEnabled: boolean;
   mentorDailyLimitPerUser: number;

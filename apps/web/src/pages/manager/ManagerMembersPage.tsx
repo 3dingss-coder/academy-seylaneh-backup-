@@ -36,6 +36,7 @@ export function ManagerMembersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [attention, setAttention] = useState<'all' | 'lagging' | 'ready'>('all');
+  const [provinceFilter, setProvinceFilter] = useState('all');
   const [target, setTarget] = useState<ManagerMemberRow | null>(null);
   const navigate = useNavigate();
   const members = useQuery({
@@ -47,6 +48,7 @@ export function ManagerMembersPage() {
     const rows = members.data?.members ?? [];
     const q = normalize(search);
     return rows.filter((member) => {
+      if (provinceFilter !== 'all' && member.province !== provinceFilter) return false;
       if (status !== 'all' && member.status !== status) return false;
       if (attention === 'lagging' && member.stats.lagging === 0) return false;
       if (
@@ -59,7 +61,7 @@ export function ManagerMembersPage() {
         [member.name, member.phone, member.city, member.province].filter(Boolean).join(' '),
       ).includes(q);
     });
-  }, [attention, members.data?.members, search, status]);
+  }, [attention, members.data?.members, provinceFilter, search, status]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -68,7 +70,9 @@ export function ManagerMembersPage() {
         subtitle={
           members.data?.team?.name
             ? `عملکرد و پیگیری اعضای ${members.data.team.name}`
-            : 'مدیریت ارتباط با اعضای تیم'
+            : (members.data?.provinces?.length ?? 0) > 0
+              ? `بازاریاب‌های استان‌های ${members.data?.provinces?.join('، ')}`
+              : 'مدیریت ارتباط با اعضای تیم'
         }
         actions={
           <Button
@@ -234,6 +238,23 @@ export function ManagerMembersPage() {
                   placeholder="نام، شماره یا شهر"
                   icon={<Search className="size-4" aria-hidden />}
                 />
+                {(data.byProvince?.length ?? 0) > 1 && (
+                  <label className="flex flex-col gap-1.5 text-sm font-semibold text-text">
+                    استان
+                    <select
+                      className="min-h-12 rounded-input border border-border bg-surface px-3"
+                      value={provinceFilter}
+                      onChange={(event) => setProvinceFilter(event.target.value)}
+                    >
+                      <option value="all">همهٔ استان‌های من</option>
+                      {(data.byProvince ?? []).map((row) => (
+                        <option key={row.province} value={row.province}>
+                          {row.province} · {toPersianDigits(row.members)} نفر
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="flex flex-col gap-1.5 text-sm font-semibold text-text">
                   وضعیت حساب
                   <select
@@ -269,11 +290,11 @@ export function ManagerMembersPage() {
                 <EmptyState
                   icon={<Users className="size-8" aria-hidden />}
                   title={
-                    search || status !== 'all' || attention !== 'all'
+                    search || status !== 'all' || attention !== 'all' || provinceFilter !== 'all'
                       ? 'عضوی با این فیلترها پیدا نشد'
-                      : 'هنوز عضوی در این تیم نیست'
+                      : 'هنوز بازاریابی در محدودهٔ مدیریت شما نیست'
                   }
-                  description="فیلترها را تغییر دهید یا از مدیر سیستم بخواهید اعضا را به تیم شما اختصاص دهد."
+                  description="فیلترها را تغییر دهید؛ بازاریاب‌های استان‌های تحت مدیریت شما به‌صورت خودکار اینجا دیده می‌شوند."
                 />
               ) : (
                 <DataTable

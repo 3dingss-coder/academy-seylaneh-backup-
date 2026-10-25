@@ -29,6 +29,8 @@ export interface AuthProvider {
   revoke(uid: string): Promise<void>;
   setDisabled(uid: string, disabled: boolean): Promise<void>;
   setPassword(uid: string, password: string): Promise<void>;
+  /** Move an account to another synthetic auth email (legacy Manager → manager domain migration). */
+  setEmail(uid: string, email: string): Promise<void>;
   setClaims(uid: string, claims: Record<string, unknown>): Promise<void>;
   /** Email users only (phone users are reset by an admin — D35). */
   sendPasswordResetEmail(email: string): Promise<void>;

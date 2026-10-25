@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { ApiError } from '../http/errors';
 import { text } from '../http/validate';
 import {
+  identityUniqueKey,
   ids,
+  managerPhoneToAuthEmail,
   nationalCodeDigest,
   nationalCodeToAuthEmailFromDigest,
   normalizeNationalCode,
@@ -21,7 +23,7 @@ import {
 } from '../domain/iranLocations';
 import type { Role, Team, User } from '../domain/types';
 import { audit, nowIso, SYSTEM, track, type Actor, type Deps } from './context';
-import { isTeamMarketer } from './team-scope';
+import { canonicalManagerProvinces, effectiveManagerProvinces, isTeamMarketer } from './team-scope';
 
 // ─── Validation (PROMPT 002) ────────────────────────────────────────────────
 export const passwordSchema = z
@@ -46,6 +48,11 @@ const provinceSchema = text(2, 40, 'استان').refine(
   'این استان در فهرست استان‌های ایران نیست.',
 );
 const citySchema = text(2, 60, 'شهر');
+
+/** «استان‌های تحت مدیریت»: the provinces whose marketers a Manager supervises (31 max). */
+export const managerProvincesSchema = z
+  .array(provinceSchema, { invalid_type_error: 'استان‌های تحت مدیریت را انتخاب کنید.' })
+  .max(31, 'حداکثر ۳۱ استان را می‌توان انتخاب کرد.');
 
 const residenceShape = {
   province: provinceSchema.optional(),
@@ -212,6 +219,21 @@ export function parseIdentifier(raw: string): PasswordIdentifier {
   return { kind: 'phone', value: phone, phone, authEmail: phoneToAuthEmail(phone) };
 }
 
+/**
+ * Auth-email candidates for one phone across the identity namespaces, legacy (marketer)
+ * first: pre-split Manager accounts still live on the phone domain, newer Manager accounts
+ * on the manager domain. Sign-in tries them in order under a single login guard.
+ */
+export function phoneLoginEmailCandidates(phone: string): string[] {
+  return [phoneToAuthEmail(phone), managerPhoneToAuthEmail(phone)];
+}
+
+/** All auth emails a sign-in identifier may resolve to (first one is the primary/guard key). */
+export function loginEmailCandidates(idf: Identifier): string[] {
+  if (idf.kind === 'phone') return phoneLoginEmailCandidates(idf.phone);
+  return [idf.authEmail];
+}
+
 /** Build the opaque identity used by account creation and national-code sign-in. */
 export function nationalCodeIdentifier(raw: string, secret: string): NationalCodeIdentifier {
   const nationalCode = normalizeNationalCode(raw);
@@ -244,6 +266,7 @@ export function publicUser(u: Doc<User>) {
     onboardedAt: u.onboardedAt,
     ...(u.role === 'manager'
       ? {
+          managerProvinces: effectiveManagerProvinces(u),
           managerProfileRequired: Boolean(u.managerProfileRequired),
           managerProfileCompletedAt: u.managerProfileCompletedAt ?? null,
         }
@@ -266,20 +289,40 @@ export function publicUser(u: Doc<User>) {
 async function announceTeamJoin(
   d: Deps,
   teamId: string,
-  member: { id: string; name: string },
+  member: { id: string; name: string; province?: string | null },
 ): Promise<void> {
   // Lazy, like the `notify` import below: `users.ts` is on the sign-up path and the automation stack is
   // only reached when someone actually enabled a rule.
   const { emitAutomationEventForUsers, isListening } = await import('./push-automation-events');
   if (!(await isListening(d, 'team.member_joined'))) return;
-  const managers = await d.store.query<User>({
-    collection: 'users',
-    where: [
-      ['teamId', '==', teamId],
-      ['role', '==', 'manager'],
-      ['status', '==', 'active'],
-    ],
-  });
+  const managers = teamId
+    ? await d.store.query<User>({
+        collection: 'users',
+        where: [
+          ['teamId', '==', teamId],
+          ['role', '==', 'manager'],
+          ['status', '==', 'active'],
+        ],
+      })
+    : [];
+  // A province Manager (no manual team) also "gains a member" when a marketer of their
+  // province joins — marketers usually land in the default team, not the Manager's team.
+  if (member.province) {
+    const province = canonicalProvince(member.province) ?? member.province;
+    const active = await d.store.query<User>({
+      collection: 'users',
+      where: [
+        ['role', '==', 'manager'],
+        ['status', '==', 'active'],
+      ],
+    });
+    for (const manager of active)
+      if (
+        effectiveManagerProvinces(manager).includes(province) &&
+        !managers.some((m) => m.id === manager.id)
+      )
+        managers.push(manager);
+  }
   await emitAutomationEventForUsers(
     d,
     'team.member_joined',
@@ -287,6 +330,33 @@ async function announceTeamJoin(
     { memberName: member.name },
     { dedupeKey: member.id },
   );
+}
+
+/**
+ * Lazy identity migration for pre-split Manager accounts: the Manager keeps signing in with
+ * the same phone + password (now through the manager-domain auth email and the
+ * manager-scoped unique key), while the legacy phone reservation is released so the person
+ * can hold a marketer account on the same number again. Returns false when the phone is not
+ * a clean legacy-Manager case (a marketer already exists, or another Manager holds the key).
+ */
+async function freeLegacyManagerPhone(d: Deps, phone: string, owner: Doc<User>): Promise<boolean> {
+  const samePhone = await d.store.query<User>({
+    collection: 'users',
+    where: [['phone', '==', phone]],
+  });
+  if (samePhone.some((user) => user.role === 'marketer' && user.status !== 'blacklisted'))
+    return false;
+  const legacyKeyPath = `unique_keys/${ids.uniqueKey('phone', phone)}`;
+  const managerKeyPath = `unique_keys/${identityUniqueKey('phone', phone, 'manager')}`;
+  const managerKey = await d.store.get<{ uid: string | null }>(managerKeyPath);
+  if (managerKey?.uid && managerKey.uid !== owner.id) return false;
+  const now = nowIso(d);
+  if (!managerKey)
+    await d.store.create(managerKeyPath, { kind: 'phone', createdAt: now, uid: owner.id });
+  else if (!managerKey.uid) await d.store.update(managerKeyPath, { uid: owner.id });
+  await d.auth.setEmail(owner.id, managerPhoneToAuthEmail(phone));
+  await d.store.delete(legacyKeyPath);
+  return true;
 }
 
 export async function register(
@@ -298,35 +368,55 @@ export async function register(
   identity?: Identifier,
 ) {
   const idf = identity ?? parseIdentifier(input.identifier);
-  const keyId = ids.uniqueKey(idf.kind, idf.value);
+  // A Manager account for a phone lives in its own identity namespace (manager-domain auth
+  // email + manager-scoped unique key), so the same phone keeps working as a marketer too.
+  const managerPhone = role === 'manager' && idf.kind === 'phone';
+  const authEmail = managerPhone ? managerPhoneToAuthEmail(idf.phone) : idf.authEmail;
+  const keyId = managerPhone
+    ? identityUniqueKey('phone', idf.value, 'manager')
+    : ids.uniqueKey(idf.kind, idf.value);
   const now = nowIso(d);
   // Reserve the unique key first (handles concurrent sign-ups deterministically).
-  try {
-    await d.store.create(`unique_keys/${keyId}`, { kind: idf.kind, createdAt: now, uid: null });
-  } catch (e) {
-    if (e instanceof StoreConflictError) {
-      const reserved = await d.store.get<{ uid: string | null }>(`unique_keys/${keyId}`);
-      const owner = reserved?.uid ? await d.store.get<User>(`users/${reserved.uid}`) : null;
-      if (owner?.status === 'blacklisted')
-        throw new ApiError(
-          'FORBIDDEN',
-          idf.kind === 'nationalCode' ? BLACKLISTED_NATIONAL_CODE_MESSAGE : BLACKLISTED_MESSAGE,
-        );
+  const reserveKey = async (): Promise<boolean> => {
+    try {
+      await d.store.create(`unique_keys/${keyId}`, { kind: idf.kind, createdAt: now, uid: null });
+      return true;
+    } catch (e) {
+      if (e instanceof StoreConflictError) return false;
+      throw e;
+    }
+  };
+  if (!(await reserveKey())) {
+    const reserved = await d.store.get<{ uid: string | null }>(`unique_keys/${keyId}`);
+    const owner = reserved?.uid ? await d.store.get<User>(`users/${reserved.uid}`) : null;
+    if (owner?.status === 'blacklisted')
+      throw new ApiError(
+        'FORBIDDEN',
+        idf.kind === 'nationalCode' ? BLACKLISTED_NATIONAL_CODE_MESSAGE : BLACKLISTED_MESSAGE,
+      );
+    // Phones granted Manager access before the identity split still hold the phone in the
+    // legacy namespace. Move that Manager account to the manager namespace on the fly so the
+    // same phone can register as a marketer again (the bug this split exists to fix).
+    const migrated =
+      !managerPhone && role !== 'manager' && idf.kind === 'phone' && owner?.role === 'manager'
+        ? await freeLegacyManagerPhone(d, idf.phone, owner).catch(() => false)
+        : false;
+    if (!migrated || !(await reserveKey()))
       throw new ApiError(
         'CONFLICT',
-        idf.kind === 'phone'
-          ? 'این شماره قبلاً ثبت شده است. وارد شوید.'
-          : idf.kind === 'nationalCode'
-            ? 'این کد ملی قبلاً ثبت شده است. وارد شوید.'
-            : 'این ایمیل قبلاً ثبت شده است. وارد شوید.',
+        managerPhone
+          ? 'برای این شماره قبلاً حساب مدیر ساخته شده است.'
+          : idf.kind === 'phone'
+            ? 'این شماره قبلاً ثبت شده است. وارد شوید.'
+            : idf.kind === 'nationalCode'
+              ? 'این کد ملی قبلاً ثبت شده است. وارد شوید.'
+              : 'این ایمیل قبلاً ثبت شده است. وارد شوید.',
       );
-    }
-    throw e;
   }
   let uid: string;
   try {
     uid = await d.auth.createUser({
-      email: idf.authEmail,
+      email: authEmail,
       password: input.password,
       displayName: input.name,
       passwordless: opts.passwordless,
@@ -365,8 +455,14 @@ export async function register(
   await track(d, 'signup_completed', uid, { method: idf.kind });
   const created = { ...user, id: uid } as Doc<User>;
   // A self sign-up lands in the default sales team when it exists (routes/auth.ts), and that is a new
-  // member for its managers — the same hook an admin's team move fires.
-  if (created.teamId) await announceTeamJoin(d, created.teamId, { id: uid, name: user.name });
+  // member for its managers — the same hook an admin's team move fires. Province Managers of the
+  // joiner's province hear about it too, whichever team the joiner landed in.
+  if (created.role === 'marketer' && (created.teamId || created.province))
+    await announceTeamJoin(d, created.teamId ?? '', {
+      id: uid,
+      name: user.name,
+      province: user.province,
+    });
   return created;
 }
 
@@ -390,7 +486,17 @@ export async function login(d: Deps, input: z.infer<typeof loginSchema>) {
   }
   const guardKey = ids.hash(idf.authEmail);
   const guard = await loginGuard(d, guardKey);
-  const r = await d.auth.signIn(idf.authEmail, input.password);
+  // One guard strike per attempt, however many namespace candidates were tried.
+  let r = await d.auth.signIn(idf.authEmail, input.password);
+  if (!r.ok && r.reason === 'invalid') {
+    for (const candidate of loginEmailCandidates(idf).slice(1)) {
+      const retry = await d.auth.signIn(candidate, input.password);
+      if (retry.ok || retry.reason !== 'invalid') {
+        r = retry;
+        break;
+      }
+    }
+  }
   if (!r.ok) {
     if (r.reason === 'disabled') {
       await track(d, 'login_failed', null, { reason: 'disabled' });
@@ -497,9 +603,10 @@ export async function requestPasswordReset(d: Deps, identifier: string) {
   const users = await d.store.query<User>({
     collection: 'users',
     where: [idf.kind === 'phone' ? ['phone', '==', idf.phone] : ['email', '==', idf.email]],
-    limit: 1,
   });
-  const user = users[0];
+  // One phone may hold a (passwordless) marketer account and a password Manager account;
+  // a reset request is about the password account.
+  const user = users.find((candidate) => candidate.role === 'manager') ?? users[0];
   if (!user || user.status !== 'active') return;
   if (idf.kind === 'email') {
     await d.auth.sendPasswordResetEmail(idf.email);
@@ -630,15 +737,24 @@ export async function changePassword(
   user: Doc<User>,
   input: z.infer<typeof changePasswordSchema>,
 ) {
-  const authEmail =
-    user.email ??
-    (user.phone
-      ? phoneToAuthEmail(user.phone)
+  const candidates = user.email
+    ? [user.email]
+    : user.phone
+      ? user.role === 'manager'
+        ? [managerPhoneToAuthEmail(user.phone), phoneToAuthEmail(user.phone)]
+        : phoneLoginEmailCandidates(user.phone)
       : user.nationalCodeHash
-        ? nationalCodeToAuthEmailFromDigest(user.nationalCodeHash)
-        : '');
-  const r = await d.auth.signIn(authEmail, input.currentPassword);
-  if (!r.ok) throw new ApiError('VALIDATION', 'رمز فعلی اشتباه است.');
+        ? [nationalCodeToAuthEmailFromDigest(user.nationalCodeHash)]
+        : [''];
+  let ok = false;
+  for (const authEmail of candidates) {
+    const r = await d.auth.signIn(authEmail, input.currentPassword);
+    if (r.ok && r.uid === user.id) {
+      ok = true;
+      break;
+    }
+  }
+  if (!ok) throw new ApiError('VALIDATION', 'رمز فعلی اشتباه است.');
   await d.auth.setPassword(user.id, input.newPassword);
   await audit(d, { id: user.id, role: user.role }, 'user.password_changed', 'users', user.id);
 }
@@ -676,20 +792,29 @@ export async function completeManagerProfile(
 ) {
   if (manager.role !== 'manager' || manager.status !== 'active' || !manager.managerProfileRequired)
     throw new ApiError('CONFLICT', 'تکمیل پروفایل مدیر برای این حساب در دسترس نیست.');
-  if (!manager.teamId) throw new ApiError('CONFLICT', 'حساب مدیر هنوز به تیمی متصل نشده است.');
-  const team = await d.store.get<Team>(`teams/${manager.teamId}`);
-  if (!team || team.archived) throw new ApiError('CONFLICT', 'تیم تخصیص‌داده‌شده در دسترس نیست.');
+  // A Manager is scoped by their supervised provinces and/or an optional manual team; either
+  // one is enough to start (province-only Managers never get a team).
+  if (!manager.teamId && !effectiveManagerProvinces(manager).length)
+    throw new ApiError('CONFLICT', 'برای حساب مدیر هنوز استان یا تیمی تعیین نشده است.');
+  if (manager.teamId) {
+    const team = await d.store.get<Team>(`teams/${manager.teamId}`);
+    if (!team || team.archived) throw new ApiError('CONFLICT', 'تیم تخصیص‌داده‌شده در دسترس نیست.');
+  }
 
   const nationalCode = normalizeNationalCode(input.nationalCode);
   if (!nationalCode) throw new ApiError('VALIDATION', 'کد ملی معتبر ۱۰ رقمی وارد کنید.');
   const nationalCodeHash = nationalCodeDigest(nationalCode, d.config.localSecret);
-  const keyPath = `unique_keys/${ids.uniqueKey('nationalCode', nationalCodeHash)}`;
+  // The Manager reserves the code in the Manager identity namespace; the legacy key is only
+  // consulted so the same person holding the code on their marketer account is not rejected.
+  const keyPath = `unique_keys/${identityUniqueKey('nationalCode', nationalCodeHash, 'manager')}`;
+  const legacyKeyPath = `unique_keys/${ids.uniqueKey('nationalCode', nationalCodeHash)}`;
   const at = nowIso(d);
   const canonicalResidence = residence(input);
   await d.store.runTransaction(async (tx) => {
-    const [current, key] = await Promise.all([
+    const [current, key, legacyKey] = await Promise.all([
       tx.get<User>(`users/${manager.id}`),
       tx.get<{ uid: string | null }>(keyPath),
+      tx.get<{ uid: string | null }>(legacyKeyPath),
     ]);
     if (
       !current ||
@@ -701,6 +826,12 @@ export async function completeManagerProfile(
       throw new ApiError('CONFLICT', 'وضعیت حساب تغییر کرده است؛ دوباره وارد پنل شوید.');
     if (key?.uid && key.uid !== manager.id)
       throw new ApiError('CONFLICT', 'این کد ملی پیش‌تر به حساب دیگری متصل شده است.');
+    if (legacyKey?.uid && legacyKey.uid !== manager.id) {
+      // Same person, second account: the marketer account with this phone may hold the code.
+      const owner = await tx.get<User>(`users/${legacyKey.uid}`);
+      if (!owner || !current.phone || owner.phone !== current.phone)
+        throw new ApiError('CONFLICT', 'این کد ملی پیش‌تر به حساب دیگری متصل شده است.');
+    }
     if (!key) tx.create(keyPath, { kind: 'nationalCode', createdAt: at, uid: manager.id });
     else if (!key.uid) tx.update(keyPath, { uid: manager.id });
     tx.update(`users/${manager.id}`, {
@@ -775,21 +906,28 @@ export const adminCreateUserSchema = z
     phone: z.string().trim().min(1, 'شماره موبایل را وارد کنید.').max(30),
     role: z.enum(['marketer', 'manager']),
     teamId: z.string().trim().max(80).nullable().optional(),
+    /** «استان‌های تحت مدیریت» for a Manager — a team is optional when provinces are given. */
+    managerProvinces: managerProvincesSchema.optional(),
+    /** A marketer's residence decides their automatic province team + supervising Managers. */
+    province: provinceSchema.optional(),
+    city: citySchema.optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.role === 'manager' && !value.teamId)
+    if (value.role === 'manager' && !value.teamId && !value.managerProvinces?.length)
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['teamId'],
-        message: 'برای ساخت حساب مدیر، تیم را انتخاب کنید.',
+        path: ['managerProvinces'],
+        message: 'برای ساخت حساب مدیر، دست‌کم یک استان تحت مدیریت انتخاب کنید.',
       });
-  });
+  })
+  .superRefine(checkResidence);
 
 export const adminPatchUserSchema = z
   .object({
     name: text(2, 60, 'نام').optional(),
     role: z.enum(['marketer', 'manager', 'admin', 'superadmin']).optional(),
     teamId: z.string().max(80).nullable().optional(),
+    managerProvinces: managerProvincesSchema.optional(),
     status: z.enum(['active', 'inactive']).optional(),
     brandIds: z.array(z.string().max(80)).max(50).optional(),
     // Admins may correct the residence captured at sign-up (also for accounts that predate it).
@@ -844,20 +982,123 @@ export async function adminUpdateUser(
         'این آخرین مدیر ارشد سیستم است و نمی‌توان نقش یا وضعیت آن را تغییر داد.',
       );
   }
+  let patchTeam: Team | null = null;
   if (patch.teamId) {
-    const team = await d.store.get<Team>(`teams/${patch.teamId}`);
-    if (!team || team.archived) throw new ApiError('VALIDATION', 'تیم انتخاب‌شده معتبر نیست.');
+    patchTeam = await d.store.get<Team>(`teams/${patch.teamId}`);
+    if (!patchTeam || patchTeam.archived)
+      throw new ApiError('VALIDATION', 'تیم انتخاب‌شده معتبر نیست.');
   }
-  const nextRole = patch.role ?? target.role;
-  const nextTeamId = patch.teamId === undefined ? target.teamId : patch.teamId;
-  if (nextRole === 'manager' && !nextTeamId)
-    throw new ApiError('VALIDATION', 'مدیر باید به یک تیم فعال متصل باشد.', {
-      teamId: 'تیم را انتخاب کنید.',
-    });
   if (patch.brandIds?.length) {
     const brands = await d.store.getMany(patch.brandIds.map((b) => `brands/${b}`));
     if (brands.some((b) => !b)) throw new ApiError('VALIDATION', 'برند انتخاب‌شده معتبر نیست.');
   }
+  const patchedProvinces =
+    patch.managerProvinces !== undefined
+      ? canonicalManagerProvinces(patch.managerProvinces)
+      : undefined;
+  const nextRole = patch.role ?? target.role;
+  const nextTeamId = patch.teamId === undefined ? target.teamId : patch.teamId;
+  const nextProvinces = patchedProvinces ?? effectiveManagerProvinces(target);
+
+  // Granting Manager access to a marketer no longer converts their account: a separate
+  // Manager account is created for the same phone (its own password + identity namespace),
+  // and the marketer account — sign-in, learning history, points — stays exactly as it was.
+  // The one-time temporary password is returned so the admin can hand it over once.
+  if (patch.role === 'manager' && target.role === 'marketer') {
+    const provinces = patchedProvinces ?? [];
+    const managerTeamId = patch.teamId ?? null;
+    if (!managerTeamId && !provinces.length)
+      throw new ApiError('VALIDATION', 'برای ساخت حساب مدیر، دست‌کم یک استان انتخاب کنید.', {
+        managerProvinces: 'دست‌کم یک استان تحت مدیریت انتخاب کنید.',
+      });
+    if (!target.phone)
+      throw new ApiError(
+        'VALIDATION',
+        'این حساب شماره موبایل ندارد؛ حساب مدیر را از «کاربر جدید» با شمارهٔ موبایل بسازید.',
+      );
+    const personResidence =
+      patch.province !== undefined || patch.city !== undefined
+        ? residence(patch)
+        : { province: target.province, city: target.city };
+    const temporaryPassword = tempPassword();
+    const manager = await register(
+      d,
+      {
+        name: patch.name ?? target.name,
+        identifier: target.phone,
+        password: temporaryPassword,
+      },
+      'manager',
+      {
+        teamId: managerTeamId,
+        managerProvinces: provinces,
+        province: personResidence.province ?? provinces[0] ?? patchTeam?.province ?? null,
+        city: personResidence.city ?? null,
+        nationalCodeHash: target.nationalCodeHash ?? null,
+        managerProfileRequired: true,
+        managerProfileCompletedAt: null,
+      },
+    );
+    if (managerTeamId) await syncTeamManagerPointer(d, managerTeamId);
+    // The rest of the patch describes the person/marketer account itself (name, residence…).
+    const marketerUpdate: Partial<User> = { updatedAt: nowIso(d) };
+    if (patch.name !== undefined) marketerUpdate.name = patch.name;
+    if (patch.status !== undefined) marketerUpdate.status = patch.status;
+    if (patch.brandIds !== undefined) marketerUpdate.brandIds = patch.brandIds;
+    if (patch.province !== undefined || patch.city !== undefined)
+      Object.assign(marketerUpdate, residence(patch));
+    if (Object.keys(marketerUpdate).length > 1)
+      await d.store.update(`users/${userId}`, marketerUpdate as Record<string, unknown>);
+    if (patch.status !== undefined && patch.status !== target.status) {
+      await d.auth.setDisabled(userId, patch.status === 'inactive');
+      if (patch.status === 'inactive') await d.auth.revoke(userId);
+    }
+    const warnings = [
+      'حساب بازاریاب دست‌نخورده ماند و حساب مدیر جداگانه‌ای با همین شماره ساخته شد؛ از این به بعد ورود بازاریاب با همان شماره و ورود مدیر با رمز موقت انجام می‌شود.',
+    ];
+    await audit(
+      d,
+      actor,
+      'user.manager_account_created',
+      'users',
+      userId,
+      { role: 'marketer' },
+      {
+        managerUserId: manager.id,
+        managerProvinces: provinces,
+        teamId: managerTeamId,
+      },
+    );
+    await track(d, 'admin_user_updated', actor.id, { fields: Object.keys(patch) });
+    const updated = await d.store.get<User>(`users/${userId}`);
+    return {
+      user: updated ? publicUser(updated) : null,
+      warnings,
+      createdManager: { user: publicUser(manager), temporaryPassword },
+    };
+  }
+
+  // Turning a Manager account back into a marketer only makes sense when the person has no
+  // separate marketer account for the same phone; otherwise block the Manager account instead.
+  if (target.role === 'manager' && patch.role === 'marketer' && target.phone) {
+    const samePhone = await d.store.query<User>({
+      collection: 'users',
+      where: [
+        ['phone', '==', target.phone],
+        ['role', '==', 'marketer'],
+      ],
+    });
+    if (samePhone.some((u) => u.id !== userId && u.status !== 'blacklisted'))
+      throw new ApiError(
+        'CONFLICT',
+        'برای این شماره حساب بازاریاب جداگانه وجود دارد؛ به‌جای تغییر نقش، دسترسی این حساب مدیر را مسدود کنید.',
+      );
+  }
+  if (nextRole === 'manager' && !nextTeamId && !nextProvinces.length)
+    throw new ApiError('VALIDATION', 'مدیر باید دست‌کم یک استان تحت مدیریت داشته باشد.', {
+      managerProvinces: 'دست‌کم یک استان تحت مدیریت انتخاب کنید.',
+      teamId: 'استان‌ها را انتخاب کنید یا مدیر را به تیمی وصل کنید.',
+    });
   const warnings: string[] = [];
   const wasManager = target.role === 'manager';
   const movedTeam = wasManager && nextTeamId !== target.teamId;
@@ -871,6 +1112,7 @@ export async function adminUpdateUser(
   }
   // Store the canonical spellings, not whatever the picker/search box sent.
   if (patch.province) Object.assign(update, residence(patch));
+  if (patchedProvinces !== undefined) update.managerProvinces = patchedProvinces;
   await d.store.update(`users/${userId}`, update as Record<string, unknown>);
   if (roleChanged) await d.auth.setClaims(userId, { role: patch.role });
   if (roleChanged || patch.status === 'inactive') await d.auth.revoke(userId);
@@ -914,7 +1156,11 @@ export async function adminUpdateUser(
   await track(d, 'admin_user_updated', actor.id, { fields: Object.keys(patch) });
   // Joining the team is the event, whoever moved the person in — including an admin-created account.
   if (patch.teamId && patch.teamId !== target.teamId)
-    await announceTeamJoin(d, patch.teamId, { id: userId, name: patch.name ?? target.name });
+    await announceTeamJoin(d, patch.teamId, {
+      id: userId,
+      name: patch.name ?? target.name,
+      province: patch.province ?? target.province,
+    });
   const updated = await d.store.get<User>(`users/${userId}`);
   return { user: updated ? publicUser(updated) : null, warnings };
 }
@@ -944,9 +1190,11 @@ export async function adminCreateUser(
     throw new ApiError('VALIDATION', 'تیم انتخاب‌شده معتبر نیست.', {
       teamId: 'تیم انتخاب‌شده معتبر نیست.',
     });
-  if (input.role === 'manager' && !teamId)
-    throw new ApiError('VALIDATION', 'برای ساخت حساب مدیر، تیم را انتخاب کنید.', {
-      teamId: 'تیم را انتخاب کنید.',
+  const managerProvinces =
+    input.role === 'manager' ? canonicalManagerProvinces(input.managerProvinces) : [];
+  if (input.role === 'manager' && !teamId && !managerProvinces.length)
+    throw new ApiError('VALIDATION', 'برای ساخت حساب مدیر، دست‌کم یک استان انتخاب کنید.', {
+      managerProvinces: 'دست‌کم یک استان تحت مدیریت انتخاب کنید.',
     });
 
   const name = `${input.firstName.trim()} ${input.lastName.trim()}`;
@@ -959,14 +1207,25 @@ export async function adminCreateUser(
       // Marketers use the existing identity flow. Managers receive a random, strong password
       // below and must replace it while completing their first-login profile.
       password: temporaryPassword ?? randomBytesBase64Url(24),
+      // A marketer's residence decides their automatic province team + supervising Managers.
+      ...(input.role === 'marketer' && input.province
+        ? { province: input.province, city: input.city }
+        : {}),
     },
     input.role,
     {
       teamId,
-      ...(team ? { province: team.province ?? null, city: team.city ?? null } : {}),
       ...(input.role === 'manager'
-        ? { managerProfileRequired: true, managerProfileCompletedAt: null }
-        : {}),
+        ? {
+            managerProvinces,
+            province: team?.province ?? managerProvinces[0] ?? null,
+            city: team?.city ?? null,
+            managerProfileRequired: true,
+            managerProfileCompletedAt: null,
+          }
+        : team && !input.province
+          ? { province: team.province ?? null, city: team.city ?? null }
+          : {}),
     },
     { passwordless: input.role === 'marketer' },
   );
@@ -974,6 +1233,7 @@ export async function adminCreateUser(
   await audit(d, actor, 'user.admin_created', 'users', user.id, null, {
     role: user.role,
     teamId: user.teamId,
+    ...(input.role === 'manager' ? { managerProvinces } : {}),
     phone,
   });
   await track(d, 'admin_user_created', actor.id, { role: user.role });
@@ -1204,6 +1464,61 @@ export async function listTeams(d: Deps) {
     .sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
 
+/**
+ * «تیم‌های استانی خودکار» — the virtual province teams: every marketer grouped by their
+ * residence province, plus the Managers who supervise that province (effective scope).
+ * Nothing is stored; the groups always reflect live registrations, so a Manager assigned to
+ * a province sees exactly these people in their panel.
+ */
+export async function listProvinceTeams(d: Deps) {
+  const users = await d.store.query<User>({ collection: 'users' });
+  const memberView = (u: Doc<User>) => ({
+    id: u.id,
+    name: u.name,
+    phone: u.phone,
+    city: u.city ?? null,
+    status: u.status,
+    teamId: u.teamId,
+    pointsBalance: u.pointsBalance,
+    lastActiveAt: u.lastActiveAt,
+  });
+  const marketers = users.filter((u) => u.role === 'marketer' && u.status !== 'blacklisted');
+  const managers = users.filter((u) => u.role === 'manager' && u.status !== 'blacklisted');
+  const provinces = canonicalManagerProvinces([
+    ...marketers.map((u) => u.province ?? ''),
+    ...managers.flatMap((u) => effectiveManagerProvinces(u)),
+  ]);
+  const groups = provinces.map((province) => {
+    const members = marketers
+      .filter((u) => u.province && (canonicalProvince(u.province) ?? u.province) === province)
+      .sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+    const provinceManagers = managers
+      .filter((u) => effectiveManagerProvinces(u).includes(province))
+      .sort((a, b) => Number(b.status === 'active') - Number(a.status === 'active'));
+    return {
+      province,
+      memberCount: members.length,
+      activeMemberCount: members.filter((u) => u.status === 'active').length,
+      managers: provinceManagers.map((u) => ({
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        status: u.status,
+        teamId: u.teamId,
+        managerProvinces: effectiveManagerProvinces(u),
+      })),
+      members: members.map(memberView),
+    };
+  });
+  const unassigned = marketers
+    .filter((u) => !u.province || !canonicalProvince(u.province))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+  return {
+    provinces: groups,
+    unassigned: { memberCount: unassigned.length, members: unassigned.map(memberView) },
+  };
+}
+
 function selectedManagerIds(input: {
   managerIds?: string[];
   managerId?: string | null;
@@ -1276,6 +1591,7 @@ export async function ensureUser(
     password: string;
     role: Role;
     teamId?: string | null;
+    managerProvinces?: string[];
     brandIds?: string[];
     /** Optional residence for seeded/demo accounts (sign-up collects it from the form). */
     province?: string | null;
@@ -1286,9 +1602,11 @@ export async function ensureUser(
   const existing = await d.store.query<User>({
     collection: 'users',
     where: [idf.kind === 'phone' ? ['phone', '==', idf.phone] : ['email', '==', idf.email]],
-    limit: 1,
   });
-  if (existing[0]) return existing[0];
+  // One phone may hold both a marketer and a Manager account; ensure the one for this role.
+  const sameRole = existing.find((user) => user.role === p.role);
+  if (sameRole) return sameRole;
+  if (existing[0] && p.role !== 'manager' && existing[0].role !== 'manager') return existing[0];
   const u = await register(
     d,
     {
@@ -1299,7 +1617,12 @@ export async function ensureUser(
       city: p.city ?? undefined,
     },
     p.role,
-    { teamId: p.teamId ?? null, brandIds: p.brandIds ?? [], onboardedAt: nowIso(d) },
+    {
+      teamId: p.teamId ?? null,
+      brandIds: p.brandIds ?? [],
+      ...(p.managerProvinces ? { managerProvinces: p.managerProvinces } : {}),
+      onboardedAt: nowIso(d),
+    },
   );
   await audit(d, SYSTEM, 'user.seeded', 'users', u.id, null, { role: p.role });
   return u;

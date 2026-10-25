@@ -1,3 +1,4 @@
+import { effectiveManagerProvinces } from './team-scope';
 import { DAY, dayKey } from '../lib/time';
 import type { Doc } from '../store/types';
 import type {
@@ -744,11 +745,12 @@ export async function evaluateSweep(
     const facts = ctx.facts.get(u.id) ?? {};
     if (aggregate) {
       const days = a.trigger.inactivityDays ?? 7;
+      const provinces = effectiveManagerProvinces(u);
       const flagged = ctx.users.filter(
         (m) =>
           m.role !== 'manager' &&
-          !!u.teamId &&
-          m.teamId === u.teamId &&
+          ((!!u.teamId && m.teamId === u.teamId) ||
+            (!!m.province && provinces.includes(m.province))) &&
           num(ctx.facts.get(m.id)?.inactiveDays, 9999) >= days,
       ).length;
       if (!flagged) {

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { ApiError } from '../http/errors';
-import { ids, nationalCodeToAuthEmailFromDigest, phoneToAuthEmail } from '../lib/ids';
+import {
+  identityUniqueKey,
+  ids,
+  managerPhoneToAuthEmail,
+  nationalCodeToAuthEmailFromDigest,
+  phoneToAuthEmail,
+} from '../lib/ids';
 import type { Doc, Where } from '../store/types';
 import type { ArchivedReport, Team, User } from '../domain/types';
 import { audit, nowIso, track, type Actor, type Deps } from './context';
@@ -186,10 +192,31 @@ export async function purgeUser(d: Deps, actor: Actor, userId: string) {
       ? nationalCodeToAuthEmailFromDigest(target.nationalCodeHash)
       : (target.email ?? staffAuthEmail(target.name));
   const keys = [`login_guards/${ids.hash(authEmail)}`];
-  if (target.phone) keys.push(`unique_keys/${ids.uniqueKey('phone', target.phone)}`);
+  // Only this account's identity namespace is released: the same phone's other account
+  // (marketer ⇄ Manager) keeps its reservation and sign-in.
+  const scope = target.role === 'manager' ? 'manager' : 'account';
+  if (target.phone) {
+    keys.push(`unique_keys/${identityUniqueKey('phone', target.phone, scope)}`);
+    keys.push(`login_guards/${ids.hash(managerPhoneToAuthEmail(target.phone))}`);
+    keys.push(`login_guards/${ids.hash(phoneToAuthEmail(target.phone))}`);
+  }
   if (target.email) keys.push(`unique_keys/${ids.uniqueKey('email', target.email)}`);
   if (target.nationalCodeHash)
-    keys.push(`unique_keys/${ids.uniqueKey('nationalCode', target.nationalCodeHash)}`);
+    keys.push(`unique_keys/${identityUniqueKey('nationalCode', target.nationalCodeHash, scope)}`);
+  // Pre-split Manager accounts still hold the legacy reservations; release those only when
+  // they point at this very account.
+  if (scope === 'manager') {
+    for (const legacyPath of [
+      target.phone ? `unique_keys/${ids.uniqueKey('phone', target.phone)}` : null,
+      target.nationalCodeHash
+        ? `unique_keys/${ids.uniqueKey('nationalCode', target.nationalCodeHash)}`
+        : null,
+    ]) {
+      if (!legacyPath) continue;
+      const legacy = await d.store.get<{ uid: string | null }>(legacyPath);
+      if (legacy?.uid === userId) keys.push(legacyPath);
+    }
+  }
   await d.store.deleteMany(keys);
   await d.auth.deleteUser(userId);
   // The account document goes last: if anything above failed, the user is still in the archive.

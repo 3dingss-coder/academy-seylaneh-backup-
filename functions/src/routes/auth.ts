@@ -9,7 +9,7 @@ import * as users from '../services/users';
 import { MemoryAuthProvider } from '../auth/memory';
 import { ApiError } from '../http/errors';
 import { randomBytesBase64Url } from '../lib/crypto';
-import { ids } from '../lib/ids';
+import { identityUniqueKey, managerPhoneToAuthEmail } from '../lib/ids';
 import type { User } from '../domain/types';
 import * as managerAccess from '../services/manager-access';
 
@@ -28,11 +28,35 @@ async function passwordlessLogin(
     ? users.BLACKLISTED_NATIONAL_CODE_MESSAGE
     : users.BLACKLISTED_MESSAGE;
   const idKind = isNationalCode ? 'کد ملی' : 'شماره';
-  const result = await auth.demoSignIn(identity.authEmail);
+  // A phone can hold a marketer account (legacy auth email) and, separately, a Manager
+  // account created before the namespace split may sit under the manager email after a
+  // demotion — try the marketer email first, then the manager one; the role check below
+  // still refuses a genuine Manager account on this passwordless route.
+  const candidates =
+    identity.kind === 'phone'
+      ? [
+          { email: identity.authEmail, scope: 'account' as const },
+          { email: managerPhoneToAuthEmail(identity.phone), scope: 'manager' as const },
+        ]
+      : [{ email: identity.authEmail, scope: 'account' as const }];
+  const [primary, ...fallbacks] = candidates;
+  if (!primary) throw new ApiError('UNAUTHENTICATED');
+  let result = await auth.demoSignIn(primary.email);
+  let resultScope = primary.scope;
+  if (!result.ok && result.reason !== 'disabled') {
+    for (const candidate of fallbacks) {
+      const retry = await auth.demoSignIn(candidate.email);
+      if (retry.ok || retry.reason === 'disabled') {
+        result = retry;
+        resultScope = candidate.scope;
+        break;
+      }
+    }
+  }
   if (!result.ok) {
     if (result.reason === 'disabled') {
       const key = await d.store.get<{ uid: string | null }>(
-        `unique_keys/${ids.uniqueKey(identity.kind, identity.value)}`,
+        `unique_keys/${identityUniqueKey(identity.kind, identity.value, resultScope)}`,
       );
       const owner = key?.uid ? await d.store.get<User>(`users/${key.uid}`) : null;
       if (owner?.status === 'blacklisted')
@@ -53,7 +77,9 @@ async function passwordlessLogin(
       'FORBIDDEN',
       isNationalCode
         ? 'این کد ملی از طریق ورود با کد ملی قابل استفاده نیست.'
-        : 'این شماره از طریق ورود با شماره موبایل قابل استفاده نیست.',
+        : user.role === 'manager'
+          ? 'این شماره حساب مدیر دارد ولی حساب بازاریاب ندارد؛ برای ساخت حساب بازاریاب با همین شماره ثبت‌نام کنید، یا از پنل مدیر وارد شوید.'
+          : 'این شماره از طریق ورود با شماره موبایل قابل استفاده نیست.',
     );
   const identityMatches =
     identity.kind === 'phone'

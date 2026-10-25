@@ -16,7 +16,12 @@ import { loadLearningForUsers, loadUserLearning, type PackageView } from './lear
 import { archivedReportKeys } from './archive';
 import { notifyTemplate } from './notify';
 import { publicUser } from './users';
-import { isUserInManagerTeam, teamMarketers } from './team-scope';
+import {
+  effectiveManagerProvinces,
+  isInManagerScope,
+  managerMarketers,
+  managerScope,
+} from './team-scope';
 
 /** Laggard = overdue & incomplete, or ≤72h left with < 50% progress. */
 export function isLagging(p: PackageView, now: Date): boolean {
@@ -109,10 +114,9 @@ export function summarize(members: MemberLearning[], now: Date) {
   };
 }
 
-// ─── Manager scope: explicit team members plus the team's optional city territory ───
+// ─── Manager scope: supervised provinces (primary) plus the optional manual team ───
 export async function teamMembers(d: Deps, manager: Doc<User>): Promise<Array<Doc<User>>> {
-  if (!manager.teamId) return [];
-  return teamMarketers(d, manager.teamId);
+  return managerMarketers(d, manager);
 }
 
 export async function assertTeamMember(
@@ -121,21 +125,22 @@ export async function assertTeamMember(
   userId: string,
 ): Promise<Doc<User>> {
   const u = await d.store.get<User>(`users/${userId}`);
-  // Admins may inspect anyone; managers only their own team. Same 403 for "not found" to avoid probing.
+  // Admins may inspect anyone; managers only their own scope. Same 403 for "not found" to avoid probing.
   if (!u) throw new ApiError(manager.role === 'manager' ? 'FORBIDDEN' : 'NOT_FOUND');
   if (manager.role === 'manager') {
-    const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
-    if (!manager.teamId || !isUserInManagerTeam(u, manager.teamId, team))
-      throw new ApiError('FORBIDDEN', 'این کاربر عضو تیم شما نیست.');
+    const scope = await managerScope(d, manager);
+    if (!isInManagerScope(scope, u))
+      throw new ApiError('FORBIDDEN', 'این بازاریاب در محدودهٔ مدیریت شما نیست.');
   }
   return u;
 }
 
 export async function managerProfile(d: Deps, manager: Doc<User>) {
-  // A Manager can only resolve their own assigned team; the client cannot supply a team/user id.
+  // A Manager can only resolve their own assigned scope; the client cannot supply a team/user id.
   const team = manager.teamId ? await d.store.get<Team>(`teams/${manager.teamId}`) : null;
   return {
     team: team && !team.archived ? { id: manager.teamId, name: team.name } : null,
+    managerProvinces: effectiveManagerProvinces(manager),
     managementArea: {
       province: manager.province ?? null,
       city: manager.city ?? null,
@@ -152,17 +157,16 @@ export async function managerDashboard(d: Deps, manager: Doc<User>) {
     scopedUsers.filter((u) => u.status === 'active'),
   );
   const memberIds = new Set(scopedUsers.map((u) => u.id));
-  const pendingRetakes = manager.teamId
-    ? (
-        await d.store.query<RetakeRequest>({
-          collection: 'retake_requests',
-          where: [['status', '==', 'pending']],
-        })
-      ).filter((request) => memberIds.has(request.userId))
-    : [];
+  const pendingRetakes = (
+    await d.store.query<RetakeRequest>({
+      collection: 'retake_requests',
+      where: [['status', '==', 'pending']],
+    })
+  ).filter((request) => memberIds.has(request.userId));
   await track(d, 'manager_dashboard_viewed', manager.id);
   return {
     team: team ? { id: team.id, name: team.name } : null,
+    provinces: effectiveManagerProvinces(manager),
     ...summarize(members, d.clock()),
     pendingRetakes: pendingRetakes.length,
   };
@@ -219,8 +223,15 @@ export async function managerMembers(d: Deps, manager: Doc<User>) {
     };
   });
   await track(d, 'manager_members_viewed', manager.id, { count: items.length });
+  const byProvince = new Map<string, number>();
+  for (const item of items)
+    if (item.province) byProvince.set(item.province, (byProvince.get(item.province) ?? 0) + 1);
   return {
     team: team ? { id: team.id, name: team.name } : null,
+    provinces: effectiveManagerProvinces(manager),
+    byProvince: [...byProvince.entries()]
+      .map(([province, count]) => ({ province, members: count }))
+      .sort((a, b) => a.province.localeCompare(b.province, 'fa')),
     totals: {
       members: items.length,
       active: items.filter((item) => item.status === 'active').length,
@@ -730,7 +741,6 @@ export async function listRetakes(
   const where: Array<[string, '==', unknown]> = [['status', '==', status]];
   let list = await d.store.query<RetakeRequest>({ collection: 'retake_requests', where });
   if (viewer.role === 'manager') {
-    if (!viewer.teamId) return [];
     const memberIds = new Set((await teamMembers(d, viewer)).map((member) => member.id));
     list = list.filter((request) => memberIds.has(request.userId));
   }
@@ -784,13 +794,19 @@ export async function reviewRetake(
     const r = await tx.get<RetakeRequest>(path);
     if (!r) throw new ApiError('NOT_FOUND', 'درخواست پیدا نشد.');
     if (reviewer.role === 'manager') {
-      if (!reviewer.teamId) throw new ApiError('FORBIDDEN', 'این درخواست مربوط به تیم شما نیست.');
       const [member, team] = await Promise.all([
         tx.get<User>(`users/${r.userId}`),
-        tx.get<Team>(`teams/${reviewer.teamId}`),
+        reviewer.teamId
+          ? tx.get<Team>(`teams/${reviewer.teamId}`)
+          : Promise.resolve<Doc<Team> | null>(null),
       ]);
-      if (!member || !isUserInManagerTeam(member, reviewer.teamId, team))
-        throw new ApiError('FORBIDDEN', 'این درخواست مربوط به تیم شما نیست.');
+      const scope = {
+        provinces: effectiveManagerProvinces(reviewer),
+        teamId: reviewer.teamId,
+        team,
+      };
+      if (!member || !isInManagerScope(scope, member))
+        throw new ApiError('FORBIDDEN', 'این درخواست مربوط به بازاریاب‌های تحت مدیریت شما نیست.');
     }
     if (reviewer.role === 'manager' && r.escalated && r.status === 'pending')
       throw new ApiError('FORBIDDEN', 'این درخواست به مدیر سیستم ارجاع شده است.');

@@ -233,18 +233,27 @@ export function ManagerProfilePage() {
               <div>
                 <h2 className="font-black text-[#143f36]">تیم و محدودهٔ دسترسی</h2>
                 <p className="mt-1 text-sm leading-6 text-text-secondary">
-                  محدودهٔ نمایش اطلاعات با تیم تخصیص‌داده‌شده توسط ادمین تعیین می‌شود.
+                  شما گزارش‌های همهٔ بازاریاب‌های استان‌های تحت مدیریت‌تان را می‌بینید؛ محدوده را
+                  ادمین تعیین می‌کند.
                 </p>
               </div>
             </div>
             <ReadOnlyField
-              label="تیم"
+              label="استان‌های تحت مدیریت"
               value={
-                profile.isLoading ? 'در حال بارگذاری…' : (team?.name ?? 'هنوز تیمی تخصیص داده نشده')
+                profile.isLoading
+                  ? 'در حال بارگذاری…'
+                  : profile.data?.managerProvinces?.length
+                    ? profile.data.managerProvinces.join('، ')
+                    : 'استانی تخصیص داده نشده'
               }
             />
             <ReadOnlyField
-              label="محدودهٔ مدیریت"
+              label="تیم دستی"
+              value={profile.isLoading ? 'در حال بارگذاری…' : (team?.name ?? 'بدون تیم دستی')}
+            />
+            <ReadOnlyField
+              label="شهر محل استقرار"
               value={[area?.city, area?.province].filter(Boolean).join('، ') || 'ثبت نشده'}
             />
             <ReadOnlyField

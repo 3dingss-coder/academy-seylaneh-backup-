@@ -32,6 +32,7 @@ import {
 import { Select, Tabs } from '@/components/common/Field';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
+import { ProvinceMultiSelect } from '@/components/common/ProvinceMultiSelect';
 import { QueryState } from '@/components/common/QueryState';
 import { DataTable } from '@/components/admin/DataTable';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
@@ -234,11 +235,27 @@ export function UsersPage() {
                     },
                     {
                       key: 't',
-                      header: 'تیم',
-                      cell: (g) =>
-                        uniq(g.rows.map((u) => (u.teamId ? teamName.get(u.teamId) : null))).join(
-                          '، ',
-                        ) || '—',
+                      header: 'تیم / استان‌های تحت مدیریت',
+                      cell: (g) => {
+                        const teams = uniq(
+                          g.rows.map((u) => (u.teamId ? teamName.get(u.teamId) : null)),
+                        );
+                        const provinces = uniq(
+                          g.rows.flatMap((u) =>
+                            u.role === 'manager' ? (u.managerProvinces ?? []) : [],
+                          ),
+                        );
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            <span>{teams.join('، ') || '—'}</span>
+                            {provinces.length > 0 && (
+                              <span className="text-[11px] leading-5 text-text-secondary">
+                                استان‌ها: {provinces.join('، ')}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      },
                     },
                     {
                       key: 's',
@@ -334,6 +351,8 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'marketer' | 'manager'>('manager');
   const [teamId, setTeamId] = useState('');
+  const [managerProvinces, setManagerProvinces] = useState<string[]>([]);
+  const [residence, setResidence] = useState<Residence>({ province: '', city: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<CreatedAdminUser | null>(null);
   const create = useMutation({
@@ -344,6 +363,11 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
         phone: phone.trim(),
         role,
         teamId: teamId || null,
+        ...(role === 'manager' ? { managerProvinces } : {}),
+        // A marketer's residence puts them in their automatic province team right away.
+        ...(role === 'marketer' && residence.province
+          ? { province: residence.province, city: residence.city }
+          : {}),
       }),
     onSuccess: (result) => {
       setCreated(result);
@@ -376,7 +400,8 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
                 firstName.trim().length < 2 ||
                 lastName.trim().length < 2 ||
                 !phone.trim() ||
-                (role === 'manager' && !teamId)
+                (role === 'manager' && !teamId && managerProvinces.length === 0) ||
+                (role === 'marketer' && Boolean(residence.province) && !residence.city)
               }
               onClick={() => create.mutate()}
             >
@@ -394,6 +419,12 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
               {ROLE_LABEL[created.user.role]}
               {selectedTeam ? ` · ${selectedTeam.name}` : ''}
             </p>
+            {created.user.role === 'manager' &&
+              (created.user.managerProvinces?.length ?? 0) > 0 && (
+                <p className="mt-1 text-sm text-text-secondary">
+                  استان‌های تحت مدیریت: {created.user.managerProvinces?.join('، ')}
+                </p>
+              )}
             <p className="mt-2 text-sm">
               شمارهٔ ورود:{' '}
               <b dir="ltr" className="inline-block font-mono">
@@ -461,14 +492,18 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
               <option value="manager">{ROLE_LABEL.manager}</option>
             </Select>
             <Select
-              label={role === 'manager' ? 'تیم مدیر' : 'تیم'}
+              label={role === 'manager' ? 'تیم مدیر (اختیاری)' : 'تیم'}
               value={teamId}
               onChange={(event) => setTeamId(event.target.value)}
               error={errors.teamId}
               disabled={create.isPending}
-              hint={role === 'manager' ? 'انتخاب تیم برای مدیر الزامی است.' : 'اختیاری'}
+              hint={
+                role === 'manager'
+                  ? 'مدیر با انتخاب استان‌ها نیازی به تیم ندارد؛ تیم فقط برای گروه‌بندی دستی است.'
+                  : 'اختیاری'
+              }
             >
-              <option value="">{role === 'manager' ? 'انتخاب تیم' : 'بدون تیم'}</option>
+              <option value="">بدون تیم</option>
               {(teams.data ?? []).map((team) => (
                 <option key={team.id} value={team.id}>
                   {team.name}
@@ -477,11 +512,29 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
               ))}
             </Select>
           </div>
-          {role === 'manager' && (
-            <p className="rounded-xl border border-[#dce9dc] bg-[#f6faf5] p-3 text-xs leading-6 text-[#52645b]">
-              مدیر بلافاصله به حساب فعال و محدودهٔ همین تیم دسترسی می‌گیرد؛ پیش از دیدن گزارش‌ها
-              باید پروفایل خود را کامل و رمز موقت را عوض کند.
-            </p>
+          {role === 'manager' ? (
+            <>
+              <ProvinceMultiSelect
+                value={managerProvinces}
+                onChange={setManagerProvinces}
+                error={errors.managerProvinces}
+                disabled={create.isPending}
+                hint="گزارش‌های همهٔ بازاریاب‌های این استان‌ها — از جمله بازاریاب‌هایی که قبلاً ثبت‌نام کرده‌اند — در پنل مدیر دیده می‌شود."
+              />
+              <p className="rounded-xl border border-[#dce9dc] bg-[#f6faf5] p-3 text-xs leading-6 text-[#52645b]">
+                مدیر بلافاصله حساب فعال می‌گیرد و گزارش‌های بازاریاب‌های استان‌های انتخاب‌شده را
+                می‌بیند؛ پیش از دیدن گزارش‌ها باید پروفایل خود را کامل و رمز موقت را عوض کند.
+              </p>
+            </>
+          ) : (
+            <ResidencePicker
+              value={residence}
+              onChange={setResidence}
+              label="استان و شهر محل فعالیت (اختیاری)"
+              cityError={errors.city}
+              provinceError={errors.province}
+              clearable
+            />
           )}
         </div>
       )}
@@ -575,6 +628,11 @@ function UserDialog({
   const [name, setName] = useState(user.name);
   const [role, setRole] = useState<Role>(user.role);
   const [teamId, setTeamId] = useState(user.teamId ?? '');
+  const [managerProvinces, setManagerProvinces] = useState<string[]>(user.managerProvinces ?? []);
+  const [createdManager, setCreatedManager] = useState<{
+    user: Me;
+    temporaryPassword: string;
+  } | null>(null);
   const [status, setStatus] = useState(user.status);
   const [brandIds, setBrandIds] = useState<string[]>(user.brandIds);
   const [residence, setResidence] = useState<Residence>({
@@ -587,12 +645,17 @@ function UserDialog({
   const qc = useQueryClient();
   const toast = useToast();
   const canPrivileged = me?.role === 'superadmin';
+  const promoting = user.role === 'marketer' && role === 'manager';
   const save = useMutation({
     mutationFn: () =>
-      api.patch<{ warnings?: string[] }>(`/admin/users/${user.id}`, {
+      api.patch<{
+        warnings?: string[];
+        createdManager?: { user: Me; temporaryPassword: string };
+      }>(`/admin/users/${user.id}`, {
         name: name.trim(),
         role,
         teamId: teamId || null,
+        ...(role === 'manager' ? { managerProvinces } : {}),
         status,
         brandIds,
         // null clears the pair (the API rejects a stray city without its province).
@@ -602,6 +665,16 @@ function UserDialog({
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ['admin'] });
       const warnings = r?.warnings ?? [];
+      // Granting Manager access created a separate account: keep the dialog open so the
+      // one-time password is not lost, and say plainly that the marketer account survived.
+      if (r?.createdManager) {
+        setCreatedManager(r.createdManager);
+        toast.show({
+          type: 'success',
+          message: 'حساب مدیر جداگانه ساخته شد؛ حساب بازاریاب با همین شماره برقرار است.',
+        });
+        return;
+      }
       // Changes that detach a team or revoke a role must not be swallowed by a generic toast.
       toast.show({
         type: warnings.length ? 'warning' : 'success',
@@ -629,6 +702,10 @@ function UserDialog({
   const submit = () => {
     if (residence.province && !residence.city) {
       setErrors({ city: 'شهر را انتخاب کنید.' });
+      return;
+    }
+    if (role === 'manager' && !teamId && managerProvinces.length === 0) {
+      setErrors({ managerProvinces: 'دست‌کم یک استان تحت مدیریت انتخاب کنید.' });
       return;
     }
     save.mutate();
@@ -692,7 +769,14 @@ function UserDialog({
           <Select
             label="نقش"
             value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
+            onChange={(e) => {
+              const next = e.target.value as Role;
+              // Promoting a marketer spawns a *separate* Manager account; its team starts
+              // empty instead of silently inheriting the marketer's own team.
+              if (user.role === 'marketer' && next === 'manager') setTeamId('');
+              if (user.role === 'marketer' && next === 'marketer') setTeamId(user.teamId ?? '');
+              setRole(next);
+            }}
             error={errors.role}
           >
             <option value="marketer">{ROLE_LABEL.marketer}</option>
@@ -705,7 +789,7 @@ function UserDialog({
             </option>
           </Select>
           <Select
-            label="تیم"
+            label={promoting ? 'تیم مدیر (اختیاری)' : 'تیم'}
             value={teamId}
             onChange={(e) => setTeamId(e.target.value)}
             error={errors.teamId}
@@ -732,6 +816,36 @@ function UserDialog({
             </option>
           </Select>
         </div>
+        {createdManager && (
+          <div role="status" className="rounded-2xl border border-[#efd9a6] bg-[#fff8e8] p-4">
+            <p className="text-sm font-extrabold text-[#70520e]">
+              حساب مدیر جداگانه ساخته شد — رمز موقت مدیر، نمایش یک‌باره
+            </p>
+            <p dir="ltr" className="mt-2 select-all text-center font-mono text-xl font-black">
+              {createdManager.temporaryPassword}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-[#67583a]">
+              حساب بازاریاب «{user.name}» با همین شماره دست‌نخورده ماند و ورود بازاریاب مثل قبل کار
+              می‌کند. مدیر با همین شماره و این رمز از پنل مدیر وارد می‌شود و در نخستین ورود رمز شخصی
+              می‌سازد.
+            </p>
+          </div>
+        )}
+        {promoting && !createdManager && (
+          <p className="rounded-xl border border-[#dce9dc] bg-[#f6faf5] p-3 text-xs leading-6 text-[#52645b]">
+            با ذخیره، برای همین شماره یک <b>حساب مدیر جداگانه</b> ساخته می‌شود و حساب بازاریاب —
+            ورود، سابقهٔ آموزش و امتیازها — دست‌نخورده می‌ماند. رمز موقت مدیر بعد از ذخیره همین‌جا
+            یک بار نمایش داده می‌شود.
+          </p>
+        )}
+        {role === 'manager' && (
+          <ProvinceMultiSelect
+            value={managerProvinces}
+            onChange={setManagerProvinces}
+            error={errors.managerProvinces}
+            hint="گزارش‌های همهٔ بازاریاب‌های این استان‌ها در پنل مدیر دیده می‌شود؛ نیازی به ساخت تیم نیست."
+          />
+        )}
         <ResidencePicker
           value={residence}
           onChange={setResidence}

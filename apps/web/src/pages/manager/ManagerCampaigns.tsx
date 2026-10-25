@@ -401,6 +401,10 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
   const toast = useToast();
   const { user } = useAuth();
   const teamId = user?.teamId ?? '';
+  // Audience target: the manual team when there is one, otherwise the Manager's whole
+  // province scope (resolved live on the server at send time).
+  const provinces = user?.managerProvinces ?? [];
+  const scopeTargetId = teamId || (user && provinces.length ? `manager-scope:${user.id}` : '');
   const isNew = !campaign;
   const [form, setForm] = useState<CampaignForm>(() =>
     campaign
@@ -409,7 +413,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
           audienceType: 'team',
           targetId: campaign.audience.targetId ?? '',
         }
-      : { ...EMPTY_FORM, audienceType: 'team', targetId: teamId, channel: 'any' },
+      : { ...EMPTY_FORM, audienceType: 'team', targetId: scopeTargetId, channel: 'any' },
   );
   const [previewChannel, setPreviewChannel] = useState<PreviewChannel>('web');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -422,7 +426,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
     queryKey: ['manager', 'campaigns', 'preview', form.channel],
     queryFn: () =>
       api.post<AudiencePreview>('/manager/campaigns/audience-preview', { channel: form.channel }),
-    enabled: Boolean(teamId),
+    enabled: Boolean(scopeTargetId),
     staleTime: 30_000,
   });
 
@@ -521,7 +525,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
   const validate = (scheduleMode: boolean) => {
     const candidate = scheduleMode ? form : { ...form, scheduleDate: '', scheduleTime: '' };
     const nextErrors = validateForm(candidate);
-    if (!teamId) nextErrors.audience = 'حساب شما به تیمی متصل نیست.';
+    if (!scopeTargetId) nextErrors.audience = 'برای حساب شما هنوز استان یا تیمی تعیین نشده است.';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -539,13 +543,13 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
       <Card tone="brand" className="flex items-start gap-3 text-sm leading-6">
         <Users className="mt-0.5 size-5 shrink-0 text-primary-fg" aria-hidden />
         <p>
-          مخاطب به‌صورت ثابت به تیم حساب شما محدود است. پیش‌نمایش تعداد دستگاه‌ها تقریبی است و هنگام
-          ارسال دوباره محاسبه می‌شود.
+          مخاطب به‌صورت ثابت به محدودهٔ مدیریت شما (تیم یا استان‌هایتان) محدود است. پیش‌نمایش تعداد
+          دستگاه‌ها تقریبی است و هنگام ارسال دوباره محاسبه می‌شود.
         </p>
       </Card>
-      {!teamId && (
+      {!scopeTargetId && (
         <Card className="border-danger/30 bg-danger-light text-sm text-danger-fg">
-          این حساب به تیمی متصل نیست و امکان ساخت یا ارسال کمپین ندارد.
+          برای این حساب هنوز استان تحت مدیریت یا تیمی تعیین نشده و امکان ساخت یا ارسال کمپین ندارد.
         </Card>
       )}
 
@@ -608,10 +612,14 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
                 label="مخاطبان"
                 value="team"
                 disabled
-                hint="فقط اعضای تیم حساب شما"
+                hint={
+                  teamId
+                    ? 'فقط اعضای تیم حساب شما'
+                    : `همهٔ بازاریاب‌های استان‌های ${provinces.join('، ')}`
+                }
                 onChange={() => undefined}
               >
-                <option value="team">تیم من</option>
+                <option value="team">{teamId ? 'تیم من' : 'بازاریاب‌های استان‌های من'}</option>
               </Select>
               <Select
                 label="کانال دستگاه"
@@ -709,7 +717,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
             variant="secondary"
             icon={<FileEdit className="size-4" aria-hidden />}
             loading={saveDraft.isPending}
-            disabled={busy || !teamId}
+            disabled={busy || !scopeTargetId}
             onClick={() => validate(false) && saveDraft.mutate()}
           >
             ذخیره پیش‌نویس
@@ -718,7 +726,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
             variant="secondary"
             icon={<CalendarClock className="size-4" aria-hidden />}
             loading={schedule.isPending}
-            disabled={busy || !teamId}
+            disabled={busy || !scopeTargetId}
             onClick={() => validate(true) && setConfirm('schedule')}
           >
             زمان‌بندی
@@ -727,7 +735,7 @@ function CampaignEditor({ campaign }: { campaign: PushCampaign | null }) {
         <Button
           icon={<Send className="size-4" aria-hidden />}
           loading={send.isPending}
-          disabled={busy || !teamId}
+          disabled={busy || !scopeTargetId}
           onClick={() => validate(false) && setConfirm('send')}
         >
           ذخیره و ارسال

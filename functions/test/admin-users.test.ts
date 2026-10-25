@@ -162,39 +162,70 @@ describe('Admin-created accounts and Manager first-login setup', () => {
     expect(afterUnblock.body.data).toMatchObject({ state: 'active' });
   });
 
-  it('requires the first-login profile when Admin promotes an existing account to Manager', async () => {
+  it('keeps the marketer account and spawns a separate Manager account when Admin grants Manager access', async () => {
     const marketer = await ctx.user('marketer', { teamId: 'team-tehran' });
     const promoted = await ctx.api(admin.token).patch(`/v1/admin/users/${marketer.id}`, {
       role: 'manager',
-      teamId: 'team-tehran',
+      managerProvinces: ['تهران', 'مازندران'],
     });
     expect(promoted.status).toBe(200);
+    // The marketer account itself is untouched…
     expect(promoted.body.data.user).toMatchObject({
-      role: 'manager',
+      id: marketer.id,
+      role: 'marketer',
       teamId: 'team-tehran',
+    });
+    // …and a separate Manager account comes back with its one-time password.
+    const createdManager = promoted.body.data.createdManager as {
+      user: { id: string };
+      temporaryPassword: string;
+    };
+    expect(createdManager).toBeTruthy();
+    expect(createdManager.user.id).not.toBe(marketer.id);
+    expect(promoted.body.data.createdManager.user).toMatchObject({
+      role: 'manager',
+      phone: marketer.phone,
+      teamId: null,
+      managerProvinces: ['تهران', 'مازندران'],
       managerProfileRequired: true,
       managerProfileCompletedAt: null,
     });
 
     const signedIn = await ctx.api().post('/v1/auth/manager-access/sign-in', {
       phone: marketer.phone,
-      password: 'pass1234',
+      password: createdManager.temporaryPassword,
     });
-    expect(signedIn.body.data.user).toMatchObject({ managerProfileRequired: true });
+    expect(signedIn.body.data.user).toMatchObject({
+      id: createdManager.user.id,
+      managerProfileRequired: true,
+    });
     expect((await ctx.api(signedIn.body.data.idToken).get('/v1/manager/dashboard')).status).toBe(
       403,
     );
+    // The same phone still signs in as a marketer, exactly as before the grant.
+    expect((await ctx.api(marketer.token).get('/v1/me')).status).toBe(200);
+    const marketerLogin = await ctx.api().post('/v1/auth/login', {
+      identifier: marketer.phone,
+      password: 'pass1234',
+    });
+    expect(marketerLogin.body.data.user).toMatchObject({ id: marketer.id, role: 'marketer' });
+    // Granting twice conflicts instead of creating a second Manager account.
+    const again = await ctx.api(admin.token).patch(`/v1/admin/users/${marketer.id}`, {
+      role: 'manager',
+      managerProvinces: ['تهران'],
+    });
+    expect(again.status).toBe(409);
   });
 
-  it('requires a team for new Managers, rejects a non-admin creator, and rejects duplicate phone numbers', async () => {
-    const missingTeam = await ctx.api(admin.token).post('/v1/admin/users', {
+  it('requires provinces (or a team) for new Managers, rejects a non-admin creator, and rejects duplicate phone numbers', async () => {
+    const missingScope = await ctx.api(admin.token).post('/v1/admin/users', {
       firstName: 'نام',
       lastName: 'مدیر',
       phone: '09125550125',
       role: 'manager',
     });
-    expect(missingTeam.status).toBe(400);
-    expect(JSON.stringify(missingTeam.body.error)).toContain('teamId');
+    expect(missingScope.status).toBe(400);
+    expect(JSON.stringify(missingScope.body.error)).toContain('managerProvinces');
 
     const marketer = await ctx.user('marketer');
     const forbidden = await ctx.api(marketer.token).post('/v1/admin/users', {
@@ -202,19 +233,43 @@ describe('Admin-created accounts and Manager first-login setup', () => {
       lastName: 'مدیر',
       phone: '09125550126',
       role: 'manager',
-      teamId: 'team-tehran',
+      managerProvinces: ['تهران'],
     });
     expect(forbidden.status).toBe(403);
 
+    // A province-only Manager needs no team at all.
     const body = {
-      firstName: 'نام',
-      lastName: 'اول',
+      firstName: 'احمد',
+      lastName: 'رضایی',
       phone: '09125550127',
       role: 'manager',
-      teamId: 'team-tehran',
+      managerProvinces: ['تهران', 'مازندران'],
     };
-    expect((await ctx.api(admin.token).post('/v1/admin/users', body)).status).toBe(201);
+    const created = await ctx.api(admin.token).post('/v1/admin/users', body);
+    expect(created.status).toBe(201);
+    expect(created.body.data.user).toMatchObject({
+      role: 'manager',
+      teamId: null,
+      managerProvinces: ['تهران', 'مازندران'],
+    });
     const duplicate = await ctx.api(admin.token).post('/v1/admin/users', body);
     expect(duplicate.status).toBe(409);
+
+    // The same phone can still get a marketer account afterwards (separate identity namespace).
+    const marketerTwin = await ctx.api(admin.token).post('/v1/admin/users', {
+      firstName: 'احمد',
+      lastName: 'رضایی',
+      phone: '09125550127',
+      role: 'marketer',
+      province: 'تهران',
+      city: 'تهران',
+    });
+    expect(marketerTwin.status).toBe(201);
+    expect(marketerTwin.body.data.user).toMatchObject({
+      role: 'marketer',
+      province: 'تهران',
+      city: 'تهران',
+    });
+    expect(marketerTwin.body.data.user.id).not.toBe(created.body.data.user.id);
   });
 });

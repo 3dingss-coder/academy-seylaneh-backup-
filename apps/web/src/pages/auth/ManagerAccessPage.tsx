@@ -258,7 +258,7 @@ export function ManagerAccessPage() {
       className="relative min-h-dvh overflow-hidden bg-[#f6f3ec] px-3 pb-10 pt-5 sm:px-6 sm:pt-8"
     >
       <img
-        src="/brand/auth/auth-welcome-bg.png"
+        src="/brand/auth/auth-welcome-bg.webp"
         alt=""
         aria-hidden
         className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.13]"

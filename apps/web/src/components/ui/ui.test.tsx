@@ -186,7 +186,7 @@ describe('BottomNav', () => {
     );
 
     for (const name of ['home', 'learning', 'messages', 'cards']) {
-      const icon = container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`);
+      const icon = container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`);
       expect(icon).toHaveAttribute('alt', '');
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     }
@@ -232,7 +232,7 @@ describe('MarketerIcon', () => {
   ] as MarketerIconName[])('maps %s to its decorative image asset', (name) => {
     const { container } = render(<MarketerIcon name={name} className="size-8" />);
     const icon = container.querySelector('img');
-    expect(icon).toHaveAttribute('src', `/brand/m/icons/${name}-3d.png`);
+    expect(icon).toHaveAttribute('src', `/brand/m/icons/${name}-3d.webp`);
     expect(icon).toHaveAttribute('alt', '');
     expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
@@ -242,7 +242,7 @@ describe('MentorLauncher', () => {
   it('keeps its accessible action label with the 3D marketer mentor icon', () => {
     const { container } = render(<MentorLauncher packageId="p1" />);
     expect(screen.getByRole('button', { name: 'از منتور بپرس' })).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/m/icons/mentor-3d.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/icons/mentor-3d.webp"]')).not.toBeNull();
   });
 });
 

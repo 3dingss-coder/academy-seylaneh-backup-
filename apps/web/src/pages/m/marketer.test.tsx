@@ -176,7 +176,7 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     const { container } = renderHome();
     expect(await screen.findByText('برای این آموزش از منتور کمک بگیر.')).toBeInTheDocument();
     for (const name of ['mentor', 'assignment', 'learning', 'quiz', 'badge-medal']) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
   });
 
@@ -184,12 +184,12 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     mockApi(homeRoutes(HOME_ROUTINE));
     const { container } = renderHome();
     await screen.findByTestId('next-item');
-    const avatar = container.querySelector('img[src="/brand/m/icons/profile-3d.png"]');
+    const avatar = container.querySelector('img[src="/brand/m/icons/profile-3d.webp"]');
     expect(avatar).not.toBeNull();
     expect(avatar).toHaveAttribute('alt', '');
     expect(avatar).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByRole('link', { name: 'پروفایل سارا' })).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.webp"]')).toBeNull();
   });
 
   it('empty state carries the delivered empty illustration and keeps its copy', async () => {
@@ -199,7 +199,7 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
     expect(
       screen.getByText('منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید.'),
     ).toBeInTheDocument();
-    const illustration = container.querySelector('img[src="/brand/m/m-empty.png"]');
+    const illustration = container.querySelector('img[src="/brand/m/m-empty.webp"]');
     expect(illustration).not.toBeNull();
     expect(illustration).toHaveAttribute('alt', '');
   });
@@ -214,7 +214,7 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
       'href',
       '/learn/all',
     );
-    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).toBeNull();
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.webp"]')).toBeNull();
   });
 
   it('all-done success moment carries the delivered celebration asset and keeps the message', async () => {
@@ -230,7 +230,7 @@ describe('HomePage — one dominant next action (marketer core principle)', () =
       await screen.findByRole('heading', { name: 'همه آموزش‌ها را تمام کردی!' }),
     ).toBeInTheDocument();
     expect(screen.getByText('به محض فعال‌شدن آموزش جدید، همین‌جا می‌بینیش.')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/m-celebrate-trophy.webp"]')).not.toBeNull();
   });
 });
 
@@ -315,7 +315,7 @@ describe('CardsPage — points and badge ledger', () => {
       'badge-medal',
       'badge-star',
     ]) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
   });
 });
@@ -407,12 +407,12 @@ describe('MessagesPage — notifications and manager notes', () => {
       'weekly-summary',
       'announcement',
     ]) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
     fireEvent.click(screen.getByRole('tab', { name: /پیام مدیر/ }));
     expect(await screen.findByText('مدیر تیم')).toBeInTheDocument();
     expect(screen.getByText('لطفاً درس اول را مرور کن.')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/m/icons/manager-note-3d.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src="/brand/m/icons/manager-note-3d.webp"]')).not.toBeNull();
   });
 
   it('shows separate empty states for notifications and manager messages', async () => {
@@ -560,7 +560,7 @@ describe('MentorPage — real mentor surface, mascot as supportive mentor state'
     expect(screen.getByRole('button', { name: 'گفتن سؤال با صدا' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ارسال' })).toBeInTheDocument();
     for (const name of ['mentor-plus', 'mentor-mic', 'mentor-send']) {
-      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.png"]`)).not.toBeNull();
+      expect(container.querySelector(`img[src="/brand/m/icons/${name}-3d.webp"]`)).not.toBeNull();
     }
   });
 });

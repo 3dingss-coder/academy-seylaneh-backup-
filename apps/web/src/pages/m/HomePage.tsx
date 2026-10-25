@@ -106,7 +106,7 @@ export function HomePage() {
             description="منتظر آموزش جدید باشید؛ وقتی فعال شد همین‌جا می‌بینید."
             illustration={
               <img
-                src="/brand/m/m-empty.png"
+                src="/brand/m/m-empty.webp"
                 alt=""
                 aria-hidden
                 className="h-32 w-auto object-contain"
@@ -140,7 +140,7 @@ export function HomePage() {
           }`}
         >
           <img
-            src="/brand/m/m-home-hero.png"
+            src="/brand/m/m-home-hero.webp"
             alt=""
             aria-hidden
             width={1536}
@@ -412,7 +412,7 @@ function HomeGreeting({
   avatarUrl?: string | null;
   unread: number;
 }) {
-  const profileIconSrc = '/brand/m/icons/profile-3d.png';
+  const profileIconSrc = '/brand/m/icons/profile-3d.webp';
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const avatarSrc = avatarUrl && failedSrc !== avatarUrl ? avatarUrl : null;
   const showProfileIcon = !avatarSrc && failedSrc !== profileIconSrc;
@@ -481,7 +481,7 @@ function EmptyNext({ allCompleted }: { allCompleted: boolean }) {
       </Link>
       {allCompleted ? (
         <img
-          src="/brand/m/m-celebrate-trophy.png"
+          src="/brand/m/m-celebrate-trophy.webp"
           alt=""
           aria-hidden
           width={160}

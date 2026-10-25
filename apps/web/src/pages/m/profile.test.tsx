@@ -56,7 +56,9 @@ describe('ProfilePage — real account management', () => {
     await screen.findByRole('heading', { name: 'پروفایل من' }, { timeout: 15000 });
 
     const toolbarProfile = screen.getByRole('link', { name: 'پروفایل' });
-    expect(toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.webp"]')).not.toBeNull();
+    expect(
+      toolbarProfile.querySelector('img[src="/brand/m/icons/profile-3d.webp"]'),
+    ).not.toBeNull();
     for (const name of [
       'profile-settings',
       'notification',

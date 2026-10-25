@@ -412,7 +412,9 @@ describe('MessagesPage — notifications and manager notes', () => {
     fireEvent.click(screen.getByRole('tab', { name: /پیام مدیر/ }));
     expect(await screen.findByText('مدیر تیم')).toBeInTheDocument();
     expect(screen.getByText('لطفاً درس اول را مرور کن.')).toBeInTheDocument();
-    expect(container.querySelector('img[src="/brand/m/icons/manager-note-3d.webp"]')).not.toBeNull();
+    expect(
+      container.querySelector('img[src="/brand/m/icons/manager-note-3d.webp"]'),
+    ).not.toBeNull();
   });
 
   it('shows separate empty states for notifications and manager messages', async () => {

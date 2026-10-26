@@ -1,12 +1,17 @@
 import { ApiError } from '../http/errors';
 import { buildXlsx, type XlsxSheet } from '../lib/xlsx';
 import { dayKey, zonedParts } from '../lib/time';
+import { normalizePhone } from '../lib/ids';
 import { HttpTelegramSender } from '../telegram/bot';
-import { UnconfiguredTelegramSender, type TelegramSender } from '../telegram/types';
+import {
+  UnconfiguredTelegramSender,
+  type TelegramReplyMarkup,
+  type TelegramSender,
+} from '../telegram/types';
 import type { User } from '../domain/types';
 import { StoreConflictError, type Doc } from '../store/types';
 import { getPolicy, nowIso, track, type Deps } from './context';
-import { managerMarketers } from './team-scope';
+import { effectiveManagerProvinces, managerMarketers } from './team-scope';
 import { managerMembers } from './reports';
 
 /**
@@ -15,8 +20,10 @@ import { managerMembers } from './reports';
  * — every marketer of their supervised provinces (plus their manual team, if any) with
  * learning progress, and a per-package detail sheet.
  *
- * Infrastructure only: without TELEGRAM_BOT_TOKEN the job is a no-op, and a Manager opts in
- * by saving their chat id (the bot tells it to them via the webhook reply).
+ * Pairing: after their first login the Manager is sent to the bot; /start asks for their
+ * mobile number (Telegram contact-share), the number is matched to the Manager account with
+ * that phone, and from then on that Manager's daily reports go to this chat. Manual chat-id
+ * entry in the profile remains as a fallback. Without TELEGRAM_BOT_TOKEN the job is a no-op.
  */
 
 export function telegramSender(d: Deps): TelegramSender {
@@ -141,6 +148,20 @@ export async function buildManagerDailyReport(
     bytes,
     caption,
     memberCount: members.length,
+  };
+}
+
+export interface TelegramBotInfo {
+  /** A bot token is configured, so daily reports can actually be delivered. */
+  configured: boolean;
+  /** Public @username for t.me links (null when TELEGRAM_BOT_USERNAME is not set). */
+  botUsername: string | null;
+}
+
+export function telegramBotInfo(d: Deps): TelegramBotInfo {
+  return {
+    configured: telegramSender(d).enabled,
+    botUsername: d.config.telegramBotUsername || null,
   };
 }
 
@@ -281,30 +302,227 @@ export async function sendManagerTelegramTest(
 interface TelegramUpdate {
   message?: {
     chat?: { id?: number | string; first_name?: string };
+    from?: { id?: number | string; first_name?: string };
     text?: string;
+    contact?: { phone_number?: string; user_id?: number | string; first_name?: string };
   };
 }
 
+const ASK_PHONE_MARKUP: TelegramReplyMarkup = {
+  keyboard: [[{ text: '📱 ارسال شماره موبایل', request_contact: true }]],
+  resize_keyboard: true,
+  one_time_keyboard: true,
+};
+const REMOVE_KEYBOARD: TelegramReplyMarkup = { remove_keyboard: true };
+
+const UNPAIR_TEXTS = new Set(['/stop', 'قطع اتصال', 'لغو گزارش', 'لغو']);
+
+/** Managers (any status) holding this canonical phone — a phone may have a marketer twin too. */
+async function managersByPhone(d: Deps, phone: string): Promise<Array<Doc<User>>> {
+  const byPhone = await d.store.query<User>({
+    collection: 'users',
+    where: [['phone', '==', phone]],
+  });
+  return byPhone.filter((user) => user.role === 'manager');
+}
+
+/** The Manager currently paired to a chat, if any. */
+async function managerByChatId(d: Deps, chatId: string): Promise<Doc<User> | null> {
+  const rows = await d.store.query<User>({
+    collection: 'users',
+    where: [['telegramChatId', '==', chatId]],
+  });
+  return rows.find((user) => user.role === 'manager') ?? null;
+}
+
 /**
- * Webhook: any message to the bot gets the chat id back, so a Manager can copy it into
- * their profile («شناسهٔ گفت‌وگو»). Nothing else is stored from the update.
+ * Pairs a chat to a Manager. A chat belongs to exactly one Manager at a time: pairing a new
+ * Manager (the person switched Telegram accounts, or a shared phone) detaches the old one so
+ * reports never leak into a chat that now belongs to somebody else.
+ */
+async function pairTelegramChat(d: Deps, manager: Doc<User>, chatId: string): Promise<void> {
+  const others = await d.store.query<User>({
+    collection: 'users',
+    where: [['telegramChatId', '==', chatId]],
+  });
+  for (const other of others)
+    if (other.id !== manager.id)
+      await d.store.update(`users/${other.id}`, {
+        telegramChatId: null,
+        telegramPairedAt: null,
+        updatedAt: nowIso(d),
+      });
+  await d.store.update(`users/${manager.id}`, {
+    telegramChatId: chatId,
+    telegramPairedAt: nowIso(d),
+    updatedAt: nowIso(d),
+  });
+  await track(d, 'telegram_paired', manager.id, {}).catch(() => {});
+}
+
+async function unpairTelegramChat(d: Deps, chatId: string): Promise<boolean> {
+  const manager = await managerByChatId(d, chatId);
+  if (!manager) return false;
+  await d.store.update(`users/${manager.id}`, {
+    telegramChatId: null,
+    telegramPairedAt: null,
+    updatedAt: nowIso(d),
+  });
+  await track(d, 'telegram_unpaired', manager.id, {}).catch(() => {});
+  return true;
+}
+
+/**
+ * Webhook — the phone-pairing conversation:
+ *
+ *  1. `/start` (or any first message) → greeting + a button that shares the user's own
+ *     mobile number («📱 ارسال شماره موبایل»).
+ *  2. The shared contact is matched to the Manager account with that phone and the chat is
+ *     paired to it; from the next 09:00 run that Manager's Excel lands in this chat.
+ *  3. `/stop` unpairs.
+ *
+ * Security: pairing only happens for a *verified* webhook call (Telegram's secret-token
+ * header matched, or a non-prod environment) and only when the shared contact is the
+ * sender's own (`contact.user_id === from.id`) — Telegram fills it from the account's real
+ * number, so nobody can pair a Manager's reports to a stranger's chat by typing a number.
+ * Typed numbers are therefore never paired; the bot asks for the button instead.
  */
 export async function handleTelegramWebhook(
   d: Deps,
   update: TelegramUpdate,
+  opts: { verified?: boolean } = {},
 ): Promise<{ ok: true }> {
-  const chatId = update.message?.chat?.id;
-  if (chatId === undefined || chatId === null) return { ok: true };
+  const message = update.message;
+  const rawChatId = message?.chat?.id;
+  if (rawChatId === undefined || rawChatId === null) return { ok: true };
+  const chatId = String(rawChatId);
+  const verified = opts.verified ?? true;
   const sender = telegramSender(d);
-  if (!sender.enabled) return { ok: true };
-  const name = update.message?.chat?.first_name?.trim();
-  await sender
-    .sendMessage(
-      String(chatId),
-      `سلام${name ? ` ${name}` : ''} 👋\n` +
-        `شناسهٔ گفت‌وگوی شما: ${chatId}\n` +
-        `این شناسه را در «پنل مدیر ← پروفایل ← گزارش روزانهٔ تلگرام» وارد کنید تا هر روز ساعت ۹ صبح، گزارش اکسل بازاریاب‌های استان‌هایتان را همین‌جا دریافت کنید.`,
-    )
-    .catch(() => {});
+  const reply = async (text: string, replyMarkup?: TelegramReplyMarkup) => {
+    if (!sender.enabled) return;
+    await sender
+      .sendMessage(chatId, text, replyMarkup ? { replyMarkup } : undefined)
+      .catch(() => {});
+  };
+  const firstName = (message?.from?.first_name ?? message?.chat?.first_name ?? '').trim();
+  const hello = firstName ? `سلام ${firstName} 👋` : 'سلام 👋';
+  const askPhone = () =>
+    reply(
+      `${hello}\n` +
+        'به ربات گزارش روزانهٔ سیلانه سبز خوش آمدید.\n' +
+        'برای اتصال این گفت‌وگو به پنل مدیرتان، دکمهٔ «📱 ارسال شماره موبایل» را بزنید تا شماره‌تان با حساب مدیرتان تطبیق داده شود؛ بعد از آن، هر روز ساعت ۹ صبح گزارش اکسل بازاریاب‌های استان‌هایتان را همین‌جا می‌گیرید.',
+      ASK_PHONE_MARKUP,
+    );
+
+  // 1) Shared contact → pairing.
+  const contact = message?.contact;
+  if (contact?.phone_number) {
+    // The button always yields the sender's own contact (user_id === from.id). Anything
+    // else — a phone-book contact card, a forwarded contact — proves nothing about whose
+    // number it is, so it can never pair.
+    if (
+      contact.user_id === undefined ||
+      message?.from?.id === undefined ||
+      String(contact.user_id) !== String(message.from.id)
+    ) {
+      await reply(
+        'این شماره متعلق به حساب تلگرام شما نیست. برای اتصال، شمارهٔ خودتان را با دکمهٔ «📱 ارسال شماره موبایل» بفرستید.',
+        ASK_PHONE_MARKUP,
+      );
+      return { ok: true };
+    }
+    if (!verified) {
+      // Production without a webhook secret: never trust a pairing payload. The manual
+      // chat-id method in the Manager profile still works.
+      await reply(
+        'اتصال خودکار در حال حاضر فعال نیست. شناسهٔ این گفت‌وگو را در «پنل مدیر ← پروفایل ← گزارش روزانهٔ تلگرام» وارد کنید:\n' +
+          chatId,
+      );
+      return { ok: true };
+    }
+    const phone = normalizePhone(contact.phone_number);
+    if (!phone) {
+      await reply(
+        'شمارهٔ موبایل معتبر نیست. شماره باید یک موبایل ایران (مثل ۰۹۱۲…) باشد؛ دوباره با دکمهٔ ارسال شماره تلاش کنید.',
+        ASK_PHONE_MARKUP,
+      );
+      return { ok: true };
+    }
+    const managers = await managersByPhone(d, phone);
+    const manager = managers.find((m) => m.status === 'active') ?? managers[0];
+    if (!manager) {
+      await reply(
+        'برای این شماره، حساب «مدیر» در سامانهٔ سیلانه سبز پیدا نشد.\n' +
+          'اگر شمارهٔ حسابتان در سامانه چیز دیگری است، با همان شماره وارد تلگرام شوید یا از مدیر سیستم بخواهید شمارهٔ حسابتان را اصلاح کند.\n' +
+          `شناسهٔ این گفت‌وگو برای اتصال دستی: ${chatId}`,
+        REMOVE_KEYBOARD,
+      );
+      return { ok: true };
+    }
+    if (manager.status !== 'active') {
+      await reply(
+        'حساب مدیر این شماره در حال حاضر فعال نیست؛ برای فعال‌سازی با مدیر سیستم در تماس باشید.',
+        REMOVE_KEYBOARD,
+      );
+      return { ok: true };
+    }
+    await pairTelegramChat(d, manager, chatId);
+    const provinces = effectiveManagerProvinces(manager);
+    await reply(
+      `✅ اتصال انجام شد، ${manager.name}\n` +
+        (provinces.length ? `محدودهٔ مدیریت شما: ${provinces.join('، ')}\n` : '') +
+        'از این پس هر روز ساعت ۹ صبح، گزارش اکسل بازاریاب‌های محدوده‌تان همین‌جا ارسال می‌شود.\n' +
+        'برای قطع اتصال، /stop را بفرستید.',
+      REMOVE_KEYBOARD,
+    );
+    return { ok: true };
+  }
+
+  const text = (message?.text ?? '').trim();
+
+  // 2) Unpair.
+  if (UNPAIR_TEXTS.has(text)) {
+    if (verified && (await unpairTelegramChat(d, chatId)))
+      await reply(
+        'اتصال این گفت‌وگو قطع شد و دیگر گزارش روزانه نمی‌گیرید. برای اتصال دوباره /start را بفرستید.',
+        REMOVE_KEYBOARD,
+      );
+    else
+      await reply(
+        'این گفت‌وگو به هیچ پنل مدیری متصل نیست. برای اتصال /start را بفرستید.',
+        REMOVE_KEYBOARD,
+      );
+    return { ok: true };
+  }
+
+  // 3) A typed phone number never pairs (anyone can type someone else's number).
+  if (text && normalizePhone(text)) {
+    await reply(
+      'برای امنیت گزارش‌ها، شمارهٔ تایپ‌شده قبول نمی‌شود؛ تلگرام باید مالکیت شماره را تأیید کند. دکمهٔ «📱 ارسال شماره موبایل» را بزنید.',
+      ASK_PHONE_MARKUP,
+    );
+    return { ok: true };
+  }
+
+  // 4) /start and everything else.
+  if (text.startsWith('/start')) {
+    const paired = await managerByChatId(d, chatId);
+    if (paired) {
+      await reply(
+        `${hello}\nاین گفت‌وگو به پنل مدیر «${paired.name}» متصل است و گزارش روزانه ساعت ۹ صبح می‌رسد.\nبرای اتصال با شمارهٔ دیگر، شماره را با دکمهٔ زیر بفرستید؛ برای قطع اتصال /stop را بفرستید.`,
+        ASK_PHONE_MARKUP,
+      );
+      return { ok: true };
+    }
+    await askPhone();
+    return { ok: true };
+  }
+
+  const paired = await managerByChatId(d, chatId);
+  if (paired)
+    await reply(
+      'این گفت‌وگو به پنل مدیر شما متصل است؛ گزارش بعدی ساعت ۹ صبح می‌رسد. برای قطع اتصال /stop را بفرستید.',
+    );
+  else await askPhone();
   return { ok: true };
 }

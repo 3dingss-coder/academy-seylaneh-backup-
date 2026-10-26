@@ -32,6 +32,8 @@ export interface User {
    */
   /** Telegram chat id for the daily Manager report (Managers opt in from their profile). */
   telegramChatId?: string | null;
+  /** When the Manager paired this Telegram chat (via the bot's phone-share flow or manually). */
+  telegramPairedAt?: string | null;
   managerProvinces?: string[];
   brandIds: string[];
   status: UserStatus;

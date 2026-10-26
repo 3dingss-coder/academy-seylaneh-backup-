@@ -82,4 +82,71 @@ describe('Manager first-login profile setup', () => {
       newPassword: 'Password123',
     });
   });
+
+  it('after profile completion, asks the Manager to pair Telegram by mobile number', async () => {
+    const completedUser: Me = {
+      ...manager,
+      hasNationalCode: true,
+      managerProfileRequired: false,
+      managerProfileCompletedAt: '2026-10-03T06:30:00.000Z',
+    };
+    let paired = false;
+    mockApi({
+      'POST /v1/auth/refresh': () => ({
+        data: { user: manager, idToken: 'manager-token', refreshToken: 'r2', expiresIn: 3600 },
+      }),
+      'GET /v1/me': () => ({
+        data: paired ? { ...completedUser, telegramChatId: '777001' } : manager,
+      }),
+      'POST /v1/manager/complete-profile': () => ({ data: completedUser }),
+      'GET /v1/manager/profile': () => ({
+        data: {
+          team: { id: 'team-tehran', name: 'تیم تهران' },
+          managerProvinces: ['تهران'],
+          managementArea: { province: 'تهران', city: 'تهران' },
+          createdAt: '2026-10-01T00:00:00.000Z',
+          telegram: { configured: true, botUsername: 'seylane_reports_bot', connected: paired },
+        },
+      }),
+      'GET /v1/manager/dashboard': () => ({
+        data: {
+          team: { id: 'team-tehran', name: 'تیم تهران' },
+          kpis: {
+            completionRate: 0,
+            completed: 0,
+            assigned: 0,
+            onTimeRate: 0,
+            laggardCount: 0,
+            members: 0,
+          },
+          pendingRetakes: 0,
+          laggards: [],
+        },
+      }),
+    });
+
+    renderApp('/manager');
+    expect(await screen.findByRole('heading', { name: 'تکمیل پروفایل مدیر' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('کد ملی'), { target: { value: '1234567891' } });
+    fireEvent.change(screen.getByLabelText('رمز جدید'), { target: { value: 'Password123' } });
+    fireEvent.change(screen.getByLabelText('تکرار رمز جدید'), {
+      target: { value: 'Password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'تکمیل پروفایل و ورود به پنل' }));
+
+    // The connect step: bot link + phone-share instructions tied to the Manager's own number.
+    expect(
+      await screen.findByRole('heading', { name: 'اتصال به ربات تلگرام' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ورود به ربات تلگرام/ })).toHaveAttribute(
+      'href',
+      'https://t.me/seylane_reports_bot',
+    );
+    expect(screen.getByText(/۰۹۱۲۵۵۵۰۱۲۳/)).toBeInTheDocument();
+
+    // Simulate the bot visit: the number got paired, «وصل شدم» detects it and enters the panel.
+    paired = true;
+    fireEvent.click(screen.getByRole('button', { name: 'وصل شدم، بررسی کن' }));
+    expect(await screen.findByRole('heading', { name: 'تیم تهران' })).toBeInTheDocument();
+  });
 });

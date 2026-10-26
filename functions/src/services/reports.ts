@@ -146,6 +146,13 @@ export async function managerProfile(d: Deps, manager: Doc<User>) {
       city: manager.city ?? null,
     },
     createdAt: manager.createdAt,
+    // Daily Telegram report: lets the panel link straight to the bot and show whether this
+    // Manager is already paired (first-login connect prompt + profile card).
+    telegram: {
+      configured: Boolean(d.config.telegramBotToken),
+      botUsername: d.config.telegramBotUsername || null,
+      connected: Boolean(manager.telegramChatId),
+    },
   };
 }
 

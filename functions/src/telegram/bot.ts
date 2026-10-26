@@ -1,4 +1,4 @@
-import type { TelegramDocument, TelegramSender } from './types';
+import type { TelegramDocument, TelegramMessageOptions, TelegramSender } from './types';
 
 /**
  * Telegram Bot API over plain fetch (Workers- and Node-compatible).
@@ -25,11 +25,15 @@ export class HttpTelegramSender implements TelegramSender {
     }
   }
 
-  async sendMessage(chatId: string, text: string): Promise<void> {
+  async sendMessage(chatId: string, text: string, options?: TelegramMessageOptions): Promise<void> {
     await this.call('sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        ...(options?.replyMarkup ? { reply_markup: options.replyMarkup } : {}),
+      }),
     });
   }
 

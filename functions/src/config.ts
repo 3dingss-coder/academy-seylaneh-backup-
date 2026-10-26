@@ -54,6 +54,8 @@ export interface AppConfig {
   smtpUrl: string;
   /** Telegram bot for the daily Manager reports (empty = the feature is off). */
   telegramBotToken: string;
+  /** Public @username of the bot (for t.me links in the Manager panel); empty when unknown. */
+  telegramBotUsername: string;
   /** Optional secret Telegram echoes in the webhook header (set when registering the webhook). */
   telegramWebhookSecret: string;
   /** Public URL of the web app (links in emails). */
@@ -109,6 +111,7 @@ export function loadConfig(
         : 1,
     smtpUrl: env.SMTP_URL ?? '',
     telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? '',
+    telegramBotUsername: (env.TELEGRAM_BOT_USERNAME ?? '').replace(/^@/, '').trim(),
     telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET ?? '',
     appUrl: (env.APP_URL ?? env.URL ?? env.DEPLOY_PRIME_URL ?? '').replace(/\/$/, ''),
     mailFrom: env.MAIL_FROM ?? 'آکادمی سیلانه <no-reply@seylane-sabz.local>',

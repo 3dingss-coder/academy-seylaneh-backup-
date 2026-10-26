@@ -10,10 +10,25 @@ export interface TelegramDocument {
   caption?: string;
 }
 
+/** Reply keyboard asking Telegram to share the user's own phone number (pairing flow). */
+export interface TelegramKeyboardMarkup {
+  keyboard: Array<Array<{ text: string; request_contact?: boolean }>>;
+  resize_keyboard?: boolean;
+  one_time_keyboard?: boolean;
+}
+export interface TelegramRemoveKeyboardMarkup {
+  remove_keyboard: true;
+}
+export type TelegramReplyMarkup = TelegramKeyboardMarkup | TelegramRemoveKeyboardMarkup;
+
+export interface TelegramMessageOptions {
+  replyMarkup?: TelegramReplyMarkup;
+}
+
 export interface TelegramSender {
   /** True when a bot token is configured and sends will really go out. */
   readonly enabled: boolean;
-  sendMessage(chatId: string, text: string): Promise<void>;
+  sendMessage(chatId: string, text: string, options?: TelegramMessageOptions): Promise<void>;
   sendDocument(chatId: string, doc: TelegramDocument): Promise<void>;
   describe?(): { provider: 'telegram' | 'unconfigured' | 'recording'; configured: boolean };
 }
@@ -21,10 +36,10 @@ export interface TelegramSender {
 /** Records messages instead of sending (tests / local). */
 export class RecordingTelegramSender implements TelegramSender {
   readonly enabled = true;
-  readonly messages: Array<{ chatId: string; text: string }> = [];
+  readonly messages: Array<{ chatId: string; text: string; options?: TelegramMessageOptions }> = [];
   readonly documents: Array<{ chatId: string; doc: TelegramDocument }> = [];
-  async sendMessage(chatId: string, text: string) {
-    this.messages.push({ chatId, text });
+  async sendMessage(chatId: string, text: string, options?: TelegramMessageOptions) {
+    this.messages.push({ chatId, text, options });
   }
   async sendDocument(chatId: string, doc: TelegramDocument) {
     this.documents.push({ chatId, doc });

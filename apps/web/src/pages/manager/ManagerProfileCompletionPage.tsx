@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, MapPin, ShieldCheck, UserRound } from 'lucide-react';
+import { KeyRound, MapPin, RefreshCw, Send, ShieldCheck, UserRound } from 'lucide-react';
 import { ResidencePicker, type Residence } from '@/components/common/ResidencePicker';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button, Card, Input, useToast } from '@/components/ui';
@@ -8,7 +8,8 @@ import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { errMsg } from '@/lib/errors';
 import { toPersianDigits } from '@/lib/digits';
-import type { Me } from '@/lib/types';
+import type { ManagerProfileView, Me } from '@/lib/types';
+import { telegramBotUrl } from './telegramBot';
 
 /** Mandatory first-login identity/profile setup for Managers provisioned by an Admin. */
 export function ManagerProfileCompletionPage() {
@@ -25,6 +26,13 @@ export function ManagerProfileCompletionPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Set after a successful completion when the daily Telegram report is available but this
+  // Manager has not paired a chat yet — the first-login connect step.
+  const [telegramStep, setTelegramStep] = useState<{ botUsername: string | null } | null>(null);
+  // The completed account, held back from auth state until the Telegram step is done:
+  // RequireAuth would bounce a completed Manager off this page the moment setUser lands.
+  const [pendingUser, setPendingUser] = useState<Me | null>(null);
+  const [checking, setChecking] = useState(false);
 
   if (!user) return null;
 
@@ -52,6 +60,21 @@ export function ManagerProfileCompletionPage() {
         city: residence.city,
         newPassword,
       });
+      // First login → offer the Telegram daily-report connection before entering the panel.
+      // The profile is already completed server-side, so /manager/profile answers; local
+      // auth state is only updated afterwards (see pendingUser). Any failure here must not
+      // block entry: fall through to the panel.
+      try {
+        const view = await api.get<ManagerProfileView>('/manager/profile');
+        if (view.telegram?.configured && !view.telegram.connected && !completed.telegramChatId) {
+          setPendingUser(completed);
+          setTelegramStep({ botUsername: view.telegram.botUsername });
+          toast.show({ type: 'success', message: 'پروفایل تکمیل شد.' });
+          return;
+        }
+      } catch {
+        // ignore — the dashboard banner offers the same connection later
+      }
       setUser(completed);
       toast.show({ type: 'success', message: 'پروفایل تکمیل شد؛ وارد پنل تیم خود می‌شوید.' });
       navigate('/manager', { replace: true });
@@ -62,6 +85,92 @@ export function ManagerProfileCompletionPage() {
       setBusy(false);
     }
   };
+
+  const checkTelegram = async () => {
+    setChecking(true);
+    try {
+      const me = await api.get<Me>('/me');
+      setUser(me);
+      if (me.telegramChatId) {
+        toast.show({
+          type: 'success',
+          message: 'تلگرام متصل شد؛ گزارش اول فردا ساعت ۹ صبح می‌رسد.',
+        });
+        navigate('/manager', { replace: true });
+      } else {
+        toast.show({
+          type: 'warning',
+          message: 'هنوز اتصالی ثبت نشده است؛ در ربات دکمهٔ «ارسال شماره موبایل» را بزنید.',
+        });
+      }
+    } catch (cause) {
+      toast.show({ type: 'error', message: errMsg(cause) });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  if (telegramStep) {
+    return (
+      <main dir="rtl" className="min-h-dvh bg-[#f7f7f2] px-3 py-5 sm:px-6 sm:py-8">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <PageHeader
+            title="اتصال به ربات تلگرام"
+            subtitle="آخرین گام: گزارش روزانهٔ پنل‌تان را در تلگرام بگیرید."
+          />
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#e8f3fb] text-[#1b6fa8]">
+                <Send className="size-6" aria-hidden />
+              </span>
+              <div>
+                <h1 className="text-lg font-black text-[#143f36]">گزارش ساعت ۹ صبح در تلگرام</h1>
+                <p className="mt-1 text-sm leading-6 text-[#52645b]">
+                  وارد ربات تلگرام شوید، دکمهٔ «شروع» را بزنید و شماره موبایل‌تان را با دکمهٔ «📱
+                  ارسال شماره موبایل» بفرستید. ربات شماره را با همین حساب مدیرتان (
+                  {user.phone ? (
+                    <span dir="ltr">{toPersianDigits(user.phone)}</span>
+                  ) : (
+                    'شمارهٔ ورودتان'
+                  )}
+                  ) تطبیق می‌دهد و از فردا، هر روز ساعت ۹ صبح گزارش اکسل بازاریاب‌های استان‌هایتان
+                  را در تلگرام می‌گیرید.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {telegramStep.botUsername && (
+                <a href={telegramBotUrl(telegramStep.botUsername)} target="_blank" rel="noreferrer">
+                  <Button type="button" icon={<Send className="size-4" aria-hidden />}>
+                    ورود به ربات تلگرام
+                  </Button>
+                </a>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                loading={checking}
+                icon={<RefreshCw className="size-4" aria-hidden />}
+                onClick={() => void checkTelegram()}
+              >
+                وصل شدم، بررسی کن
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (pendingUser) setUser(pendingUser);
+                  navigate('/manager', { replace: true });
+                }}
+              >
+                فعلاً رد کن و وارد پنل شو
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main dir="rtl" className="min-h-dvh bg-[#f7f7f2] px-3 py-5 sm:px-6 sm:py-8">

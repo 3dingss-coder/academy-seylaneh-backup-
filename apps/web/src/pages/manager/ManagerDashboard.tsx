@@ -24,6 +24,7 @@ import { toPersianDigits } from '@/lib/digits';
 import { faDate, faPercent, faRelative } from '@/lib/format';
 import type { Laggard, ManagerDashboard as Data } from '@/lib/types';
 import { SendMessageDialog } from './SendMessageDialog';
+import { TelegramConnectBanner } from './TelegramReportCard';
 
 /** W1 — داشبورد مدیر: team KPIs + laggards with quick message. */
 export function ManagerDashboard() {
@@ -66,6 +67,7 @@ export function ManagerDashboard() {
                   : 'وضعیت آموزش اعضای تیم'
               }
             />
+            <TelegramConnectBanner />
             {!d.team && (d.provinces?.length ?? 0) === 0 ? (
               /* rare help state (manager spec: mascot only for rare empty/help states) */
               <EmptyState

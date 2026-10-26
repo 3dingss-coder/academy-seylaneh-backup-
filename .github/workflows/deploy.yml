@@ -9,6 +9,7 @@ name: Deploy to Cloudflare (Worker + D1 Database)
 #
 # Optional Secrets / Variables:
 #   GEMINI_API_KEY                 (Optional: enables AI Mentor; falls back to rule-based mentor without it)
+#   TELEGRAM_BOT_TOKEN / TELEGRAM_WEBHOOK_SECRET  (Optional: daily Manager Excel report via Telegram; both are needed)
 #   CLOUDFLARE_D1_DATABASE_NAME    (Optional: defaults to `seylane-sabz-db`; auto-created if missing)
 #   CLOUDFLARE_PAGES_PROJECT       (Optional: if you also want `wrangler pages deploy` in addition to Worker)
 on:
@@ -125,6 +126,8 @@ jobs:
           DB_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME || 'seylane-sabz-db' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           # `wrangler deploy` re-runs `[build] command = "npm run build"` (wrangler.toml) and that
           # rebuild overwrites apps/web/dist, so the build-time VITE_* values must be present here
           # too, otherwise the deployed site silently loses them (no web push, no API base).
@@ -177,6 +180,27 @@ jobs:
           if [ -n "$FCM_SERVICE_ACCOUNT_JSON" ]; then
             echo "Syncing FCM_SERVICE_ACCOUNT_JSON to the Worker ..."
             printf '%s' "$FCM_SERVICE_ACCOUNT_JSON" | npx --yes wrangler@4 secret put FCM_SERVICE_ACCOUNT_JSON
+          fi
+
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "Syncing TELEGRAM_BOT_TOKEN to the Worker ..."
+            printf '%s' "$TELEGRAM_BOT_TOKEN" | npx --yes wrangler@4 secret put TELEGRAM_BOT_TOKEN
+          fi
+
+          if [ -n "$TELEGRAM_WEBHOOK_SECRET" ]; then
+            echo "Syncing TELEGRAM_WEBHOOK_SECRET to the Worker ..."
+            printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | npx --yes wrangler@4 secret put TELEGRAM_WEBHOOK_SECRET
+          fi
+
+          # Telegram allows exactly one webhook URL, so it is (re)registered here on every deploy.
+          # Idempotent; the secret_token makes Telegram sign each call so the Worker can verify it.
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_WEBHOOK_SECRET" ]; then
+            echo "Registering the Telegram webhook ..."
+            curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+              --data-urlencode "url=https://academy-seylaneh.site/v1/telegram/webhook" \
+              --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
+              --data-urlencode 'allowed_updates=["message"]' \
+              | python3 -c "import json,sys; r=json.load(sys.stdin); print('setWebhook ok:', r.get('ok'), r.get('description',''))"
           fi
 
       - name: Optional Deploy to Cloudflare Pages (if CLOUDFLARE_PAGES_PROJECT is set)

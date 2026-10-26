@@ -26,6 +26,9 @@ PLAYBACK_BUDGET = "off"
 RATE_LIMIT_SCALE = "20"
 # Public site URL: used to build the absolute click-through link in web push notifications.
 APP_URL = "https://academy-seylaneh.site"
+# Public bot username (no @) for the Manager "connect Telegram" link. The token and webhook secret are
+# Worker secrets (synced by deploy.yml), never vars.
+TELEGRAM_BOT_USERNAME = "Academy_seylanehbot"
 # D1 -> R2 media move: files are copied to R2 and verified by size; the D1 copy is deleted only
 # when this is "on" (flip it after checking that images/videos play from R2).
 R2_MIGRATE_PURGE = "on"

@@ -102,7 +102,7 @@ describe('telegram daily Manager reports', () => {
     expect(ctx.deps.telegram.messages).toHaveLength(1);
   });
 
-  it('/start asks for the mobile number with a contact-share button; secret enforced', async () => {
+  it('/start offers Persian start, which asks for the mobile number; secret enforced', async () => {
     const { ctx } = await setup();
     const res = await webhook(ctx, {
       chat: { id: 424242 },
@@ -111,7 +111,9 @@ describe('telegram daily Manager reports', () => {
     });
     expect(res.status).toBeLessThan(300);
     expect(ctx.deps.telegram.messages).toHaveLength(1);
-    const sent = ctx.deps.telegram.messages[0];
+    expect(ctx.deps.telegram.messages[0]?.text).toContain('شروع کنیم');
+    await webhook(ctx, { chat: { id: 424242 }, text: 'شروع کنیم' });
+    const sent = ctx.deps.telegram.messages[1];
     expect(sent?.text).toContain('ارسال شماره موبایل');
     const markup = sent?.options?.replyMarkup as {
       keyboard?: Array<Array<{ request_contact?: boolean }>>;

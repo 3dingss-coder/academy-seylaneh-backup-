@@ -146,19 +146,24 @@ describe('Telegram instant activity report', () => {
     const menu = ctx.deps.telegram.messages.at(-1)?.options?.replyMarkup as TelegramKeyboardMarkup;
     expect(menu.keyboard.flat().map((b) => b.text)).toContain('دریافت گزارشات');
     await webhook('دریافت گزارشات');
-    const range = ctx.deps.telegram.messages.at(-1)?.options?.replyMarkup as TelegramKeyboardMarkup;
-    expect(range.keyboard.flat().map((b) => b.text)).toEqual([
-      'یک روز اخیر',
-      '۳۰ روز اخیر',
+    const formats = ctx.deps.telegram.messages.at(-1)?.options
+      ?.replyMarkup as TelegramKeyboardMarkup;
+    expect(formats.keyboard.flat().map((b) => b.text)).toEqual([
+      'اکسل (Excel)',
+      'پی‌دی‌اف (PDF)',
       'بازگشت',
     ]);
+    await webhook('اکسل (Excel)');
+    await webhook('همه استان‌های من');
+    const range = ctx.deps.telegram.messages.at(-1)?.options?.replyMarkup as TelegramKeyboardMarkup;
+    expect(range.keyboard.flat().map((b) => b.text)).toContain('بازه دلخواه');
     expect((await webhook('یک روز اخیر', { updateId: 100 })).status).toBe(200);
     expect((await webhook('یک روز اخیر', { updateId: 100 })).status).toBe(200);
     expect(ctx.deps.telegram.documents).toHaveLength(1);
     expect((await webhook('۳۰ روز اخیر')).status).toBe(200);
     expect(ctx.deps.telegram.documents).toHaveLength(2);
-    expect(ctx.deps.telegram.documents[0]?.doc.filename).toContain('-1d-');
-    expect(ctx.deps.telegram.documents[1]?.doc.filename).toContain('-30d-');
+    expect(ctx.deps.telegram.documents[0]?.doc.filename).toContain('-1-');
+    expect(ctx.deps.telegram.documents[1]?.doc.filename).toContain('-30-');
   });
 
   it('blocks unpaired, disabled, incomplete, non-private and unverified report requests', async () => {

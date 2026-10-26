@@ -30,10 +30,9 @@ import { CompletionReport } from '@/components/reports/CompletionReport';
 import { QuizResultsReport } from '@/components/reports/QuizResultsReport';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { faDate, faNumber, faPercent } from '@/lib/format';
+import { faNumber, faPercent } from '@/lib/format';
 import { toPersianDigits } from '@/lib/digits';
 import { downloadCsv, toCsv } from '@/lib/csv';
-import { exportExcelSheets, type ExcelColumn } from '@/lib/excel';
 import type {
   CompletionReport as CompletionData,
   CompletionRow,
@@ -128,33 +127,6 @@ function ManagerExecutiveReport() {
     () => buildManagerReportSnapshot(rows, attempts, memberRows, filters),
     [attempts, filters, memberRows, rows],
   );
-  const filteredRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          (!filters.brand || row.brandName === filters.brand) &&
-          (!filters.product || row.productName === filters.product) &&
-          (!filters.province || row.province === filters.province) &&
-          (!filters.city || row.city === filters.city),
-      ),
-    [filters, rows],
-  );
-  const filteredAttempts = useMemo(() => {
-    const now = Date.now();
-    const periodStart =
-      filters.period === 'all'
-        ? Number.NEGATIVE_INFINITY
-        : now - Number(filters.period) * 86_400_000;
-    return attempts.filter((attempt) => {
-      if (filters.brand && attempt.brandName !== filters.brand) return false;
-      if (filters.product && attempt.productName !== filters.product) return false;
-      if (filters.province && attempt.province !== filters.province) return false;
-      if (filters.city && attempt.city !== filters.city) return false;
-      if (!attempt.submittedAt) return false;
-      const timestamp = Date.parse(attempt.submittedAt);
-      return Number.isFinite(timestamp) && timestamp <= now && timestamp >= periodStart;
-    });
-  }, [attempts, filters]);
   const loading = completion.isPending || quizzes.isPending || members.isPending;
   const failed = completion.isError
     ? completion
@@ -194,180 +166,26 @@ function ManagerExecutiveReport() {
     const csv = toCsv(['معیار', 'مقدار'], csvRows);
     downloadCsv(`manager-learning-report-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   };
-  const exportXlsxReport = () => {
-    const summaryRows = [
-      { metric: 'نام تیم', value: teamName, note: '' },
-      { metric: 'بازهٔ گزارش', value: periodLabel, note: `تولید گزارش: ${generatedAt}` },
-      {
-        metric: 'اعضای فعال در دامنه فیلتر',
-        value: snapshot.activeMembers,
-        note: 'اعضای فعال براساس فیلترهای مکانی و محصولی',
-      },
-      {
-        metric: 'آموزش‌های تخصیص‌یافته',
-        value: snapshot.assignments,
-        note: 'وضعیت فعلی آموزش‌های موجود در دامنه فیلتر',
-      },
-      { metric: 'آموزش‌های تکمیل‌شده', value: snapshot.completed, note: 'وضعیت فعلی' },
-      {
-        metric: 'نرخ تکمیل فعلی (٪)',
-        value: snapshot.completionRate ?? '',
-        note: 'آموزش تکمیل‌شده ÷ آموزش تخصیص‌یافته',
-      },
-      { metric: 'تکمیل ثبت‌شده در بازه', value: snapshot.completedInPeriod, note: periodLabel },
-      {
-        metric: 'تکمیل دوره قبل',
-        value: snapshot.previousPeriodCompleted ?? '',
-        note:
-          filters.period === 'all'
-            ? 'برای کل بازه مقایسهٔ دوره‌ای انجام نشده است.'
-            : 'دورهٔ هم‌اندازه پیش از بازهٔ انتخابی',
-      },
-      {
-        metric: 'دیرکرد فعلی',
-        value: snapshot.overdue,
-        note: 'وضعیت فعلی آموزش‌ها؛ مستقل از بازهٔ انتخابی',
-      },
-      {
-        metric: 'نیازمند پیگیری',
-        value: snapshot.lagging,
-        note: 'براساس آخرین فعالیت/مهلت ثبت‌شده',
-      },
-      { metric: 'تلاش‌های آزمون در بازه', value: snapshot.quizAttempts, note: periodLabel },
-      {
-        metric: 'تلاش‌های آزمون دارای نتیجه',
-        value: snapshot.quizScoredAttempts,
-        note: 'مبنای محاسبهٔ نرخ قبولی',
-      },
-      {
-        metric: 'قبولی تلاش‌های آزمون',
-        value: snapshot.quizPassed,
-        note: 'تلاش‌های ثبت‌شده با نتیجهٔ قبولی',
-      },
-      {
-        metric: 'نرخ قبولی تلاش‌ها (٪)',
-        value: snapshot.quizPassRate ?? '',
-        note: 'قبولی ÷ تلاش‌های دارای نتیجه',
-      },
-      {
-        metric: 'میانگین نمره آزمون (٪)',
-        value: snapshot.averageScore ?? '',
-        note: 'میانگین نمرهٔ تلاش‌های دارای نمره',
-      },
-    ];
-    const completionColumns: ExcelColumn[] = [
-      { header: 'نام عضو', key: 'userName', width: 22 },
-      { header: 'شماره', key: 'phone', width: 14 },
-      { header: 'استان', key: 'province', width: 16 },
-      { header: 'شهر', key: 'city', width: 16 },
-      { header: 'آموزش', key: 'packageTitle', width: 28 },
-      { header: 'برند', key: 'brandName', width: 18 },
-      { header: 'محصول', key: 'productName', width: 22 },
-      { header: 'پیشرفت (٪)', key: 'percent', width: 12, isNumber: true, align: 'center' },
-      { header: 'وضعیت', key: 'status', width: 14 },
-      { header: 'دیرکرد', key: 'overdue', width: 10 },
-      { header: 'نیازمند پیگیری', key: 'lagging', width: 14 },
-      { header: 'مهلت', key: 'deadline', width: 16 },
-      { header: 'تکمیل', key: 'completedAt', width: 16 },
-      { header: 'به‌موقع', key: 'onTime', width: 12 },
-      { header: 'آخرین فعالیت', key: 'lastActivity', width: 16 },
-      { header: 'گیر کرده در', key: 'stuckAt', width: 24 },
-    ];
-    const quizColumns: ExcelColumn[] = [
-      { header: 'نام عضو', key: 'userName', width: 22 },
-      { header: 'استان', key: 'province', width: 16 },
-      { header: 'شهر', key: 'city', width: 16 },
-      { header: 'آموزش', key: 'packageTitle', width: 28 },
-      { header: 'برند', key: 'brandName', width: 18 },
-      { header: 'محصول', key: 'productName', width: 22 },
-      { header: 'بخش آزمون', key: 'sectionTitle', width: 24 },
-      { header: 'شماره تلاش', key: 'attemptNumber', width: 12, isNumber: true, align: 'center' },
-      { header: 'نمره (٪)', key: 'score', width: 10, isNumber: true, align: 'center' },
-      { header: 'حدنصاب', key: 'passScore', width: 10, isNumber: true, align: 'center' },
-      { header: 'درست', key: 'correct', width: 10, isNumber: true, align: 'center' },
-      { header: 'غلط', key: 'wrong', width: 10, isNumber: true, align: 'center' },
-      { header: 'نتیجه', key: 'result', width: 12 },
-      { header: 'ثبت‌شده در', key: 'submittedAt', width: 18 },
-    ];
-    const productColumns: ExcelColumn[] = [
-      { header: 'برند', key: 'brand', width: 22 },
-      { header: 'محصول / آموزش', key: 'product', width: 28 },
-      { header: 'آموزش تخصیص‌یافته', key: 'assigned', width: 18, isNumber: true, align: 'center' },
-      { header: 'تکمیل‌شده', key: 'completed', width: 14, isNumber: true, align: 'center' },
-      { header: 'نرخ تکمیل (٪)', key: 'rate', width: 14, isNumber: true, align: 'center' },
-      { header: 'دیرکرد فعلی', key: 'overdue', width: 14, isNumber: true, align: 'center' },
-    ];
-    const regionColumns: ExcelColumn[] = [
-      { header: 'استان', key: 'province', width: 22 },
-      { header: 'اعضا', key: 'members', width: 12, isNumber: true, align: 'center' },
-      { header: 'آموزش تخصیص‌یافته', key: 'assigned', width: 18, isNumber: true, align: 'center' },
-      { header: 'تکمیل‌شده', key: 'completed', width: 14, isNumber: true, align: 'center' },
-      { header: 'نرخ تکمیل (٪)', key: 'rate', width: 14, isNumber: true, align: 'center' },
-      { header: 'دیرکرد فعلی', key: 'overdue', width: 14, isNumber: true, align: 'center' },
-    ];
-    const excelTitle = `گزارش مدیریتی آموزش — ${teamName}`;
-    const filename = `manager-learning-report-${new Date().toISOString().slice(0, 10)}`;
-    void exportExcelSheets(filename, [
-      {
-        sheetName: 'خلاصه مدیریتی',
-        title: excelTitle,
-        subtitle: periodLabel,
-        fileName: filename,
-        columns: [
-          { header: 'معیار', key: 'metric', width: 34 },
-          { header: 'مقدار', key: 'value', width: 22 },
-          { header: 'توضیح', key: 'note', width: 48 },
-        ],
-        rows: summaryRows,
-      },
-      {
-        sheetName: 'تکمیل آموزش',
-        title: 'جزئیات تکمیل آموزش',
-        subtitle: periodLabel,
-        fileName: filename,
-        columns: completionColumns,
-        rows: completionRowsForExcel(filteredRows),
-      },
-      {
-        sheetName: 'تلاش‌های آزمون',
-        title: 'جزئیات تلاش‌های آزمون',
-        subtitle: periodLabel,
-        fileName: filename,
-        columns: quizColumns,
-        rows: quizRowsForExcel(filteredAttempts),
-      },
-      {
-        sheetName: 'عملکرد محصول',
-        title: 'تفکیک عملکرد محصول',
-        subtitle: 'بر پایه آموزش‌های تخصیص‌یافته و وضعیت فعلی',
-        fileName: filename,
-        columns: productColumns,
-        rows: snapshot.products.map((row) => ({
-          brand: row.brand,
-          product: row.product,
-          assigned: row.assigned,
-          completed: row.completed,
-          rate: row.rate,
-          overdue: row.overdue,
-        })),
-      },
-      {
-        sheetName: 'تفکیک منطقه',
-        title: 'عملکرد بر اساس استان',
-        subtitle: 'آمار فعلی، نه تغییرات جمعیتی یا فروش',
-        fileName: filename,
-        columns: regionColumns,
-        rows: snapshot.regions.map((row) => ({
-          province: row.province,
-          members: row.members,
-          assigned: row.assigned,
-          completed: row.completed,
-          rate: row.rate,
-          overdue: row.overdue,
-        })),
-      },
-    ]);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const exportReport = async (format: 'xlsx' | 'pdf') => {
+    setExporting(true);
+    setExportError('');
+    try {
+      const result = await api.post<{ filename: string; mimeType: string; base64: string }>(
+        '/manager/reports/export',
+        { ...filters, format },
+      );
+      const bytes = Uint8Array.from(atob(result.base64), (c) => c.charCodeAt(0));
+      const { saveAs } = await import('file-saver');
+      saveAs(new Blob([bytes], { type: result.mimeType }), result.filename);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'دریافت گزارش ناموفق بود.');
+    } finally {
+      setExporting(false);
+    }
   };
+  const exportXlsxReport = () => void exportReport('xlsx');
 
   return (
     <div className="flex flex-col gap-4">
@@ -388,20 +206,25 @@ function ManagerExecutiveReport() {
                 variant="secondary"
                 icon={<FileSpreadsheet className="size-4" aria-hidden />}
                 onClick={exportXlsxReport}
+                disabled={exporting}
               >
                 خروجی Excel
               </Button>
               <Button
                 variant="secondary"
                 icon={<Printer className="size-4" aria-hidden />}
-                onClick={() => window.print()}
+                onClick={() => void exportReport('pdf')}
+                disabled={exporting}
               >
-                چاپ / PDF
+                خروجی PDF
               </Button>
             </>
           }
         />
       </div>
+      {exportError && (
+        <ErrorState message={exportError} onRetry={() => void exportReport('xlsx')} />
+      )}
       <Card className="grid grid-cols-1 gap-3 border-[#dce8de] bg-white/90 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
         <Select
           label="بازه زمانی"
@@ -801,46 +624,6 @@ function comparisonText(current: number, previous: number | null) {
       : `در دورهٔ قبل تکمیلی ثبت نشده؛ اکنون ${faNumber(current)} مورد`;
   const delta = current - previous;
   return `${delta > 0 ? 'افزایش' : delta < 0 ? 'کاهش' : 'بدون تغییر'} ${faNumber(Math.abs(delta))} مورد نسبت به دورهٔ قبل`;
-}
-
-function completionRowsForExcel(rows: CompletionRow[]) {
-  const status = { new: 'شروع‌نشده', in_progress: 'در حال انجام', completed: 'تکمیل' } as const;
-  return rows.map((row) => ({
-    userName: row.userName,
-    phone: row.phone ?? '—',
-    province: row.province ?? '—',
-    city: row.city ?? '—',
-    packageTitle: row.packageTitle,
-    brandName: row.brandName ?? '—',
-    productName: row.productName ?? '—',
-    percent: row.percent,
-    status: status[row.status],
-    overdue: row.overdue ? 'بله' : 'خیر',
-    lagging: row.lagging ? 'بله' : 'خیر',
-    deadline: row.deadlineAt ? faDate(row.deadlineAt) : '—',
-    completedAt: row.completedAt ? faDate(row.completedAt) : '—',
-    onTime: row.onTime === null ? '—' : row.onTime ? 'بله' : 'خیر',
-    lastActivity: row.lastActivityAt ? faDate(row.lastActivityAt) : '—',
-    stuckAt: row.stuckAt ?? '—',
-  }));
-}
-function quizRowsForExcel(rows: QuizAttemptRow[]) {
-  return rows.map((row) => ({
-    userName: row.userName,
-    province: row.province ?? '—',
-    city: row.city ?? '—',
-    packageTitle: row.packageTitle,
-    brandName: row.brandName ?? '—',
-    productName: row.productName ?? '—',
-    sectionTitle: row.sectionTitle,
-    attemptNumber: row.attemptNumber,
-    score: row.score ?? '',
-    passScore: row.passScore,
-    correct: row.correct,
-    wrong: row.wrong,
-    result: row.passed === null ? 'نامشخص' : row.passed ? 'قبول' : 'نیازمند تکرار',
-    submittedAt: row.submittedAt ? faDate(row.submittedAt) : '—',
-  }));
 }
 
 function ManagerQuizResults() {

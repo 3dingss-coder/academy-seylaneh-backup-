@@ -8,6 +8,7 @@ export interface TelegramDocument {
   filename: string;
   bytes: Uint8Array;
   caption?: string;
+  mimeType?: string;
 }
 
 /** Reply keyboard asking Telegram to share the user's own phone number (pairing flow). */

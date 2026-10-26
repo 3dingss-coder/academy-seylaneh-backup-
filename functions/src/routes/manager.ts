@@ -10,6 +10,7 @@ import * as pushCampaigns from '../services/push-campaigns';
 import * as users from '../services/users';
 import * as telegramReports from '../services/telegram-reports';
 import { normalizeTelegramChatId } from '../telegram/types';
+import { exportManagementReport, managementExportQuery } from '../services/management-export';
 
 /** Manager APIs require the Manager role; services scope every read and mutation to the assigned team. */
 export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
@@ -53,6 +54,16 @@ export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   r.get(
     '/manager/dashboard',
     h(async (req) => reports.managerDashboard(d, me(req))),
+  );
+  r.post(
+    '/manager/reports/export',
+    h(async (req) => {
+      const file = await exportManagementReport(d, me(req), parse(managementExportQuery, req.body));
+      let binary = '';
+      for (let i = 0; i < file.bytes.length; i += 8192)
+        binary += String.fromCharCode(...file.bytes.subarray(i, i + 8192));
+      return { filename: file.filename, mimeType: file.mimeType, base64: btoa(binary) };
+    }),
   );
   r.get(
     '/manager/members',

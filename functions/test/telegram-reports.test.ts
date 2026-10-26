@@ -199,6 +199,19 @@ describe('telegram daily Manager reports', () => {
     expect(second?.telegramChatId).toBe('31337');
   });
 
+  it('in a dev-mode deployment without a webhook secret, pairing payloads are not trusted', async () => {
+    const { ctx, manager } = await setup();
+    ctx.deps.config.env = 'dev';
+    await webhook(ctx, {
+      chat: { id: 70707 },
+      from: { id: 70707 },
+      contact: { phone_number: `+98${manager.phone.slice(1)}`, user_id: 70707 },
+    });
+    const doc = await ctx.deps.store.get<{ telegramChatId?: string | null }>(`users/${manager.id}`);
+    expect(doc?.telegramChatId ?? null).toBeNull();
+    ctx.deps.config.env = 'test';
+  });
+
   it('in production without a webhook secret, pairing payloads are not trusted', async () => {
     const { ctx, manager } = await setup();
     ctx.deps.config.env = 'prod';

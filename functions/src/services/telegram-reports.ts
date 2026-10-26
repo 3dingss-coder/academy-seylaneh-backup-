@@ -13,6 +13,7 @@ import { StoreConflictError, type Doc } from '../store/types';
 import { getPolicy, nowIso, track, type Deps } from './context';
 import { effectiveManagerProvinces, managerMarketers } from './team-scope';
 import { managerMembers } from './reports';
+import { buildManagerRangeReport } from './telegram-range-report';
 
 /**
  * Daily Manager report over Telegram: every morning (09:00 Tehran by default, policy-tunable)
@@ -300,8 +301,9 @@ export async function sendManagerTelegramTest(
 }
 
 interface TelegramUpdate {
+  update_id?: number;
   message?: {
-    chat?: { id?: number | string; first_name?: string };
+    chat?: { id?: number | string; first_name?: string; type?: string };
     from?: { id?: number | string; first_name?: string };
     text?: string;
     contact?: { phone_number?: string; user_id?: number | string; first_name?: string };
@@ -312,6 +314,22 @@ const ASK_PHONE_MARKUP: TelegramReplyMarkup = {
   keyboard: [[{ text: '📱 ارسال شماره موبایل', request_contact: true }]],
   resize_keyboard: true,
   one_time_keyboard: true,
+};
+const START_MARKUP: TelegramReplyMarkup = {
+  keyboard: [[{ text: 'شروع کنیم' }]],
+  resize_keyboard: true,
+};
+const MAIN_MARKUP: TelegramReplyMarkup = {
+  keyboard: [
+    [{ text: 'دریافت گزارشات' }],
+    [{ text: 'شروع کنیم' }, { text: 'قطع اتصال' }],
+    [{ text: '📱 ارسال شماره موبایل', request_contact: true }],
+  ],
+  resize_keyboard: true,
+};
+const RANGE_MARKUP: TelegramReplyMarkup = {
+  keyboard: [[{ text: 'یک روز اخیر' }, { text: '۳۰ روز اخیر' }], [{ text: 'بازگشت' }]],
+  resize_keyboard: true,
 };
 const REMOVE_KEYBOARD: TelegramReplyMarkup = { remove_keyboard: true };
 
@@ -418,6 +436,59 @@ export async function handleTelegramWebhook(
       ASK_PHONE_MARKUP,
     );
 
+  const text = (message?.text ?? '').trim();
+  const days =
+    text === 'یک روز اخیر' ? 1 : ['۳۰ روز اخیر', '30 روز اخیر'].includes(text) ? 30 : null;
+  if (text === 'دریافت گزارشات' || days !== null) {
+    // Report files contain personal data: only a verified private chat belonging to this sender.
+    if (!verified || message?.chat?.type !== 'private' || String(message?.from?.id) !== chatId) {
+      await reply('گزارش فقط در گفت‌وگوی خصوصی و تأییدشده با ربات قابل دریافت است.');
+      return { ok: true };
+    }
+    const manager = await managerByChatId(d, chatId);
+    if (!manager) {
+      await askPhone();
+      return { ok: true };
+    }
+    if (manager.status !== 'active' || manager.managerProfileRequired) {
+      await reply(
+        'برای دریافت گزارش، حساب مدیر باید فعال و پروفایل آن در سایت تکمیل شده باشد.',
+        START_MARKUP,
+      );
+      return { ok: true };
+    }
+    if (days === null) {
+      await reply('گزارش چه بازه‌ای را می‌خواهید؟', RANGE_MARKUP);
+      return { ok: true };
+    }
+    // Telegram can deliver the same update again. A completed send is acknowledged once.
+    const receipt = Number.isSafeInteger(update.update_id)
+      ? `telegram_report_runs/manual_${chatId}_${update.update_id}`
+      : null;
+    if (receipt) {
+      try {
+        await d.store.create(receipt, { status: 'sending', createdAt: nowIso(d) });
+      } catch (e) {
+        if (!(e instanceof StoreConflictError)) throw e;
+        const previous = await d.store.get<{ status: string; createdAt: string }>(receipt);
+        if (previous?.status === 'sent') return { ok: true };
+        if (previous && d.clock().getTime() - Date.parse(previous.createdAt) < 120_000)
+          throw new ApiError('CONFLICT', 'گزارش در حال آماده‌سازی است.');
+        await d.store.set(receipt, { status: 'sending', createdAt: nowIso(d) });
+      }
+    }
+    try {
+      await reply('⏳ در حال آماده‌سازی فایل اکسل گزارش شما…', MAIN_MARKUP);
+      const report = await buildManagerRangeReport(d, manager, days);
+      await sender.sendDocument(chatId, report);
+      if (receipt) await d.store.update(receipt, { status: 'sent', sentAt: nowIso(d) });
+    } catch {
+      if (receipt) await d.store.delete(receipt).catch(() => {});
+      throw new ApiError('INTERNAL', 'دریافت و ارسال گزارش ناموفق بود. دوباره تلاش کنید.');
+    }
+    return { ok: true };
+  }
+
   // 1) Shared contact → pairing.
   const contact = message?.contact;
   if (contact?.phone_number) {
@@ -476,25 +547,23 @@ export async function handleTelegramWebhook(
       `✅ اتصال انجام شد، ${manager.name}\n` +
         (provinces.length ? `محدودهٔ مدیریت شما: ${provinces.join('، ')}\n` : '') +
         'از این پس هر روز ساعت ۹ صبح، گزارش اکسل بازاریاب‌های محدوده‌تان همین‌جا ارسال می‌شود.\n' +
-        'برای قطع اتصال، /stop را بفرستید.',
-      REMOVE_KEYBOARD,
+        'برای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید. برای قطع اتصال، «قطع اتصال» را بزنید.',
+      MAIN_MARKUP,
     );
     return { ok: true };
   }
-
-  const text = (message?.text ?? '').trim();
 
   // 2) Unpair.
   if (UNPAIR_TEXTS.has(text)) {
     if (verified && (await unpairTelegramChat(d, chatId)))
       await reply(
-        'اتصال این گفت‌وگو قطع شد و دیگر گزارش روزانه نمی‌گیرید. برای اتصال دوباره /start را بفرستید.',
-        REMOVE_KEYBOARD,
+        'اتصال این گفت‌وگو قطع شد و دیگر گزارش روزانه نمی‌گیرید. برای اتصال دوباره «شروع کنیم» را بزنید.',
+        START_MARKUP,
       );
     else
       await reply(
-        'این گفت‌وگو به هیچ پنل مدیری متصل نیست. برای اتصال /start را بفرستید.',
-        REMOVE_KEYBOARD,
+        'این گفت‌وگو به هیچ پنل مدیری متصل نیست. برای اتصال «شروع کنیم» را بزنید.',
+        START_MARKUP,
       );
     return { ok: true };
   }
@@ -509,24 +578,30 @@ export async function handleTelegramWebhook(
   }
 
   // 4) /start and everything else.
-  if (text.startsWith('/start')) {
+  if (text.startsWith('/start') || text === 'شروع کنیم' || text === 'بازگشت') {
     const paired = await managerByChatId(d, chatId);
     if (paired) {
       await reply(
-        `${hello}\nاین گفت‌وگو به پنل مدیر «${paired.name}» متصل است و گزارش روزانه ساعت ۹ صبح می‌رسد.\nبرای اتصال با شمارهٔ دیگر، شماره را با دکمهٔ زیر بفرستید؛ برای قطع اتصال /stop را بفرستید.`,
-        ASK_PHONE_MARKUP,
+        `${hello}\nاین گفت‌وگو به پنل مدیر «${paired.name}» متصل است و گزارش روزانه ساعت ۹ صبح می‌رسد.\nبرای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید.`,
+        MAIN_MARKUP,
       );
       return { ok: true };
     }
-    await askPhone();
+    if (text === 'شروع کنیم') await askPhone();
+    else
+      await reply(
+        `${hello}\nبه ربات گزارش سیلانه سبز خوش آمدید. برای اتصال پنل مدیر، «شروع کنیم» را بزنید.`,
+        START_MARKUP,
+      );
     return { ok: true };
   }
 
   const paired = await managerByChatId(d, chatId);
   if (paired)
     await reply(
-      'این گفت‌وگو به پنل مدیر شما متصل است؛ گزارش بعدی ساعت ۹ صبح می‌رسد. برای قطع اتصال /stop را بفرستید.',
+      'این گفت‌وگو به پنل مدیر شما متصل است. برای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید.',
+      MAIN_MARKUP,
     );
-  else await askPhone();
+  else await reply('برای شروع و اتصال پنل مدیر، «شروع کنیم» را بزنید.', START_MARKUP);
   return { ok: true };
 }

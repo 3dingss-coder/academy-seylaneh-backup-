@@ -16,6 +16,7 @@ import { authRouter } from './routes/auth';
 import { healthRouter } from './routes/health';
 import { managerRouter } from './routes/manager';
 import { meRouter } from './routes/me';
+import { telegramRouter } from './routes/telegram';
 import type { Deps } from './services/context';
 import { DeadlineError } from './lib/bounded';
 import { D1Store, StoreBusyError, type D1Database } from './store/d1';
@@ -254,6 +255,8 @@ export function createFetchHandler(
   const v1 = Router();
   v1.use(healthRouter(config));
   v1.use(authRouter(deps, limiter));
+  // Public Telegram webhook (the Express app mounts it too; this is the production Worker entry).
+  v1.use(telegramRouter(deps));
   v1.use(
     ['/me', '/manager', '/admin'],
     authenticate(deps),

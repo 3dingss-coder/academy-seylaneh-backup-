@@ -103,11 +103,9 @@ describe('Province-based Manager scope', () => {
       (await ctx.api(manager.token).get(`/v1/manager/users/${outsider.id}/progress`)).status,
     ).toBe(403);
 
-    const message = await ctx
-      .api(manager.token)
-      .post(`/v1/manager/users/${tehran.id}/messages`, {
-        body: 'سلام، آموزش این هفته را شروع کنید.',
-      });
+    const message = await ctx.api(manager.token).post(`/v1/manager/users/${tehran.id}/messages`, {
+      body: 'سلام، آموزش این هفته را شروع کنید.',
+    });
     expect(message.status).toBeLessThan(300);
     const blocked = await ctx
       .api(manager.token)

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { unzipSync, strFromU8 } from 'fflate';
 import { createCtx } from './support/ctx';
 import { runDailyTelegramReports } from '../src/services/telegram-reports';
 
@@ -37,11 +38,13 @@ describe('telegram daily Manager reports', () => {
       (typeof ctx.deps.telegram.documents)[0]
     >;
     expect(sent.chatId).toBe('123456789');
-    expect(sent.doc.filename).toMatch(/^manager-report-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(sent.doc.filename).toMatch(/^manager-learning-report-1-.*\.xlsx$/);
     expect(sent.doc.caption).toContain('احمد رضایی');
     expect(sent.doc.caption).toContain('تهران');
     // The workbook covers both supervised provinces — and not قم.
-    const text = new TextDecoder('utf-8', { fatal: false }).decode(sent.doc.bytes);
+    const text = Object.values(unzipSync(sent.doc.bytes))
+      .map((x) => strFromU8(x))
+      .join('');
     expect(text).toContain('بازاریاب تهران');
     expect(text).toContain('بازاریاب مازندران');
     expect(text).not.toContain('بازاریاب قم');

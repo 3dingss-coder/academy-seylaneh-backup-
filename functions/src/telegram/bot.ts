@@ -45,7 +45,11 @@ export class HttpTelegramSender implements TelegramSender {
     form.set(
       'document',
       new Blob([new Uint8Array(doc.bytes)] as unknown as ConstructorParameters<typeof Blob>[0], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type:
+          doc.mimeType ??
+          (doc.filename.endsWith('.pdf')
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       }),
       doc.filename,
     );

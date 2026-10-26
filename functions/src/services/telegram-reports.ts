@@ -1,5 +1,4 @@
 import { ApiError } from '../http/errors';
-import { buildXlsx, type XlsxSheet } from '../lib/xlsx';
 import { dayKey, zonedParts } from '../lib/time';
 import { normalizePhone } from '../lib/ids';
 import { HttpTelegramSender } from '../telegram/bot';
@@ -12,8 +11,8 @@ import type { User } from '../domain/types';
 import { StoreConflictError, type Doc } from '../store/types';
 import { getPolicy, nowIso, track, type Deps } from './context';
 import { effectiveManagerProvinces, managerMarketers } from './team-scope';
-import { managerMembers } from './reports';
-import { buildManagerRangeReport } from './telegram-range-report';
+import { parseReportDateRange } from '../reporting/date-range';
+import { exportManagementReport, managementExportQuery } from './management-export';
 
 /**
  * Daily Manager report over Telegram: every morning (09:00 Tehran by default, policy-tunable)
@@ -48,15 +47,6 @@ export function faDate(d: Date, timeZone: string): string {
   }
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  active: 'فعال',
-  inactive: 'غیرفعال',
-  blacklisted: 'مسدود',
-  completed: 'تکمیل‌شده',
-  in_progress: 'در حال انجام',
-  new: 'شروع‌نشده',
-};
-
 export interface ManagerDailyReport {
   filename: string;
   bytes: Uint8Array;
@@ -69,87 +59,11 @@ export async function buildManagerDailyReport(
   d: Deps,
   manager: Doc<User>,
 ): Promise<ManagerDailyReport> {
-  const policy = await getPolicy(d);
-  const timezone = policy.timezone;
-  const today = dayKey(d.clock(), timezone);
-  const displayDate = faDate(d.clock(), timezone);
-  const [view, scoped] = await Promise.all([
-    managerMembers(d, manager),
-    managerMarketers(d, manager),
-  ]);
-  const pointsById = new Map(scoped.map((user) => [user.id, user.pointsBalance ?? 0]));
-  const members = view.members;
-
-  const summarySheet: XlsxSheet = {
-    name: 'خلاصه بازاریاب‌ها',
-    colWidths: [6, 24, 15, 14, 14, 10, 12, 12, 14, 12, 10, 14],
-    rows: [
-      [
-        'ردیف',
-        'نام بازاریاب',
-        'موبایل',
-        'استان',
-        'شهر',
-        'وضعیت',
-        'بسته تخصیص‌یافته',
-        'تکمیل‌شده',
-        'میانگین پیشرفت (٪)',
-        'بسته عقب‌مانده',
-        'امتیاز',
-        'آخرین فعالیت',
-      ],
-      ...members.map((member, i) => [
-        i + 1,
-        member.name,
-        member.phone ?? '',
-        member.province ?? '',
-        member.city ?? '',
-        STATUS_LABEL[member.status] ?? member.status,
-        member.stats.assigned,
-        member.stats.completed,
-        member.stats.averageProgress,
-        member.stats.lagging,
-        pointsById.get(member.id) ?? 0,
-        member.lastActiveAt ? faDate(new Date(member.lastActiveAt), timezone) : '—',
-      ]),
-    ],
-  };
-
-  const detailRows: XlsxSheet['rows'] = [
-    ['نام بازاریاب', 'استان', 'شهر', 'آموزش', 'برند', 'وضعیت', 'پیشرفت (٪)', 'مهلت', 'عقب‌مانده'],
-  ];
-  for (const member of members)
-    for (const pkg of member.packages)
-      detailRows.push([
-        member.name,
-        member.province ?? '',
-        member.city ?? '',
-        pkg.title,
-        pkg.brandName ?? '',
-        STATUS_LABEL[pkg.status] ?? pkg.status,
-        pkg.percent,
-        pkg.deadlineAt ? faDate(new Date(pkg.deadlineAt), timezone) : '—',
-        pkg.overdue ? 'بله' : '',
-      ]);
-
-  const bytes = buildXlsx([
-    summarySheet,
-    { name: 'جزئیات آموزش‌ها', colWidths: [24, 14, 14, 32, 16, 12, 12, 12, 10], rows: detailRows },
-  ]);
-  const scopeLabel = view.provinces?.length
-    ? view.provinces.join('، ')
-    : (view.team?.name ?? 'محدودهٔ مدیریت شما');
-  const caption =
-    `📊 گزارش روزانهٔ آموزش — ${displayDate}\n` +
-    `مدیر: ${manager.name}\n` +
-    `محدوده: ${scopeLabel}\n` +
-    `بازاریاب‌ها: ${members.length} نفر · نیازمند پیگیری: ${view.totals.lagging} نفر`;
-  return {
-    filename: `manager-report-${today}.xlsx`,
-    bytes,
-    caption,
-    memberCount: members.length,
-  };
+  return exportManagementReport(
+    d,
+    manager,
+    managementExportQuery.parse({ period: '1', format: 'xlsx' }),
+  );
 }
 
 export interface TelegramBotInfo {
@@ -328,7 +242,12 @@ const MAIN_MARKUP: TelegramReplyMarkup = {
   resize_keyboard: true,
 };
 const RANGE_MARKUP: TelegramReplyMarkup = {
-  keyboard: [[{ text: 'یک روز اخیر' }, { text: '۳۰ روز اخیر' }], [{ text: 'بازگشت' }]],
+  keyboard: [
+    [{ text: 'یک روز اخیر' }, { text: '۷ روز اخیر' }],
+    [{ text: '۳۰ روز اخیر' }, { text: '۹۰ روز اخیر' }],
+    [{ text: 'بازه دلخواه' }],
+    [{ text: 'بازگشت' }],
+  ],
   resize_keyboard: true,
 };
 const REMOVE_KEYBOARD: TelegramReplyMarkup = { remove_keyboard: true };
@@ -437,9 +356,44 @@ export async function handleTelegramWebhook(
     );
 
   const text = (message?.text ?? '').trim();
+  const privateVerified =
+    verified && message?.chat?.type === 'private' && String(message?.from?.id) === chatId;
+  type ReportSession = {
+    format: 'xlsx' | 'pdf';
+    province: string;
+    managerId: string;
+    awaiting?: 'dates';
+    updatedAt: string;
+  };
+  const sessionPath = `telegram_report_sessions/${chatId}`;
+  let reportSession = privateVerified ? await d.store.get<ReportSession>(sessionPath) : null;
+  if (reportSession && d.clock().getTime() - Date.parse(reportSession.updatedAt) > 30 * 60_000)
+    reportSession = null;
   const days =
-    text === 'یک روز اخیر' ? 1 : ['۳۰ روز اخیر', '30 روز اخیر'].includes(text) ? 30 : null;
-  if (text === 'دریافت گزارشات' || days !== null) {
+    (
+      {
+        'یک روز اخیر': 1,
+        '۷ روز اخیر': 7,
+        '7 روز اخیر': 7,
+        '۳۰ روز اخیر': 30,
+        '30 روز اخیر': 30,
+        '۹۰ روز اخیر': 90,
+        '90 روز اخیر': 90,
+      } as Record<string, number>
+    )[text] ?? null;
+  const fileChoice = ['اکسل (Excel)', 'پی‌دی‌اف (PDF)'].includes(text);
+  const navigation = ['بازگشت', 'شروع کنیم', '/start', '/stop', 'قطع اتصال'].includes(text);
+  const customRange = reportSession?.awaiting === 'dates' && !navigation && days === null;
+  if (navigation && privateVerified) await d.store.delete(sessionPath);
+  if (
+    text === 'دریافت گزارشات' ||
+    days !== null ||
+    fileChoice ||
+    text.startsWith('استان: ') ||
+    text === 'همه استان‌های من' ||
+    text === 'بازه دلخواه' ||
+    customRange
+  ) {
     // Report files contain personal data: only a verified private chat belonging to this sender.
     if (!verified || message?.chat?.type !== 'private' || String(message?.from?.id) !== chatId) {
       await reply('گزارش فقط در گفت‌وگوی خصوصی و تأییدشده با ربات قابل دریافت است.');
@@ -457,10 +411,77 @@ export async function handleTelegramWebhook(
       );
       return { ok: true };
     }
-    if (days === null) {
-      await reply('گزارش چه بازه‌ای را می‌خواهید؟', RANGE_MARKUP);
+    if (reportSession?.managerId !== manager.id) reportSession = null;
+    if (text === 'دریافت گزارشات') {
+      await d.store.delete(sessionPath);
+      await reply('قالب گزارش را انتخاب کنید.', {
+        keyboard: [[{ text: 'اکسل (Excel)' }, { text: 'پی‌دی‌اف (PDF)' }], [{ text: 'بازگشت' }]],
+        resize_keyboard: true,
+      });
       return { ok: true };
     }
+    const saveSession = async (value: Omit<ReportSession, 'managerId' | 'updatedAt'>) => {
+      await d.store.set(sessionPath, { ...value, managerId: manager.id, updatedAt: nowIso(d) });
+    };
+    if (fileChoice) {
+      const format = text === 'پی‌دی‌اف (PDF)' ? 'pdf' : 'xlsx';
+      await saveSession({ format, province: '' });
+      const users = await managerMarketers(d, manager);
+      const provinces = [
+        ...new Set([
+          ...effectiveManagerProvinces(manager),
+          ...users.map((u) => u.province).filter((v): v is string => !!v),
+        ]),
+      ];
+      await reply('استان گزارش را انتخاب کنید.', {
+        keyboard: [
+          [{ text: 'همه استان‌های من' }],
+          ...provinces.map((p) => [{ text: `استان: ${p}` }]),
+          [{ text: 'بازگشت' }],
+        ],
+        resize_keyboard: true,
+      });
+      return { ok: true };
+    }
+    if (text.startsWith('استان: ') || text === 'همه استان‌های من') {
+      const province = text === 'همه استان‌های من' ? '' : text.slice('استان: '.length);
+      const users = await managerMarketers(d, manager);
+      if (
+        province &&
+        !effectiveManagerProvinces(manager).includes(province) &&
+        !users.some((u) => u.province === province)
+      ) {
+        await reply('این استان در محدوده مدیریت شما نیست.');
+        return { ok: true };
+      }
+      await saveSession({ format: reportSession?.format ?? 'xlsx', province });
+      await reply('بازه زمانی گزارش را انتخاب کنید.', RANGE_MARKUP);
+      return { ok: true };
+    }
+    if (text === 'بازه دلخواه') {
+      await saveSession({
+        format: reportSession?.format ?? 'xlsx',
+        province: reportSession?.province ?? '',
+        awaiting: 'dates',
+      });
+      await reply(
+        'تاریخ شروع و پایان را به این شکل بفرستید (شمسی یا میلادی):\n۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۸/۱۰',
+        { keyboard: [[{ text: 'بازگشت' }]], resize_keyboard: true },
+      );
+      return { ok: true };
+    }
+    const range = customRange ? parseReportDateRange(text) : null;
+    if (customRange && !range) {
+      await reply('بازه معتبر نیست. نمونه: ۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۸/۱۰');
+      return { ok: true };
+    }
+    if (days === null && !range) return { ok: true };
+    const requestQuery = managementExportQuery.parse({
+      format: reportSession?.format ?? 'xlsx',
+      province: reportSession?.province ?? '',
+      period: range ? 'custom' : String(days),
+      ...(range ?? {}),
+    });
     // Telegram can deliver the same update again. A completed send is acknowledged once.
     const receipt = Number.isSafeInteger(update.update_id)
       ? `telegram_report_runs/manual_${chatId}_${update.update_id}`
@@ -478,12 +499,19 @@ export async function handleTelegramWebhook(
       }
     }
     try {
-      await reply('⏳ در حال آماده‌سازی فایل اکسل گزارش شما…', MAIN_MARKUP);
-      const report = await buildManagerRangeReport(d, manager, days);
+      await reply('⏳ در حال آماده‌سازی گزارش شما…', MAIN_MARKUP);
+      const report = await exportManagementReport(d, manager, requestQuery);
       await sender.sendDocument(chatId, report);
       if (receipt) await d.store.update(receipt, { status: 'sent', sentAt: nowIso(d) });
-    } catch {
+    } catch (error) {
       if (receipt) await d.store.delete(receipt).catch(() => {});
+      if (
+        error instanceof ApiError &&
+        (error.code === 'VALIDATION' || error.code === 'FORBIDDEN')
+      ) {
+        await reply(error.message, RANGE_MARKUP);
+        return { ok: true };
+      }
       throw new ApiError('INTERNAL', 'دریافت و ارسال گزارش ناموفق بود. دوباره تلاش کنید.');
     }
     return { ok: true };

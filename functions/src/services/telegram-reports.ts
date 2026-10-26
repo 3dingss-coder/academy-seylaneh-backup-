@@ -383,7 +383,7 @@ export async function handleTelegramWebhook(
     )[text] ?? null;
   const fileChoice = ['اکسل (Excel)', 'پی‌دی‌اف (PDF)'].includes(text);
   const navigation = ['بازگشت', 'شروع کنیم', '/start', '/stop', 'قطع اتصال'].includes(text);
-  const customRange = reportSession?.awaiting === 'dates' && !navigation;
+  const customRange = reportSession?.awaiting === 'dates' && !navigation && days === null;
   if (navigation && privateVerified) await d.store.delete(sessionPath);
   if (
     text === 'دریافت گزارشات' ||

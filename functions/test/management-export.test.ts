@@ -125,6 +125,11 @@ describe('shared Manager report templates', () => {
     await webhook('بازه دلخواه');
     expect((await webhook('۱۴۰۵/۰۸/۰۱ تا ۱۴۰۵/۰۸/۰۴')).status).toBe(200);
     expect(ctx.deps.telegram.documents).toHaveLength(1);
+    await webhook('بازه دلخواه');
+    expect((await webhook('2030/01/01 تا 2030/01/02')).status).toBe(200);
+    expect(ctx.deps.telegram.documents).toHaveLength(1);
+    expect((await webhook('یک روز اخیر')).status).toBe(200);
+    expect(ctx.deps.telegram.documents).toHaveLength(2);
     expect(
       (
         await ctx.api(manager.token).post('/v1/manager/reports/export', {

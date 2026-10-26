@@ -13,9 +13,11 @@ import { RateLimiter } from '../../src/http/rateLimit';
 import type { AiHub } from '../../src/ai/hub';
 import { FakeLlm, type LlmClient } from '../../src/llm/types';
 import { RecordingPushSender } from '../../src/push/types';
+import { RecordingTelegramSender } from '../../src/telegram/types';
 import { SYSTEM, type Deps } from '../../src/services/context';
 import * as content from '../../src/services/content';
 import { register } from '../../src/services/users';
+import { managerPhoneToAuthEmail, phoneToAuthEmail } from '../../src/lib/ids';
 import { MemoryStore } from '../../src/store/memory';
 import type { DocStore, QuerySpec } from '../../src/store/types';
 
@@ -63,7 +65,11 @@ function withQueryLog(store: DocStore, file: string): DocStore {
 }
 
 export interface TestCtx {
-  deps: Deps & { push: RecordingPushSender; mail: RecordingMailer };
+  deps: Deps & {
+    push: RecordingPushSender;
+    mail: RecordingMailer;
+    telegram: RecordingTelegramSender;
+  };
   app: Express;
   limiter: RateLimiter;
   now: { value: Date };
@@ -71,7 +77,14 @@ export interface TestCtx {
   setNow(iso: string): void;
   user(
     role: Role,
-    opts?: { teamId?: string | null; name?: string; brandIds?: string[] },
+    opts?: {
+      teamId?: string | null;
+      name?: string;
+      brandIds?: string[];
+      managerProvinces?: string[];
+      province?: string;
+      city?: string;
+    },
   ): Promise<{ id: string; token: string; phone: string }>;
   api(token?: string): {
     get: (url: string) => request.Test;
@@ -103,6 +116,7 @@ export async function createCtx(
     auth: new MemoryAuthProvider(store, 'test-secret', () => clock().getTime()),
     blob: new LocalBlobStore(blobRoot, 'test-secret', () => clock().getTime()),
     push: new RecordingPushSender(),
+    telegram: new RecordingTelegramSender(),
     mail: new RecordingMailer(),
     llm: opts.llm === undefined ? new FakeLlm() : opts.llm,
     ...(opts.ai ? { ai: opts.ai } : {}),
@@ -124,9 +138,19 @@ export async function createCtx(
         deps,
         { name: o.name ?? `کاربر ${phoneSeq}`, identifier: phone, password: 'pass1234' },
         role,
-        { teamId: o.teamId ?? null, brandIds: o.brandIds ?? [] },
+        {
+          teamId: o.teamId ?? null,
+          brandIds: o.brandIds ?? [],
+          ...(o.managerProvinces ? { managerProvinces: o.managerProvinces } : {}),
+          ...(o.province ? { province: o.province } : {}),
+          ...(o.city ? { city: o.city } : {}),
+        },
       );
-      const signed = await deps.auth.signIn(`${phone}@phone.seylane-sabz.app`, 'pass1234');
+      // Manager accounts authenticate on the manager domain; everyone else on the phone domain.
+      const signed = await deps.auth.signIn(
+        role === 'manager' ? managerPhoneToAuthEmail(phone) : phoneToAuthEmail(phone),
+        'pass1234',
+      );
       if (!signed.ok) throw new Error('sign-in failed');
       return { id: u.id, token: signed.tokens.idToken, phone };
     },

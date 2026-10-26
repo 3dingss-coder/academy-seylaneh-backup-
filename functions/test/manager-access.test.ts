@@ -148,7 +148,6 @@ describe('Manager access request and review', () => {
     expect(appeal.body.data.status).toBe('review_requested');
 
     const approved = await adminRequest(admin.token, marketer.id, 'approve', {
-      teamId: 'team-a',
       phoneReviewedExternally: true,
     });
     expect(approved.status).toBe(200);
@@ -156,14 +155,35 @@ describe('Manager access request and review', () => {
     request = await ctx.deps.store.get<ManagerAccessRequest>(
       `manager_access_requests/${marketer.id}`,
     );
-    expect(user).toMatchObject({ role: 'manager', status: 'active', teamId: 'team-a' });
+    // The marketer account is preserved; approval created a separate Manager account instead,
+    // scoped to the province the applicant asked for (تهران), with they chose.
+    expect(user).toMatchObject({ role: 'marketer', status: 'active', teamId: null });
     expect(request).toMatchObject({ status: 'approved', managerPasswordCiphertext: null });
+    const managerUserId = request?.managerUserId as string;
+    expect(managerUserId).toBeTruthy();
+    expect(managerUserId).not.toBe(marketer.id);
+    const managerUser = await ctx.deps.store.get<User>(`users/${managerUserId}`);
+    expect(managerUser).toMatchObject({
+      role: 'manager',
+      status: 'active',
+      teamId: null,
+      managerProvinces: ['تهران'],
+    });
+    expect((await ctx.api(marketer.token).get('/v1/me')).status).toBe(200);
+    const marketerLogin = await ctx.api().post('/v1/auth/login', {
+      identifier: marketer.phone,
+      password: 'pass1234',
+    });
+    expect(marketerLogin.body.data.user).toMatchObject({ id: marketer.id, role: 'marketer' });
 
     const signIn = await ctx.api().post('/v1/auth/manager-access/sign-in', {
       phone: marketer.phone,
       password: PASSWORD,
     });
-    expect(signIn.body.data).toMatchObject({ state: 'active', user: { role: 'manager' } });
+    expect(signIn.body.data).toMatchObject({
+      state: 'active',
+      user: { id: managerUserId, role: 'manager', managerProvinces: ['تهران'] },
+    });
   });
 
   it('creates an inactive Manager account, encrypts the national code, and notifies Admin', async () => {

@@ -24,6 +24,17 @@ export interface User {
   firebaseUid: string;
   role: Role;
   teamId: string | null;
+  /**
+   * «استان‌های تحت مدیریت» — for role 'manager', the provinces whose marketers this Manager
+   * supervises (canonical province names). Undefined on legacy Manager docs: readers fall back
+   * to the Manager's own `province` (see `effectiveManagerProvinces` in services/team-scope).
+   * An explicit array — even an empty one — is authoritative.
+   */
+  /** Telegram chat id for the daily Manager report (Managers opt in from their profile). */
+  telegramChatId?: string | null;
+  /** When the Manager paired this Telegram chat (via the bot's phone-share flow or manually). */
+  telegramPairedAt?: string | null;
+  managerProvinces?: string[];
   brandIds: string[];
   status: UserStatus;
   pointsBalance: number;
@@ -51,7 +62,13 @@ export interface ManagerAccessAppeal {
 /** A Manager application. National-code plaintext is encrypted at rest and only revealed to Admins. */
 export interface ManagerAccessRequest {
   userId: string;
-  /** True when the application requests a role change on an existing active marketer account. */
+  /**
+   * For `existingAccount` approvals `userId` stays the applicant's *marketer* account (which is
+   * preserved), and this points at the separate Manager account created for the same phone.
+   * Null/absent for new applicants, whose `userId` already is the Manager account.
+   */
+  managerUserId?: string | null;
+  /** True when the application comes from an existing active marketer account. */
   existingAccount?: boolean;
   /** Encrypted proposed Manager password; retained only until approval for existing accounts. */
   managerPasswordCiphertext?: string | null;
@@ -478,6 +495,8 @@ export interface Policy {
   timezone: string;
   weeklyDigestDay: number; // 0=Sunday … 6=Saturday
   weeklyDigestHour: number;
+  /** Hour (policy timezone) of the daily Telegram Excel report to Managers. Default 9. */
+  managerDailyReportHour: number;
   reminderInactiveDays: number;
   mentorChatEnabled: boolean;
   mentorDailyLimitPerUser: number;

@@ -590,9 +590,9 @@ export function ManagerAccessPage() {
                   <div className="flex items-center gap-2 font-extrabold text-[#174d3b]">
                     <ShieldCheck className="size-5" aria-hidden /> قبل از ارسال
                   </div>
-                  پس از تأیید ادمین، دسترسی مدیر برای همین شماره فعال می‌شود. حساب‌های موجود تا آن
-                  زمان با نقش فعلی می‌مانند و رمز ثبت‌شده برای ورود مدیر فقط پس از تأیید فعال خواهد
-                  شد.
+                  پس از تأیید ادمین، برای همین شماره یک حساب مدیر جداگانه فعال می‌شود. اگر حساب
+                  بازاریاب دارید، آن حساب — ورود، سابقهٔ آموزش و امتیازهایتان — دست‌نخورده می‌ماند و
+                  هر دو ورود با همین شماره کار می‌کنند.
                 </div>
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">

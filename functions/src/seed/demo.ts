@@ -24,6 +24,9 @@ export const DEMO_USERS = [
     name: 'رضا مدیر فروش',
     phone: '09120000003',
     team: 'team-tehran',
+    managerProvinces: ['تهران', 'البرز'],
+    province: 'تهران',
+    city: 'تهران',
   },
   {
     key: 'marketer',
@@ -49,6 +52,7 @@ export const DEMO_USERS = [
     name: 'نرگس مدیر فروش',
     phone: '09120000006',
     team: 'team-isfahan',
+    managerProvinces: ['اصفهان'],
     province: 'اصفهان',
     city: 'اصفهان',
   },
@@ -86,6 +90,7 @@ export async function seedDemo(d: Deps) {
       password: DEMO_PASSWORD,
       role: u.role,
       teamId: u.team,
+      managerProvinces: 'managerProvinces' in u ? u.managerProvinces : undefined,
       province: u.province ?? null,
       city: u.city ?? null,
     });

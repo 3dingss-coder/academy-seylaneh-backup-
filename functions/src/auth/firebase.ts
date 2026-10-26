@@ -110,6 +110,9 @@ export class FirebaseAuthProvider implements AuthProvider {
   async setPassword(uid: string, password: string) {
     await this.auth.updateUser(uid, { password });
   }
+  async setEmail(uid: string, email: string) {
+    await this.auth.updateUser(uid, { email: email.toLowerCase() });
+  }
   async setClaims(uid: string, claims: Record<string, unknown>) {
     await this.auth.setCustomUserClaims(uid, claims);
   }

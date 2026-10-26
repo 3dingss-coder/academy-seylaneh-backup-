@@ -50,6 +50,30 @@ export function phoneToAuthEmail(phone: string): string {
 }
 
 /**
+ * Manager accounts authenticate with their own synthetic email domain. One phone number can
+ * therefore hold two accounts at once — a passwordless marketer account (phone domain) and a
+ * password-protected Manager account (manager domain) — so being granted Manager access never
+ * closes the person's marketer sign-in. Manager accounts created before this split use the
+ * phone domain; sign-in flows try both candidates.
+ */
+export const MANAGER_PHONE_EMAIL_DOMAIN = 'manager.seylane-sabz.app';
+export function managerPhoneToAuthEmail(phone: string): string {
+  return `${phone}@${MANAGER_PHONE_EMAIL_DOMAIN}`;
+}
+
+/** Which uniqueness namespace a phone/national-code reservation belongs to (see above). */
+export type IdentityScope = 'account' | 'manager';
+
+/** `unique_keys` document id for a phone/national-code value in one identity namespace. */
+export function identityUniqueKey(
+  kind: 'phone' | 'nationalCode',
+  value: string,
+  scope: IdentityScope = 'account',
+): string {
+  return ids.uniqueKey(kind, scope === 'manager' ? `manager:${value}` : value);
+}
+
+/**
  * A keyed, non-reversible lookup value for national codes. Codes are low-entropy personal data, so
  * a plain SHA-256 digest would be vulnerable to an offline dictionary attack if the store leaked.
  */

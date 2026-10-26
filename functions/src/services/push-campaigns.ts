@@ -16,7 +16,7 @@ import type {
   User,
 } from '../domain/types';
 import { audit, track, type Actor, type Deps } from './context';
-import { activeTeamAudience } from './team-scope';
+import { activeTeamAudience, effectiveManagerProvinces, managerMarketers } from './team-scope';
 
 /**
  * Admin push campaigns (studio). Storage: the generic document store (`push_campaigns`,
@@ -308,6 +308,15 @@ async function tokenIndex(d: Deps): Promise<Map<string, DeviceToken[]>> {
   return map;
 }
 
+/**
+ * Campaign audience target for a province Manager's whole scope. Stored as a `team` audience
+ * whose target resolves live to that Manager's current province/team marketers at send time,
+ * exactly like a real team's audience does.
+ */
+export const MANAGER_SCOPE_TARGET_PREFIX = 'manager-scope:';
+export const managerScopeTargetId = (managerId: string) =>
+  `${MANAGER_SCOPE_TARGET_PREFIX}${managerId}`;
+
 /** Resolves the audience from live data. `reachable` = users with a token for the channel. */
 async function resolveAudience(
   d: Deps,
@@ -316,10 +325,20 @@ async function resolveAudience(
 ): Promise<{ userIds: string[]; reachable: number; webDevices: number; androidDevices: number }> {
   const where: Where[] = [['status', '==', 'active']];
   if (aud.type === 'role') where.push(['role', '==', aud.targetId]);
-  let users =
-    aud.type === 'team'
-      ? await activeTeamAudience(d, aud.targetId ?? '')
-      : await d.store.query<User>({ collection: 'users', where });
+  let users: Array<Doc<User>>;
+  if (aud.type === 'team' && aud.targetId?.startsWith(MANAGER_SCOPE_TARGET_PREFIX)) {
+    const manager = await d.store.get<User>(
+      `users/${aud.targetId.slice(MANAGER_SCOPE_TARGET_PREFIX.length)}`,
+    );
+    users =
+      manager && manager.role === 'manager' && manager.status === 'active'
+        ? (await managerMarketers(d, manager)).filter((u) => u.status === 'active')
+        : [];
+  } else if (aud.type === 'team') {
+    users = await activeTeamAudience(d, aud.targetId ?? '');
+  } else {
+    users = await d.store.query<User>({ collection: 'users', where });
+  }
   if (aud.type === 'user') users = users.filter((u) => u.id === aud.targetId);
   const platform = aud.channel === 'any' ? null : aud.channel;
   const userIds: string[] = [];
@@ -352,17 +371,32 @@ export async function audiencePreview(d: Deps, audience: PushCampaignAudience) {
   };
 }
 
+/** Every campaign target this Manager may use: their manual team and/or their province scope. */
+function managerTargetIds(manager: Doc<User>): string[] {
+  if (manager.role !== 'manager') return [];
+  const targets: string[] = [];
+  if (manager.teamId) targets.push(manager.teamId);
+  if (effectiveManagerProvinces(manager).length) targets.push(managerScopeTargetId(manager.id));
+  return targets;
+}
+
+/** The default campaign target (manual team when there is one, else the province scope). */
 function managerTeamId(manager: Doc<User>): string {
-  if (manager.role !== 'manager' || !manager.teamId)
+  const [primary] = managerTargetIds(manager);
+  if (!primary)
     throw new ApiError(
       'FORBIDDEN',
-      'برای استفاده از ابزارهای تیمی باید به یک تیم فعال متصل باشید.',
+      'برای استفاده از ابزارهای تیمی باید استان تحت مدیریت یا تیم فعال داشته باشید.',
     );
-  return manager.teamId;
+  return primary;
 }
 
 function isManagerTeamCampaign(campaign: Doc<PushCampaign>, manager: Doc<User>): boolean {
-  return campaign.audience.type === 'team' && campaign.audience.targetId === managerTeamId(manager);
+  return (
+    campaign.audience.type === 'team' &&
+    !!campaign.audience.targetId &&
+    managerTargetIds(manager).includes(campaign.audience.targetId)
+  );
 }
 
 async function getManagerCampaignOrThrow(
@@ -381,14 +415,21 @@ function assertManagerOwnsCampaign(campaign: Doc<PushCampaign>, manager: Doc<Use
 }
 
 function assertManagerAudience(audience: PushCampaignAudience, manager: Doc<User>) {
-  const teamId = managerTeamId(manager);
-  if (audience.type !== 'team' || audience.targetId !== teamId)
-    throw new ApiError('FORBIDDEN', 'کمپین مدیر فقط می‌تواند برای اعضای تیم خودش ساخته شود.');
+  if (
+    audience.type !== 'team' ||
+    !audience.targetId ||
+    !managerTargetIds(manager).includes(audience.targetId)
+  )
+    throw new ApiError(
+      'FORBIDDEN',
+      'کمپین مدیر فقط می‌تواند برای بازاریاب‌های تحت مدیریت خودش ساخته شود.',
+    );
 }
 
-/** Manager campaigns are isolated to one team; admin/global audiences never enter this read model. */
+/** Manager campaigns are isolated to the Manager's scope; admin/global audiences never enter this read model. */
 export async function managerCampaignList(d: Deps, manager: Doc<User>, q: CampaignListQuery) {
-  const teamId = managerTeamId(manager);
+  managerTeamId(manager); // scope gate: a Manager with no provinces and no team has no campaigns
+  const targetIds = managerTargetIds(manager);
   const rows = await d.store.query<PushCampaign>({
     collection: CAMPAIGNS,
     orderBy: [['createdAt', 'desc']],
@@ -397,7 +438,7 @@ export async function managerCampaignList(d: Deps, manager: Doc<User>, q: Campai
     (campaign) =>
       (q.includeArchived || !campaign.archivedAt) &&
       campaign.audience.type === 'team' &&
-      campaign.audience.targetId === teamId &&
+      targetIds.includes(campaign.audience.targetId ?? '') &&
       (!q.status || campaign.status === q.status),
   );
   const page = paginate(filtered, q.limit, q.cursor);
@@ -405,7 +446,8 @@ export async function managerCampaignList(d: Deps, manager: Doc<User>, q: Campai
 }
 
 export async function managerCampaignDashboard(d: Deps, manager: Doc<User>) {
-  const teamId = managerTeamId(manager);
+  managerTeamId(manager); // scope gate: a Manager with no provinces and no team has no campaigns
+  const targetIds = managerTargetIds(manager);
   const rows = await d.store.query<PushCampaign>({
     collection: CAMPAIGNS,
     orderBy: [['createdAt', 'desc']],
@@ -414,7 +456,7 @@ export async function managerCampaignDashboard(d: Deps, manager: Doc<User>) {
     (campaign) =>
       !campaign.archivedAt &&
       campaign.audience.type === 'team' &&
-      campaign.audience.targetId === teamId,
+      targetIds.includes(campaign.audience.targetId ?? ''),
   );
   const count = (...statuses: PushCampaignStatus[]) =>
     live.filter((campaign) => statuses.includes(campaign.status)).length;

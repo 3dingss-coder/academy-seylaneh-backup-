@@ -21,6 +21,7 @@ import {
   useToast,
 } from '@/components/ui';
 import { Select, Tabs } from '@/components/common/Field';
+import { ProvinceMultiSelect } from '@/components/common/ProvinceMultiSelect';
 import { QueryState } from '@/components/common/QueryState';
 import { api, fileUrl } from '@/lib/api';
 import { errMsg } from '@/lib/errors';
@@ -51,6 +52,7 @@ export function ManagerAccessRequestsPanel() {
   const [approval, setApproval] = useState<ManagerAccessRequestView | null>(null);
   const [rejection, setRejection] = useState<ManagerAccessRequestView | null>(null);
   const [teamId, setTeamId] = useState('');
+  const [managerProvinces, setManagerProvinces] = useState<string[]>([]);
   const [phoneReviewed, setPhoneReviewed] = useState(false);
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState('');
@@ -65,14 +67,20 @@ export function ManagerAccessRequestsPanel() {
   const approve = useMutation({
     mutationFn: (request: ManagerAccessRequestView) =>
       api.post(`/admin/manager-access-requests/${request.id}/approve`, {
-        teamId,
+        teamId: teamId || null,
+        managerProvinces,
         phoneReviewedExternally: phoneReviewed,
       }),
     onSuccess: async () => {
-      toast.show({ type: 'success', message: 'حساب مدیر فعال و به تیم انتخاب‌شده متصل شد.' });
+      toast.show({
+        type: 'success',
+        message:
+          'حساب مدیر فعال شد و گزارش‌های استان‌های انتخاب‌شده را می‌بیند؛ حساب بازاریاب همان شماره دست‌نخورده می‌ماند.',
+      });
       setApproval(null);
       setPhoneReviewed(false);
       setTeamId('');
+      setManagerProvinces([]);
       await invalidate();
     },
     onError: (cause) => setFormError(errMsg(cause)),
@@ -174,6 +182,8 @@ export function ManagerAccessRequestsPanel() {
                         setFormError('');
                         setPhoneReviewed(false);
                         setTeamId('');
+                        // The requested province is pre-granted; Admin can widen it here.
+                        setManagerProvinces([request.managementProvince]);
                         setApproval(request);
                       }}
                       onReject={() => {
@@ -205,7 +215,7 @@ export function ManagerAccessRequestsPanel() {
             </Button>
             <Button
               loading={approve.isPending}
-              disabled={!teamId || !phoneReviewed}
+              disabled={(!teamId && managerProvinces.length === 0) || !phoneReviewed}
               icon={<Check className="size-4" aria-hidden />}
               onClick={() => approval && approve.mutate(approval)}
             >
@@ -217,26 +227,28 @@ export function ManagerAccessRequestsPanel() {
         {approval && (
           <div className="flex flex-col gap-4">
             <div className="rounded-2xl border border-[#e2e9df] bg-[#f8faf6] p-3 text-sm leading-6">
-              پس از تأیید، <b>{approval.fullName}</b> با نقش مدیر فعال می‌شود و به تیم انتخاب‌شده
-              دسترسی خواهد داشت.
+              پس از تأیید، <b>{approval.fullName}</b> با نقش مدیر فعال می‌شود و گزارش‌های
+              بازاریاب‌های استان‌های انتخاب‌شده را می‌بیند.
+              {approval.existingAccount &&
+                ' حساب بازاریاب او با همین شماره جدا و دست‌نخورده باقی می‌ماند.'}
             </div>
+            <ProvinceMultiSelect
+              value={managerProvinces}
+              onChange={setManagerProvinces}
+              hint="استان درخواستی متقاضی از قبل انتخاب شده است؛ می‌توانید استان‌های بیشتری اضافه کنید."
+            />
             <Select
-              label="تیم تحت مدیریت"
+              label="تیم دستی (اختیاری)"
               value={teamId}
               onChange={(event) => setTeamId(event.target.value)}
             >
-              <option value="">انتخاب تیم</option>
+              <option value="">بدون تیم دستی</option>
               {availableTeams.map((team) => (
                 <option key={team.id} value={team.id}>
                   {team.name}
                 </option>
               ))}
             </Select>
-            {!teams.isLoading && availableTeams.length === 0 && (
-              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800">
-                تیمی برای تخصیص وجود ندارد. ابتدا در بخش تیم‌ها یک تیم ایجاد کنید.
-              </p>
-            )}
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
               <input
                 type="checkbox"
@@ -318,9 +330,12 @@ function RequestCard({
 }) {
   const status = REQUEST_STATUS[request.status];
   const canReview = OPEN_STATUSES.has(request.status);
-  const assignedTeam = teams.find(
-    (team) => team.managerId === request.userId || team.managerIds?.includes(request.userId),
-  );
+  const managerAccountId = request.managerUserId ?? request.userId;
+  const assignedTeam =
+    teams.find((team) => team.id === request.grantedTeamId) ??
+    teams.find(
+      (team) => team.managerId === managerAccountId || team.managerIds?.includes(managerAccountId),
+    );
 
   return (
     <Card className="flex flex-col gap-4 border-[#e3e8df] p-4 sm:p-5">
@@ -344,7 +359,7 @@ function RequestCard({
             </p>
             {request.existingAccount && (
               <p className="mt-1 text-xs font-bold text-[#0d704e]">
-                درخواست تغییر نقش حساب بازاریاب به مدیر
+                متقاضی حساب بازاریاب دارد؛ پس از تأیید، حساب مدیر جداگانه ساخته می‌شود
               </p>
             )}
           </div>
@@ -381,9 +396,19 @@ function RequestCard({
         />
       </div>
 
-      {request.status === 'approved' && assignedTeam && (
+      {request.status === 'approved' && (
         <p className="text-xs text-text-secondary">
-          تیم تخصیص‌یافته: <b className="text-[#245640]">{assignedTeam.name}</b>
+          {(request.grantedProvinces?.length ?? 0) > 0 && (
+            <>
+              استان‌های تحت مدیریت:{' '}
+              <b className="text-[#245640]">{request.grantedProvinces?.join('، ')}</b>
+            </>
+          )}
+          {assignedTeam && (
+            <>
+              {' · '}تیم تخصیص‌یافته: <b className="text-[#245640]">{assignedTeam.name}</b>
+            </>
+          )}
         </p>
       )}
       {request.reviewNote && request.status === 'rejected' && (

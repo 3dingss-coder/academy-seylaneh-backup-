@@ -6,6 +6,7 @@ import { getPolicy, track, type Deps } from './context';
 import { loadShared, loadUserLearning } from './learning-state';
 import { notifyTemplate } from './notify';
 import { isLagging, loadMembers } from './reports';
+import { effectiveManagerProvinces, managerMarketers } from './team-scope';
 
 /**
  * Scheduled jobs (spec §26, PROMPT 011). Written as plain services so they are unit-testable
@@ -25,7 +26,7 @@ export async function runDeadlineSweep(d: Deps) {
     ],
   });
   const stats = { warnings: 0, passed: 0, managerReports: 0 };
-  const passedByTeam = new Map<string, Array<{ name: string; title: string }>>();
+  const passedList: Array<{ user: Doc<User>; name: string; title: string }> = [];
   const thresholds = [...policy.warningHours].sort((a, b) => a - b);
   for (const u of marketers as Doc<User>[]) {
     const { packages } = await loadUserLearning(d, u, shared);
@@ -84,35 +85,47 @@ export async function runDeadlineSweep(d: Deps) {
         );
         await track(d, 'deadline_passed', u.id, { packageId: p.id });
         stats.passed++;
-        if (u.teamId) {
-          const list = passedByTeam.get(u.teamId) ?? [];
-          list.push({ name: u.name, title: p.title });
-          passedByTeam.set(u.teamId, list);
-        }
+        passedList.push({ user: u, name: u.name, title: p.title });
       }
     }
   }
-  // Manager report (D15/D16: warning → manager report, no automatic penalty/lock).
-  for (const [teamId, list] of passedByTeam) {
+  // Manager report (D15/D16: warning → manager report, no automatic penalty/lock). Each
+  // Manager is told once about their own passed marketers — team members and every marketer
+  // resident in one of their supervised provinces (most marketers sit in the default team).
+  if (passedList.length) {
     const managers = await d.store.query<User>({
       collection: 'users',
       where: [
-        ['teamId', '==', teamId],
         ['role', '==', 'manager'],
         ['status', '==', 'active'],
       ],
     });
-    const body =
-      list.length === 1
-        ? `مهلت «${list[0]?.title}» برای ${list[0]?.name} تمام شد و آموزش کامل نشده است.`
-        : `مهلت آموزش برای ${list.length} مورد در تیم شما تمام شد و کامل نشده است.`;
-    stats.managerReports += await notifyTemplate(
-      d,
-      managers.map((m) => m.id),
-      'escalation',
-      { body },
-      { actionRef: '/manager', priority: 'high' },
-    );
+    const passedByManager = new Map<string, Array<{ name: string; title: string }>>();
+    for (const entry of passedList) {
+      for (const manager of managers) {
+        const inScope =
+          (!!entry.user.teamId && manager.teamId === entry.user.teamId) ||
+          (!!entry.user.province &&
+            effectiveManagerProvinces(manager).includes(entry.user.province));
+        if (!inScope) continue;
+        const list = passedByManager.get(manager.id) ?? [];
+        list.push({ name: entry.name, title: entry.title });
+        passedByManager.set(manager.id, list);
+      }
+    }
+    for (const [managerId, list] of passedByManager) {
+      const body =
+        list.length === 1
+          ? `مهلت «${list[0]?.title}» برای ${list[0]?.name} تمام شد و آموزش کامل نشده است.`
+          : `مهلت آموزش برای ${list.length} مورد در محدودهٔ مدیریت شما تمام شد و کامل نشده است.`;
+      stats.managerReports += await notifyTemplate(
+        d,
+        [managerId],
+        'escalation',
+        { body },
+        { actionRef: '/manager', priority: 'high' },
+      );
+    }
   }
   return stats;
 }
@@ -213,6 +226,36 @@ export async function runWeeklyDigest(d: Deps, force = false) {
         }
       }
     }
+  }
+  // Province Managers without a manual team get the same digest over their whole scope.
+  const provinceManagers = (
+    await d.store.query<User>({
+      collection: 'users',
+      where: [
+        ['role', '==', 'manager'],
+        ['status', '==', 'active'],
+      ],
+    })
+  ).filter((manager) => !manager.teamId && effectiveManagerProvinces(manager).length);
+  for (const manager of provinceManagers) {
+    const members = await loadMembers(
+      d,
+      (await managerMarketers(d, manager)).filter((u) => u.status === 'active'),
+    );
+    const count = members.filter((m) => m.packages.some((pk) => isLagging(pk, d.clock()))).length;
+    const week = `${p.year}-${p.month}-${p.day}`;
+    sent += await notifyTemplate(
+      d,
+      [manager.id],
+      'weekly_digest',
+      { count },
+      {
+        actionRef: '/manager',
+        priority: 'high',
+        throttleKey: `digest_manager_${manager.id}_${week}`,
+        throttleMs: 6 * DAY,
+      },
+    );
   }
   return { sent, skipped: false };
 }

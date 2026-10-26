@@ -429,6 +429,11 @@ export function adminRouter(d: Deps, limiter: RateLimiter): LightRouter {
     '/admin/teams',
     h(async () => users.listTeams(d)),
   );
+  // Automatic per-province marketer groups (derived from residences; never stored).
+  r.get(
+    '/admin/province-teams',
+    h(async () => users.listProvinceTeams(d)),
+  );
   r.post(
     '/admin/teams',
     h(async (req) => users.createTeam(d, actorOf(req), parse(users.teamSchema, req.body)), 201),

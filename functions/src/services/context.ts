@@ -6,6 +6,7 @@ import type { AuthProvider } from '../auth/types';
 import type { BlobStore } from '../blob/types';
 import type { LlmClient } from '../llm/types';
 import type { PushSender } from '../push/types';
+import type { TelegramSender } from '../telegram/types';
 import type { DocStore } from '../store/types';
 import type { Clock } from '../lib/time';
 import { DAY } from '../lib/time';
@@ -27,6 +28,8 @@ export interface Deps {
    * a hub here to pin providers deterministically.
    */
   ai?: AiHub;
+  /** Telegram bot port. Optional: built from `config.telegramBotToken` when absent. */
+  telegram?: TelegramSender;
   clock: Clock;
   /** Event archive target (Cloudflare only). `prune` = also remove archived rows from D1. */
   archive?: { bucket: R2BucketLike; prune: boolean };

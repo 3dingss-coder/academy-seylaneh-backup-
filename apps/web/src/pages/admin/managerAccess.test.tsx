@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { session } from '@/lib/session';
 import type { ManagerAccessRequestView, Me } from '@/lib/types';
@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Admin Manager access review area', () => {
-  it('shows the full application and requires a team and external phone review to approve', async () => {
+  it('shows the full application and approves with the requested province pre-selected (team optional)', async () => {
     const { calls } = mockApi({
       'POST /v1/auth/refresh': () => ({
         data: {
@@ -64,7 +64,7 @@ describe('Admin Manager access review area', () => {
         data: {
           status: 'approved',
           userId: 'request-1',
-          teamId: (body as { teamId: string }).teamId,
+          teamId: (body as { teamId: string | null }).teamId,
         },
       }),
     });
@@ -73,7 +73,7 @@ describe('Admin Manager access review area', () => {
     expect(
       await screen.findByText('مریم درخواست‌دهنده', {}, { timeout: 10_000 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('درخواست تغییر نقش حساب بازاریاب به مدیر')).toBeInTheDocument();
+    expect(screen.getByText(/حساب مدیر جداگانه ساخته می‌شود/)).toBeInTheDocument();
     expect(screen.getByText('۱۲۳۴۵۶۷۸۹۱')).toBeInTheDocument();
     expect(screen.getByText('تهران، تهران')).toBeInTheDocument();
     expect(screen.getByText('در انتظار بررسی دستی')).toBeInTheDocument();
@@ -83,9 +83,10 @@ describe('Admin Manager access review area', () => {
     fireEvent.click(screen.getByRole('button', { name: 'بررسی و فعال‌سازی' }));
     const dialog = await screen.findByRole('dialog', { name: 'تأیید و فعال‌سازی حساب مدیر' });
     const confirm = screen.getByRole('button', { name: 'تأیید و فعال‌سازی' });
+    // The requested province (تهران) is pre-granted; only the phone review is still missing.
     expect(confirm).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('تیم تحت مدیریت'), { target: { value: 'team-1' } });
-    expect(confirm).toBeDisabled();
+    expect(await within(dialog).findByRole('button', { name: 'حذف تهران' })).toBeInTheDocument();
+    expect(screen.getByLabelText('تیم دستی (اختیاری)')).toHaveValue('');
     fireEvent.click(
       screen.getByRole('checkbox', {
         name: /با متقاضی تماس گرفته‌ام و شمارهٔ درج‌شده را بررسی کرده‌ام/,
@@ -100,13 +101,14 @@ describe('Admin Manager access review area', () => {
           (call) => call.key === 'POST /v1/admin/manager-access-requests/request-1/approve',
         )?.body,
       ).toMatchObject({
-        teamId: 'team-1',
+        teamId: null,
+        managerProvinces: ['تهران'],
         phoneReviewedExternally: true,
       });
     });
     expect(dialog).not.toBeVisible();
     expect(
-      await screen.findByText('حساب مدیر فعال و به تیم انتخاب‌شده متصل شد.'),
+      await screen.findByText(/حساب بازاریاب همان شماره دست‌نخورده می‌ماند/),
     ).toBeInTheDocument();
   });
 

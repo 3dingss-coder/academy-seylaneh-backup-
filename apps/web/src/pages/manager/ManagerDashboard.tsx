@@ -24,6 +24,7 @@ import { toPersianDigits } from '@/lib/digits';
 import { faDate, faPercent, faRelative } from '@/lib/format';
 import type { Laggard, ManagerDashboard as Data } from '@/lib/types';
 import { SendMessageDialog } from './SendMessageDialog';
+import { TelegramConnectBanner } from './TelegramReportCard';
 
 /** W1 — داشبورد مدیر: team KPIs + laggards with quick message. */
 export function ManagerDashboard() {
@@ -56,15 +57,22 @@ export function ManagerDashboard() {
                   ? d.team.name.trim().startsWith('تیم')
                     ? d.team.name
                     : `تیم ${d.team.name}`
-                  : 'داشبورد تیم'
+                  : (d.provinces?.length ?? 0) === 1
+                    ? `استان ${d.provinces?.[0]}`
+                    : 'داشبورد محدودهٔ مدیریت'
               }
-              subtitle="وضعیت آموزش اعضای تیم"
+              subtitle={
+                (d.provinces?.length ?? 0) > 0
+                  ? `وضعیت آموزش بازاریاب‌های استان‌های ${d.provinces?.join('، ')}`
+                  : 'وضعیت آموزش اعضای تیم'
+              }
             />
-            {!d.team ? (
+            <TelegramConnectBanner />
+            {!d.team && (d.provinces?.length ?? 0) === 0 ? (
               /* rare help state (manager spec: mascot only for rare empty/help states) */
               <EmptyState
-                title="هنوز تیمی به شما سپرده نشده"
-                description="از مدیر سیستم بخواهید شما را مدیر یک تیم کند."
+                title="هنوز استان یا تیمی به شما سپرده نشده"
+                description="از مدیر سیستم بخواهید استان‌های تحت مدیریت شما را تعیین کند."
                 illustration={<Mascot mood="guide" className="h-24 w-auto" />}
               />
             ) : (

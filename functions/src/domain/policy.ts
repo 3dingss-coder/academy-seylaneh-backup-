@@ -13,6 +13,7 @@ export const DEFAULT_POLICY: Omit<Policy, 'updatedAt' | 'updatedBy'> = {
   timezone: 'Asia/Tehran',
   weeklyDigestDay: 6,
   weeklyDigestHour: 9,
+  managerDailyReportHour: 9,
   reminderInactiveDays: 3,
   mentorChatEnabled: true,
   mentorDailyLimitPerUser: 20,

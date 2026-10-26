@@ -8,6 +8,7 @@ import type {
   ArchivedReportRow,
   ArchivedUser,
   Me,
+  ProvinceTeamsView,
   MentorGuideDetail,
   MentorGuideRow,
 } from '@/lib/types';
@@ -21,6 +22,7 @@ export const ak = {
   quiz: (id: string) => ['admin', 'quiz', id] as const,
   users: ['admin', 'users'] as const,
   teams: ['admin', 'teams'] as const,
+  provinceTeams: ['admin', 'province-teams'] as const,
   archiveUsers: ['admin', 'archive', 'users'] as const,
   archiveReports: ['admin', 'archive', 'reports'] as const,
   guides: ['admin', 'mentor-guides'] as const,
@@ -54,6 +56,13 @@ export const useUsers = () =>
   useQuery({
     queryKey: ak.users,
     queryFn: ({ signal }) => api.get<Me[]>('/admin/users', signal),
+    staleTime: 30_000,
+  });
+/** Automatic province teams: marketers grouped by residence province (no manual teams needed). */
+export const useProvinceTeams = () =>
+  useQuery({
+    queryKey: ak.provinceTeams,
+    queryFn: ({ signal }) => api.get<ProvinceTeamsView>('/admin/province-teams', signal),
     staleTime: 30_000,
   });
 export const useTeams = () =>

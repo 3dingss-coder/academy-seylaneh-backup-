@@ -614,7 +614,7 @@ export async function runBehaviorSweep(d: Deps): Promise<number> {
     try {
       const brief = await evaluateBehavior(d, user);
       created += await applyInterventions(d, user, brief.interventions.slice(0, 2));
-      if (brief.escalateToManager && user.teamId) {
+      if (brief.escalateToManager) {
         await escalate(d, user, brief);
       }
     } catch (e) {

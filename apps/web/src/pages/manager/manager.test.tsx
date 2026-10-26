@@ -123,10 +123,25 @@ describe('ManagerDashboard — team health first, people needing attention actio
       }),
     });
     const { container } = renderDashboard();
-    expect(await screen.findByText('هنوز تیمی به شما سپرده نشده')).toBeInTheDocument();
+    expect(await screen.findByText('هنوز استان یا تیمی به شما سپرده نشده')).toBeInTheDocument();
     const mascot = container.querySelector('img[src="/brand/mascot.webp"]');
     expect(mascot).not.toBeNull();
     expect(mascot).toHaveAttribute('alt', '');
+  });
+
+  it('a province-only Manager (no team at all) sees the dashboard of their provinces', async () => {
+    mockApi({
+      'GET /v1/manager/dashboard': () => ({
+        data: { ...DATA_TEAM, team: null, provinces: ['تهران', 'مازندران'] },
+      }),
+    });
+    const { container } = renderDashboard();
+    expect(
+      await screen.findByText(/وضعیت آموزش بازاریاب‌های استان‌های تهران، مازندران/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('نرخ تکمیل')).toBeInTheDocument();
+    expect(screen.queryByText('هنوز استان یا تیمی به شما سپرده نشده')).not.toBeInTheDocument();
+    expect(container.querySelector('img[src="/brand/mascot.webp"]')).toBeNull();
   });
 
   it('all-good team state has no mascot (rare-only rule) and keeps its status language', async () => {
@@ -198,7 +213,9 @@ describe('ManagerMembersPage — team-scoped member workbench', () => {
       }),
     });
     renderMembers();
-    expect(await screen.findByText('هنوز عضوی در این تیم نیست')).toBeInTheDocument();
+    expect(
+      await screen.findByText('هنوز بازاریابی در محدودهٔ مدیریت شما نیست'),
+    ).toBeInTheDocument();
   });
 });
 

@@ -17,6 +17,10 @@ export interface Me {
   city: string | null;
   role: Role;
   teamId: string | null;
+  /** «استان‌های تحت مدیریت» — Managers only: provinces whose marketers they supervise. */
+  managerProvinces?: string[];
+  /** Telegram chat id for the daily 09:00 Excel report (Managers only). */
+  telegramChatId?: string | null;
   brandIds: string[];
   status: 'active' | 'inactive' | 'blacklisted';
   pointsBalance: number;
@@ -42,6 +46,10 @@ export type ManagerAccessAuthResult =
 
 export interface ManagerProfileView {
   team: { id: string; name: string } | null;
+  /** Daily Telegram report: bot availability + whether this Manager is paired. */
+  telegram?: { configured: boolean; botUsername: string | null; connected: boolean };
+  /** «استان‌های تحت مدیریت» — the provinces this Manager's panel covers. */
+  managerProvinces: string[];
   managementArea: { province: string | null; city: string | null };
   createdAt: string;
 }
@@ -49,6 +57,11 @@ export interface ManagerProfileView {
 export interface ManagerAccessRequestView {
   id: string;
   userId: string;
+  /** The separate Manager account created on approval (existing-marketer applications). */
+  managerUserId?: string | null;
+  /** Scope actually granted on approval. */
+  grantedProvinces?: string[];
+  grantedTeamId?: string | null;
   existingAccount: boolean;
   fullName: string;
   phone: string;
@@ -506,6 +519,8 @@ export interface Laggard {
 }
 export interface ManagerDashboard {
   team: { id: string; name: string } | null;
+  /** «استان‌های تحت مدیریت» covered by this dashboard (team is optional). */
+  provinces?: string[];
   kpis: TeamKpis;
   laggards: Laggard[];
   pendingRetakes: number;
@@ -536,6 +551,8 @@ export interface ManagerMemberRow {
 }
 export interface ManagerMembersResponse {
   team: { id: string; name: string } | null;
+  provinces?: string[];
+  byProvince?: Array<{ province: string; members: number }>;
   totals: { members: number; active: number; inactive: number; lagging: number };
   members: ManagerMemberRow[];
 }
@@ -837,6 +854,35 @@ export interface AdminTeam {
   province?: string | null;
   city?: string | null;
   memberCount: number;
+}
+/** One automatic province team: every marketer resident in the province + its Managers. */
+export interface ProvinceTeamMember {
+  id: string;
+  name: string;
+  phone: string | null;
+  city: string | null;
+  status: 'active' | 'inactive' | 'blacklisted';
+  teamId: string | null;
+  pointsBalance: number;
+  lastActiveAt: string | null;
+}
+export interface ProvinceTeam {
+  province: string;
+  memberCount: number;
+  activeMemberCount: number;
+  managers: Array<{
+    id: string;
+    name: string;
+    phone: string | null;
+    status: 'active' | 'inactive' | 'blacklisted';
+    teamId: string | null;
+    managerProvinces: string[];
+  }>;
+  members: ProvinceTeamMember[];
+}
+export interface ProvinceTeamsView {
+  provinces: ProvinceTeam[];
+  unassigned: { memberCount: number; members: ProvinceTeamMember[] };
 }
 export interface AdminPath {
   id: string;

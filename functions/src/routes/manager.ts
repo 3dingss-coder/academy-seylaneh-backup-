@@ -8,6 +8,8 @@ import type { Deps } from '../services/context';
 import * as reports from '../services/reports';
 import * as pushCampaigns from '../services/push-campaigns';
 import * as users from '../services/users';
+import * as telegramReports from '../services/telegram-reports';
+import { normalizeTelegramChatId } from '../telegram/types';
 
 /** Manager APIs require the Manager role; services scope every read and mutation to the assigned team. */
 export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
@@ -32,6 +34,21 @@ export function managerRouter(d: Deps, limiter: RateLimiter): LightRouter {
   r.get(
     '/manager/profile',
     h(async (req) => reports.managerProfile(d, me(req))),
+  );
+  // Send today's daily-report workbook to the Manager's Telegram chat right now (profile test).
+  r.post(
+    '/manager/telegram/test',
+    h(async (req) => {
+      const { chatId } = parse(
+        z.object({ chatId: z.string().trim().max(24).nullable().optional() }),
+        req.body ?? {},
+      );
+      return telegramReports.sendManagerTelegramTest(
+        d,
+        me(req),
+        chatId !== undefined ? normalizeTelegramChatId(chatId) : undefined,
+      );
+    }),
   );
   r.get(
     '/manager/dashboard',

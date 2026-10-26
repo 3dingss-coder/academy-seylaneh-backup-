@@ -83,6 +83,17 @@ export class MemoryAuthProvider implements AuthProvider {
     return uid;
   }
 
+  async setEmail(uid: string, email: string) {
+    const next = email.toLowerCase();
+    const acc = await this.store.get<Account>(`_auth/${uid}`);
+    if (!acc || acc.email === next) return;
+    // Claim the new address first; only then release the old one, so the account is
+    // always reachable under at least one address if a step fails midway.
+    await this.store.create(`_auth_email/${sha(next)}`, { uid });
+    await this.store.update(`_auth/${uid}`, { email: next });
+    await this.store.delete(`_auth_email/${sha(acc.email)}`);
+  }
+
   async deleteUser(uid: string) {
     const acc = await this.store.get<Account>(`_auth/${uid}`);
     if (!acc) return;

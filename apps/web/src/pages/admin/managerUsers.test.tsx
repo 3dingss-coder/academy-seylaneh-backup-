@@ -42,14 +42,15 @@ const signIn = (extra: Record<string, unknown> = {}) => {
 };
 
 describe('Admin Manager account controls', () => {
-  it('creates a Manager directly on the chosen team and reveals the temporary password once', async () => {
+  it('creates a Manager for the chosen provinces (no team needed) and reveals the temporary password once', async () => {
     const created: Me = {
       ...marketer,
       id: 'new-manager',
       name: 'مریم رضایی',
       phone: '09125550123',
       role: 'manager',
-      teamId: team.id,
+      teamId: null,
+      managerProvinces: ['تهران', 'مازندران'],
       managerProfileRequired: true,
     };
     const { calls } = mockApi(
@@ -71,21 +72,24 @@ describe('Admin Manager account controls', () => {
     fireEvent.change(within(dialog).getByLabelText('شماره موبایل'), {
       target: { value: '09125550123' },
     });
-    fireEvent.change(within(dialog).getByLabelText('تیم مدیر'), {
-      target: { value: team.id },
-    });
+    // Multi-select the supervised provinces; a team is optional now.
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'تهران' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'مازندران' }));
+    expect(within(dialog).getByText('۲ استان انتخاب شده')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'ساخت حساب' }));
 
     expect(await screen.findByText('رمز موقت مدیر — نمایش یک‌باره')).toBeInTheDocument();
     expect(screen.getByText('TempManager94')).toBeInTheDocument();
     expect(screen.getByText(/نیازی به درخواست دسترسی ندارد/)).toBeInTheDocument();
+    expect(screen.getByText(/استان‌های تحت مدیریت: تهران، مازندران/)).toBeInTheDocument();
     const request = calls.find((call) => call.key === 'POST /v1/admin/users');
     expect(request?.body).toMatchObject({
       firstName: 'مریم',
       lastName: 'رضایی',
       phone: '09125550123',
       role: 'manager',
-      teamId: team.id,
+      teamId: null,
+      managerProvinces: ['تهران', 'مازندران'],
     });
   });
 

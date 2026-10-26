@@ -400,9 +400,13 @@ export async function handleTelegramWebhook(
   const sender = telegramSender(d);
   const reply = async (text: string, replyMarkup?: TelegramReplyMarkup) => {
     if (!sender.enabled) return;
-    await sender
-      .sendMessage(chatId, text, replyMarkup ? { replyMarkup } : undefined)
-      .catch(() => {});
+    try {
+      await sender.sendMessage(chatId, text, replyMarkup ? { replyMarkup } : undefined);
+    } catch {
+      // A 200 acknowledgement would discard the update even though no reply was delivered.
+      // Return a retryable failure without exposing the Bot API URL/token or contact details.
+      throw new ApiError('INTERNAL', 'ارسال پاسخ ربات تلگرام ناموفق بود.');
+    }
   };
   const firstName = (message?.from?.first_name ?? message?.chat?.first_name ?? '').trim();
   const hello = firstName ? `سلام ${firstName} 👋` : 'سلام 👋';

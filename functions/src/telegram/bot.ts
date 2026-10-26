@@ -8,7 +8,8 @@ export class HttpTelegramSender implements TelegramSender {
   readonly enabled = true;
   constructor(
     private readonly token: string,
-    private readonly fetchFn: typeof fetch = fetch,
+    // Workers' native fetch must not be invoked with the sender instance as `this`.
+    private readonly fetchFn: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   private async call(method: string, init: RequestInit): Promise<void> {

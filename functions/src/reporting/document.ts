@@ -24,14 +24,12 @@ export interface ReportTable {
   widths: number[];
   rows: Array<Array<string | number | null>>;
 }
-export const reportDate = (v: string | null) =>
-  v
-    ? new Intl.DateTimeFormat('fa-IR', {
-        timeZone: 'Asia/Tehran',
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date(v))
-    : '—';
+const reportDateTime = new Intl.DateTimeFormat('fa-IR', {
+  timeZone: 'Asia/Tehran',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+export const reportDate = (v: string | null) => (v ? reportDateTime.format(new Date(v)) : '—');
 export function createManagementReport(
   rows: CompletionRow[],
   attempts: QuizAttemptRow[],

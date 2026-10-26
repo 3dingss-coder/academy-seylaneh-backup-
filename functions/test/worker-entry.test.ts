@@ -125,3 +125,33 @@ describe('X-Request-Id and logging', () => {
     expect(all).not.toContain('super-secret-signing-key');
   });
 });
+
+describe('Telegram webhook route', () => {
+  it('is mounted on the Worker entry (it answered 404 in production before)', async () => {
+    const env = {
+      ...(mkEnv('ok') as unknown as Record<string, unknown>),
+      TELEGRAM_WEBHOOK_SECRET: 's'.repeat(32),
+    } as unknown as CloudflareEnv;
+    const bad = await worker.fetch(
+      new Request('https://x.test/v1/telegram/webhook', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-telegram-bot-api-secret-token': 'wrong' },
+        body: JSON.stringify({ update_id: 1, message: { chat: { id: 1 }, text: '/start' } }),
+      }),
+      env,
+    );
+    expect(bad.status).toBe(401);
+    const ok = await worker.fetch(
+      new Request('https://x.test/v1/telegram/webhook', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-telegram-bot-api-secret-token': 's'.repeat(32),
+        },
+        body: JSON.stringify({ update_id: 2, message: { chat: { id: 1 }, text: 'hello' } }),
+      }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+  });
+});

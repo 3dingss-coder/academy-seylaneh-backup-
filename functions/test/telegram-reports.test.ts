@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createCtx } from './support/ctx';
 import { runDailyTelegramReports } from '../src/services/telegram-reports';
 
@@ -87,6 +87,20 @@ describe('telegram daily Manager reports', () => {
 
   const webhook = (ctx: Awaited<ReturnType<typeof createCtx>>, message: unknown) =>
     ctx.api().post('/v1/telegram/webhook', { update_id: 1, message });
+
+  it('does not acknowledge a webhook when the Telegram reply failed, and permits retry', async () => {
+    const { ctx } = await setup();
+    const send = vi.spyOn(ctx.deps.telegram, 'sendMessage');
+    send.mockRejectedValueOnce(new Error('transport failure with private details'));
+    const message = { chat: { id: 424242 }, text: '/start' };
+    const failed = await webhook(ctx, message);
+    expect(failed.status).toBe(500);
+    expect(JSON.stringify(failed.body)).not.toContain('private details');
+    expect(ctx.deps.telegram.messages).toHaveLength(0);
+    const retried = await webhook(ctx, message);
+    expect(retried.status).toBe(200);
+    expect(ctx.deps.telegram.messages).toHaveLength(1);
+  });
 
   it('/start asks for the mobile number with a contact-share button; secret enforced', async () => {
     const { ctx } = await setup();

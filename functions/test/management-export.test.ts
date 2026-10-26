@@ -86,7 +86,10 @@ describe('shared Manager report templates', () => {
     expect(bot['xl/styles.xml']).not.toContain('Calibri');
     expect(bot['xl/charts/chart1.xml']).toContain("'خلاصه مدیریتی'!$B$17:$B$22");
     expect(bot['xl/worksheets/sheet1.xml']).toContain('rightToLeft="1"');
-    expect(bot['xl/worksheets/sheet2.xml']).toContain('state="frozen"');
+    for (let i = 2; i <= 6; i++) {
+      expect(bot[`xl/worksheets/sheet${i}.xml`]).toContain('state="frozen"');
+      expect(bot[`xl/worksheets/sheet${i}.xml`]).toContain('rightToLeft="1"');
+    }
     expect(bot['xl/worksheets/sheet1.xml']).toMatch(/r="D6"[^>]*><v>1<\/v>/);
   });
   it('delivers PDF with correct MIME and shared real data through the format/province/range flow', async () => {

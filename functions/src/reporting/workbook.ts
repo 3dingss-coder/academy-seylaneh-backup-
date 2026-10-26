@@ -146,6 +146,11 @@ export async function renderManagementWorkbook(report: ManagementReport): Promis
         /<dimension\b[^>]*\/>/,
         `<dimension ref="A1:${column(table.columns.length)}${end + 2}"/>`,
       );
+    if (!xml.includes('<sheetViews>'))
+      xml = xml.replace(
+        '<sheetFormatPr',
+        '<sheetViews><sheetView workbookViewId="0" rightToLeft="1" showGridLines="0"/></sheetViews><sheetFormatPr',
+      );
     if (!xml.includes('<pane'))
       xml = xml.replace(
         /<sheetView\b([^>]*)\/>/,

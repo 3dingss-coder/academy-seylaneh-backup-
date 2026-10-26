@@ -23,16 +23,16 @@ export async function buildManagerRangeReport(d: Deps, manager: Doc<User>, days:
   const fromIso = from.toISOString();
   const toIso = to.toISOString();
   const policy = await getPolicy(d);
-  const dateTime = (at: string) =>
-    new Intl.DateTimeFormat('fa-IR', {
-      timeZone: policy.timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(new Date(at));
+  const formatter = new Intl.DateTimeFormat('fa-IR', {
+    timeZone: policy.timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const dateTime = (at: string) => formatter.format(new Date(at));
   const label = days === 1 ? 'یک روز اخیر (۲۴ ساعت)' : '۳۰ روز اخیر';
   const users = await managerMarketers(d, manager);
   const [members, playback, attempts, completions] = await Promise.all([

@@ -17,12 +17,10 @@ async function setup() {
   });
   let id = 200;
   const webhook = (text: string, chat = 777001, type = 'private', from = chat) =>
-    ctx
-      .api()
-      .post('/v1/telegram/webhook', {
-        update_id: id++,
-        message: { chat: { id: chat, type }, from: { id: from }, text },
-      });
+    ctx.api().post('/v1/telegram/webhook', {
+      update_id: id++,
+      message: { chat: { id: chat, type }, from: { id: from }, text },
+    });
   return { ctx, a, b, webhook };
 }
 

@@ -34,6 +34,8 @@ export interface User {
   telegramChatId?: string | null;
   /** When the Manager paired this Telegram chat (via the bot's phone-share flow or manually). */
   telegramPairedAt?: string | null;
+  telegramReportTime?: string | null;
+  telegramReportTimeUpdatedAt?: string | null;
   managerProvinces?: string[];
   brandIds: string[];
   status: UserStatus;

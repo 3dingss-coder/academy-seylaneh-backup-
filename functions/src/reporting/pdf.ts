@@ -1,3 +1,4 @@
+import { compactReportTable } from './compact';
 import { jsPDF } from 'jspdf';
 import { VAZIRMATN_TTF } from './font';
 import { REPORT_THEME as T, type ManagementReport, reportDate } from './document';
@@ -50,7 +51,7 @@ export function renderManagementPdf(report: ManagementReport): Uint8Array {
     );
     text(report.period, W - M, 35, 9, T.muted);
   };
-  const newPage = (title: string) => {
+  const newPage = (title = report.title) => {
     doc.addPage();
     header(title);
   };
@@ -98,54 +99,84 @@ export function renderManagementPdf(report: ManagementReport): Uint8Array {
     8,
     T.muted,
   );
-  for (const table of report.tables) {
-    newPage(table.name);
-    let y = 44;
-    text(table.note, W - M, y, 9, T.muted, usable);
-    y += 14;
+  let y = H; // Keep the dashboard on its own page; detail sections share available space.
+  for (const source of report.tables) {
+    const table = compactReportTable(source);
+    const totalWidth = table.widths.reduce((sum, w) => sum + w, 0);
+    const widths = table.widths.map((w) => (usable * w) / totalWidth);
+    doc.setFontSize(8);
+    const headingHeight =
+      Math.max(
+        1,
+        ...table.columns.map(
+          (v, i) => (doc.splitTextToSize(fa(v), (widths[i] ?? 20) - 4) as string[]).length,
+        ),
+      ) *
+        4.2 +
+      5;
+    doc.setFontSize(8.5);
+    const firstRowHeight =
+      Math.max(
+        1,
+        ...(table.rows[0] ?? []).map(
+          (v, i) => (doc.splitTextToSize(fa(v), (widths[i] ?? 20) - 4) as string[]).length,
+        ),
+      ) *
+        4.4 +
+      5;
+    doc.setFontSize(8);
+    const noteHeight = (doc.splitTextToSize(fa(table.note), usable) as string[]).length * 4.2;
+    const drawColumns = () => {
+      doc.setFillColor(`#${T.primary}`);
+      doc.rect(M, y, usable, headingHeight, 'F');
+      let x = W - M;
+      table.columns.forEach((label, i) => {
+        text(label, x - 2, y + 4.5, 8, 'FFFFFF', (widths[i] ?? 20) - 4);
+        x -= widths[i] ?? 0;
+      });
+      y += headingHeight;
+    };
+    if (y + 10 + 6 + noteHeight + 3 + headingHeight + firstRowHeight > H - 17) {
+      newPage();
+      y = 44;
+    } else y += 10;
+    text(
+      `${table.name} · ${table.rows.length.toLocaleString('fa-IR')} رکورد`,
+      W - M,
+      y,
+      12,
+      T.primary,
+    );
+    y += 6;
+    y += text(table.note, W - M, y, 8, T.muted, usable) + 3;
+    drawColumns();
     if (!table.rows.length) {
-      text('در این محدوده و بازه، رکوردی ثبت نشده است.', W - M, y, 11, T.muted);
+      text('رکوردی در این محدوده و بازه ثبت نشده است.', W - M - 3, y + 7, 9, T.muted);
+      y += 14;
       continue;
     }
-    // Compact records retain every column at a readable size instead of shrinking a 16-column table.
     for (let index = 0; index < table.rows.length; index++) {
       const row = table.rows[index] ?? [];
-      const groups = Array.from({ length: Math.ceil(table.columns.length / 4) }, (_, g) =>
-        table.columns
-          .slice(g * 4, g * 4 + 4)
-          .map((label, c) => ({ label, value: row[g * 4 + c] ?? '—' })),
+      doc.setFontSize(8.5);
+      const lines = row.map(
+        (value, i) => doc.splitTextToSize(fa(value), (widths[i] ?? 20) - 4) as string[],
       );
-      doc.setFontSize(9.5);
-      const heights = groups.map(
-        (group) =>
-          Math.max(
-            ...group.map(
-              (cell) => (doc.splitTextToSize(fa(cell.value), usable / 4 - 9) as string[]).length,
-            ),
-            1,
-          ) *
-            5 +
-          7,
-      );
-      const height = heights.reduce((a, b) => a + b, 0) + 12;
+      const height = Math.max(1, ...lines.map((v) => v.length)) * 4.4 + 5;
       if (y + height > H - 17) {
         newPage(table.name);
-        y = 45;
+        y = 44;
+        drawColumns();
       }
-      doc.setFillColor(index % 2 ? '#F8FAFC' : '#FFFFFF');
-      doc.setDrawColor(`#${T.border}`);
-      doc.roundedRect(M, y, usable, height, 2, 2, 'FD');
-      text(`ردیف ${index + 1}`, W - M - 4, y + 7, 9, T.primary);
-      let gy = y + 13;
-      groups.forEach((group, g) => {
-        group.forEach((cell, c) => {
-          const x = W - M - 5 - (c * usable) / 4;
-          text(cell.label, x, gy, 8, T.muted);
-          text(cell.value, x, gy + 5, 9.5, T.ink, usable / 4 - 9);
-        });
-        gy += heights[g] ?? 12;
+      doc.setFillColor(index % 2 ? '#F1F5F9' : '#FFFFFF');
+      doc.rect(M, y, usable, height, 'F');
+      let x = W - M;
+      row.forEach((value, i) => {
+        text(value, x - 2, y + 4.5, 8.5, T.ink, (widths[i] ?? 20) - 4);
+        x -= widths[i] ?? 0;
       });
-      y += height + 5;
+      doc.setDrawColor(`#${T.border}`);
+      doc.line(M, y + height, W - M, y + height);
+      y += height;
     }
   }
   const count = doc.getNumberOfPages();

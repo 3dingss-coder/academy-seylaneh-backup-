@@ -1,5 +1,7 @@
 import { ApiError } from '../http/errors';
-import { dayKey, zonedParts } from '../lib/time';
+import { dayKey } from '../lib/time';
+import { isReportDue, managerReportTime, normalizeReportTime } from '../telegram/schedule';
+import { updateMe } from './users';
 import { normalizePhone } from '../lib/ids';
 import { HttpTelegramSender } from '../telegram/bot';
 import {
@@ -89,20 +91,18 @@ interface DailyRunResult {
 }
 
 /**
- * The 09:00 job. Idempotent per Manager per day via a claim document
+ * Minute scheduler. Idempotent per Manager per local day via a claim document
  * (`telegram_report_runs/<date>_<managerId>`), so the hourly cron safety net and manual
  * re-runs can never send a Manager the same morning report twice (unless forced).
  */
 export async function runDailyTelegramReports(d: Deps, force = false): Promise<DailyRunResult> {
   const policy = await getPolicy(d);
   const timezone = policy.timezone;
-  const date = dayKey(d.clock(), timezone);
+  const now = d.clock();
+  const date = dayKey(now, timezone);
   const sender = telegramSender(d);
   if (!sender.enabled)
     return { sent: 0, failed: 0, skippedManagers: 0, skipped: 'not_configured', date };
-  const parts = zonedParts(d.clock(), timezone);
-  if (!force && parts.hour !== (policy.managerDailyReportHour ?? 9))
-    return { sent: 0, failed: 0, skippedManagers: 0, skipped: 'outside_slot', date };
 
   const managers = (
     await d.store.query<User>({
@@ -114,10 +114,22 @@ export async function runDailyTelegramReports(d: Deps, force = false): Promise<D
     })
   ).filter((manager) => manager.telegramChatId && !manager.managerProfileRequired);
 
+  const due = managers.filter(
+    (manager) => force || isReportDue(manager, now, timezone, policy.managerDailyReportHour ?? 9),
+  );
+  // Read existing receipts: do not attempt a conflicting write on every minute tick.
+  const previous = force
+    ? []
+    : await d.store.getMany(due.map((manager) => `telegram_report_runs/${date}_${manager.id}`));
+  const alreadyClaimed = new Set(due.filter((_, i) => previous[i]).map((manager) => manager.id));
   let sent = 0;
   let failed = 0;
-  let skippedManagers = 0;
-  for (const manager of managers) {
+  let skippedManagers = managers.length - due.length;
+  for (const manager of due) {
+    if (!force && alreadyClaimed.has(manager.id)) {
+      skippedManagers++;
+      continue;
+    }
     const runPath = `telegram_report_runs/${date}_${manager.id}`;
     if (!force) {
       try {
@@ -235,7 +247,7 @@ const START_MARKUP: TelegramReplyMarkup = {
 };
 const MAIN_MARKUP: TelegramReplyMarkup = {
   keyboard: [
-    [{ text: 'دریافت گزارشات' }],
+    [{ text: 'دریافت گزارشات' }, { text: 'تنظیم ساعت ارسال' }],
     [{ text: 'شروع کنیم' }, { text: 'قطع اتصال' }],
     [{ text: '📱 ارسال شماره موبایل', request_contact: true }],
   ],
@@ -315,7 +327,7 @@ async function unpairTelegramChat(d: Deps, chatId: string): Promise<boolean> {
  *  1. `/start` (or any first message) → greeting + a button that shares the user's own
  *     mobile number («📱 ارسال شماره موبایل»).
  *  2. The shared contact is matched to the Manager account with that phone and the chat is
- *     paired to it; from the next 09:00 run that Manager's Excel lands in this chat.
+ *     paired to it; from the next selected-time run that Manager's Excel lands in this chat.
  *  3. `/stop` unpairs.
  *
  * Security: pairing only happens for a *verified* webhook call (Telegram's secret-token
@@ -351,7 +363,7 @@ export async function handleTelegramWebhook(
     reply(
       `${hello}\n` +
         'به ربات گزارش روزانهٔ سیلانه سبز خوش آمدید.\n' +
-        'برای اتصال این گفت‌وگو به پنل مدیرتان، دکمهٔ «📱 ارسال شماره موبایل» را بزنید تا شماره‌تان با حساب مدیرتان تطبیق داده شود؛ بعد از آن، هر روز ساعت ۹ صبح گزارش اکسل بازاریاب‌های استان‌هایتان را همین‌جا می‌گیرید.',
+        'برای اتصال این گفت‌وگو به پنل مدیرتان، دکمهٔ «📱 ارسال شماره موبایل» را بزنید تا شماره‌تان با حساب مدیرتان تطبیق داده شود؛ بعد از آن، گزارش روزانه را همین‌جا می‌گیرید و ساعت آن را از منوی «تنظیم ساعت ارسال» انتخاب می‌کنید.',
       ASK_PHONE_MARKUP,
     );
 
@@ -362,13 +374,59 @@ export async function handleTelegramWebhook(
     format: 'xlsx' | 'pdf';
     province: string;
     managerId: string;
-    awaiting?: 'dates';
+    awaiting?: 'dates' | 'time';
     updatedAt: string;
   };
   const sessionPath = `telegram_report_sessions/${chatId}`;
   let reportSession = privateVerified ? await d.store.get<ReportSession>(sessionPath) : null;
   if (reportSession && d.clock().getTime() - Date.parse(reportSession.updatedAt) > 30 * 60_000)
     reportSession = null;
+  const scheduleNavigation = [
+    'بازگشت',
+    'شروع کنیم',
+    '/start',
+    '/stop',
+    'قطع اتصال',
+    'دریافت گزارشات',
+  ].includes(text);
+  if (text === 'تنظیم ساعت ارسال' || (reportSession?.awaiting === 'time' && !scheduleNavigation)) {
+    if (!privateVerified) {
+      await reply('تنظیم ساعت فقط در گفت‌وگوی خصوصی و تأییدشده امکان‌پذیر است.');
+      return { ok: true };
+    }
+    const manager = await managerByChatId(d, chatId);
+    if (!manager || manager.status !== 'active' || manager.managerProfileRequired) {
+      await reply('ابتدا حساب مدیر فعال و تکمیل‌شده را به ربات متصل کنید.', START_MARKUP);
+      return { ok: true };
+    }
+    if (text === 'تنظیم ساعت ارسال' || reportSession?.managerId !== manager.id) {
+      const policy = await getPolicy(d);
+      await d.store.set(sessionPath, {
+        format: 'xlsx',
+        province: '',
+        managerId: manager.id,
+        awaiting: 'time',
+        updatedAt: nowIso(d),
+      });
+      await reply(
+        `ساعت فعلی: ${managerReportTime(manager, policy.managerDailyReportHour)} (به وقت تهران)\nساعت دلخواه را به شکل ۱۸:۳۰ بفرستید.`,
+        { keyboard: [[{ text: 'بازگشت' }]], resize_keyboard: true },
+      );
+      return { ok: true };
+    }
+    const time = normalizeReportTime(text);
+    if (!time) {
+      await reply('ساعت معتبر بین ۰۰:۰۰ تا ۲۳:۵۹ وارد کنید؛ نمونه: ۱۸:۳۰');
+      return { ok: true };
+    }
+    await updateMe(d, manager, { telegramReportTime: time });
+    await d.store.delete(sessionPath);
+    await reply(
+      `ساعت ارسال روزانه روی ${time} به وقت تهران تنظیم شد. این تنظیم در پنل شما هم نمایش داده می‌شود.\nاگر ساعت انتخابی امروز گذشته باشد، از فردا اجرا می‌شود؛ هر روز یک گزارش ارسال می‌شود.`,
+      MAIN_MARKUP,
+    );
+    return { ok: true };
+  }
   const days =
     (
       {
@@ -574,7 +632,7 @@ export async function handleTelegramWebhook(
     await reply(
       `✅ اتصال انجام شد، ${manager.name}\n` +
         (provinces.length ? `محدودهٔ مدیریت شما: ${provinces.join('، ')}\n` : '') +
-        'از این پس هر روز ساعت ۹ صبح، گزارش اکسل بازاریاب‌های محدوده‌تان همین‌جا ارسال می‌شود.\n' +
+        'گزارش روزانهٔ بازاریاب‌های محدوده‌تان همین‌جا ارسال می‌شود؛ برای انتخاب ساعت، «تنظیم ساعت ارسال» را بزنید.\n' +
         'برای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید. برای قطع اتصال، «قطع اتصال» را بزنید.',
       MAIN_MARKUP,
     );
@@ -610,7 +668,7 @@ export async function handleTelegramWebhook(
     const paired = await managerByChatId(d, chatId);
     if (paired) {
       await reply(
-        `${hello}\nاین گفت‌وگو به پنل مدیر «${paired.name}» متصل است و گزارش روزانه ساعت ۹ صبح می‌رسد.\nبرای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید.`,
+        `${hello}\nاین گفت‌وگو به پنل مدیر «${paired.name}» متصل است و ساعت گزارش روزانه از «تنظیم ساعت ارسال» قابل انتخاب است.\nبرای گزارش لحظه‌ای، «دریافت گزارشات» را بزنید.`,
         MAIN_MARKUP,
       );
       return { ok: true };

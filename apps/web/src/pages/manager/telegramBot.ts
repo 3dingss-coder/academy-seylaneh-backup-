@@ -6,6 +6,8 @@ export interface TelegramBotInfo {
   configured: boolean;
   botUsername: string | null;
   connected: boolean;
+  reportTime?: string;
+  timeZone?: string;
 }
 
 /** Bot link + pairing state for this Manager (shared react-query cache with the profile page). */

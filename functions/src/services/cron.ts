@@ -120,7 +120,7 @@ export const CRON_JOBS: Record<string, JobName[]> = {
   '0 * * * *': ['deadline-sweep', 'weekly-digest', 'knowledge-reindex'],
   '30 4 * * *': ['mentor-daily'],
   '30 6 * * *': ['daily-reminders'],
-  '30 5 * * *': ['telegram-daily-reports'], // 09:00 Tehran — daily Excel per Manager
+  '* * * * *': ['telegram-daily-reports'], // Per-manager wall-clock minute; once per local day
   '0 22 * * *': ['archive-events'], // 01:30 Tehran, the quietest hour
 };
 

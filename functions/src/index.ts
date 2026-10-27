@@ -59,8 +59,8 @@ const scheduled = (schedule: string, name: JobName) =>
 export const deadlineSweep = scheduled('every 60 minutes', 'deadline-sweep');
 export const dailyReminders = scheduled('0 10 * * *', 'daily-reminders');
 export const weeklyDigest = scheduled('0 * * * *', 'weekly-digest');
-// Fires hourly; the job itself only sends at policy.managerDailyReportHour (default 09:00).
-export const telegramDailyReports = scheduled('0 * * * *', 'telegram-daily-reports');
+// Checks each minute; each Manager receives one report at their selected local time.
+export const telegramDailyReports = scheduled('* * * * *', 'telegram-daily-reports');
 export const mentorDaily = scheduled('0 8 * * *', 'mentor-daily');
 export const flushDeferredPush = scheduled('every 15 minutes', 'flush-push');
 // The automation engine runs on the same 15-minute rhythm on both platforms (services/cron.ts).

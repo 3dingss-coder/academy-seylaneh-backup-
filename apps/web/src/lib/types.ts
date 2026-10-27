@@ -21,6 +21,7 @@ export interface Me {
   managerProvinces?: string[];
   /** Telegram chat id for the daily 09:00 Excel report (Managers only). */
   telegramChatId?: string | null;
+  telegramReportTime?: string | null;
   brandIds: string[];
   status: 'active' | 'inactive' | 'blacklisted';
   pointsBalance: number;
@@ -47,7 +48,7 @@ export type ManagerAccessAuthResult =
 export interface ManagerProfileView {
   team: { id: string; name: string } | null;
   /** Daily Telegram report: bot availability + whether this Manager is paired. */
-  telegram?: { configured: boolean; botUsername: string | null; connected: boolean };
+  telegram?: { configured: boolean; botUsername: string | null; connected: boolean; reportTime?: string; timeZone?: string };
   /** «استان‌های تحت مدیریت» — the provinces this Manager's panel covers. */
   managerProvinces: string[];
   managementArea: { province: string | null; city: string | null };

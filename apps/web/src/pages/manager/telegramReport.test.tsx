@@ -72,7 +72,7 @@ describe('Manager Telegram daily-report card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ذخیرهٔ اتصال تلگرام' }));
 
     expect(
-      await screen.findByText('تلگرام متصل شد؛ گزارش اکسل از این پس هر روز ساعت ۹ صبح می‌رسد.'),
+      await screen.findByText('تلگرام متصل شد؛ گزارش روزانه در ساعت تنظیم‌شده ارسال می‌شود.'),
     ).toBeInTheDocument();
     expect(calls.find((c) => c.key === 'PATCH /v1/me')?.body).toEqual({
       telegramChatId: '123456789',
@@ -91,6 +91,46 @@ describe('Manager Telegram daily-report card', () => {
     expect(
       await screen.findByText('گزارش آزمایشی (۱۲ بازاریاب) به تلگرام ارسال شد.'),
     ).toBeInTheDocument();
+  });
+
+  it('saves a per-manager time and refreshes a time changed from the bot', async () => {
+    let currentTime = '09:00';
+    if (!mocks.user) throw new Error('Missing Manager');
+    mocks.user = { ...mocks.user, telegramChatId: '123456789' };
+    const { calls } = mockApi({
+      'GET /v1/manager/profile': () => ({
+        data: {
+          telegram: {
+            configured: true,
+            connected: true,
+            botUsername: 'sample_bot',
+            reportTime: currentTime,
+          },
+        },
+      }),
+      'GET /v1/me': () => ({ data: { ...mocks.user, telegramReportTime: currentTime } }),
+      'PATCH /v1/me': (body) => {
+        currentTime = (body as { telegramReportTime: string }).telegramReportTime;
+        return { data: { ...mocks.user, telegramReportTime: currentTime } };
+      },
+    });
+    renderCard(<TelegramReportCard />);
+    const input = await screen.findByLabelText('ساعت ارسال روزانه (به وقت تهران)');
+    fireEvent.change(input, { target: { value: '17:43' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره ساعت ارسال' }));
+    expect(
+      await screen.findByText('ساعت ارسال ذخیره شد و در ربات هم اعمال می‌شود.'),
+    ).toBeInTheDocument();
+    expect(calls.find((c) => c.key === 'PATCH /v1/me')?.body).toEqual({
+      telegramReportTime: '17:43',
+    });
+    expect(input).toHaveValue('17:43');
+    currentTime = '08:45';
+    fireEvent.click(screen.getByRole('button', { name: 'بررسی وضعیت اتصال' }));
+    expect(
+      await screen.findByText('تلگرام متصل است؛ ساعت ارسال با پنل همگام شد.'),
+    ).toBeInTheDocument();
+    expect(input).toHaveValue('08:45');
   });
 
   it('rejects a non-numeric chat id before calling the API', async () => {

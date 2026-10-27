@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2, RefreshCw, Send } from 'lucide-react';
 import { Button, Card, Input, useToast } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
@@ -11,7 +11,7 @@ import { telegramBotUrl, useTelegramBotInfo } from './telegramBot';
 /**
  * «گزارش روزانهٔ تلگرام» — pairing is phone-based: the Manager opens the bot, taps Start and
  * shares their mobile number; the bot matches the number to this Manager account and the
- * 09:00 Excel report of their provinces arrives in that chat every day. The manual chat-id
+ * daily report arrives at their selected wall-clock time. The manual chat-id
  * field stays as a fallback (e.g. Telegram registered under a different number).
  */
 export function TelegramReportCard() {
@@ -20,7 +20,13 @@ export function TelegramReportCard() {
   const info = useTelegramBotInfo(Boolean(user));
   const [chatId, setChatId] = useState(user?.telegramChatId ?? '');
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState<'save' | 'test' | 'check' | ''>('');
+  const [reportTime, setReportTime] = useState(user?.telegramReportTime ?? '09:00');
+  const [timeDirty, setTimeDirty] = useState(false);
+  const [timeError, setTimeError] = useState('');
+  useEffect(() => {
+    if (!timeDirty) setReportTime(info.data?.reportTime ?? user?.telegramReportTime ?? '09:00');
+  }, [info.data?.reportTime, user?.telegramReportTime, timeDirty]);
+  const [busy, setBusy] = useState<'save' | 'test' | 'check' | 'time' | ''>('');
   if (!user) return null;
   const connected = Boolean(user.telegramChatId);
   const botUsername = info.data?.botUsername ?? null;
@@ -32,10 +38,13 @@ export function TelegramReportCard() {
       const me = await api.get<Me>('/me');
       setUser(me);
       setChatId(me.telegramChatId ?? '');
+      setReportTime(me.telegramReportTime ?? info.data?.reportTime ?? '09:00');
+      await info.refetch();
+      setTimeDirty(false);
       toast.show({
         type: me.telegramChatId ? 'success' : 'warning',
         message: me.telegramChatId
-          ? 'تلگرام متصل است؛ گزارش بعدی ساعت ۹ صبح می‌رسد.'
+          ? 'تلگرام متصل است؛ ساعت ارسال با پنل همگام شد.'
           : 'هنوز اتصالی ثبت نشده است؛ در ربات دکمهٔ «ارسال شماره موبایل» را بزنید.',
       });
     } catch (cause) {
@@ -61,13 +70,31 @@ export function TelegramReportCard() {
       toast.show({
         type: 'success',
         message: value
-          ? 'تلگرام متصل شد؛ گزارش اکسل از این پس هر روز ساعت ۹ صبح می‌رسد.'
+          ? 'تلگرام متصل شد؛ گزارش روزانه در ساعت تنظیم‌شده ارسال می‌شود.'
           : 'اتصال تلگرام حذف شد.',
       });
     } catch (cause) {
       const fields = cause instanceof ApiError ? cause.fields : {};
       setError(fields.telegramChatId ?? '');
       toast.show({ type: 'error', message: errMsg(cause) });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const saveTime = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy('time');
+    setTimeError('');
+    try {
+      const updated = await api.patch<Me>('/me', { telegramReportTime: reportTime });
+      setUser(updated);
+      setReportTime(updated.telegramReportTime ?? '09:00');
+      await info.refetch();
+      setTimeDirty(false);
+      toast.show({ type: 'success', message: 'ساعت ارسال ذخیره شد و در ربات هم اعمال می‌شود.' });
+    } catch (cause) {
+      setTimeError(errMsg(cause));
     } finally {
       setBusy('');
     }
@@ -100,8 +127,7 @@ export function TelegramReportCard() {
         <div>
           <h2 className="font-black text-[#143f36]">گزارش روزانهٔ تلگرام</h2>
           <p className="mt-1 text-sm leading-6 text-text-secondary">
-            هر روز ساعت ۹ صبح، گزارش اکسل همهٔ بازاریاب‌های استان‌های تحت مدیریت‌تان در تلگرام ارسال
-            می‌شود.
+            گزارش روزانهٔ محدودهٔ مدیریتی شما، در ساعت انتخابی‌تان به تلگرام می‌رسد.
           </p>
         </div>
       </div>
@@ -109,13 +135,17 @@ export function TelegramReportCard() {
       {connected ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#dce9dc] bg-[#f6faf5] p-3 text-sm font-bold text-[#1b6549]">
           <CheckCircle2 className="size-5" aria-hidden />
-          تلگرام این پنل متصل است؛ گزارش بعدی ساعت ۹ صبح می‌رسد.
+          تلگرام متصل است؛ ساعت روزانه:{' '}
+          {toPersianDigits(info.data?.reportTime ?? user.telegramReportTime ?? '09:00')} به وقت
+          تهران.
         </div>
       ) : (
         <ol className="flex list-decimal flex-col gap-1.5 rounded-xl border border-[#e7ece4] bg-[#f8faf6] p-4 ps-8 text-sm leading-6 text-[#3f5649]">
-          <li>وارد ربات تلگرام شوید و دکمهٔ «شروع» (Start) را بزنید.</li>
+          <li>وارد ربات تلگرام شوید و دکمهٔ «شروع کنیم» را بزنید.</li>
           <li>ربات از شما شماره موبایل می‌خواهد؛ دکمهٔ «📱 ارسال شماره موبایل» را بزنید.</li>
-          <li>ربات شماره را با پنل شما تطبیق می‌دهد و از فردا ساعت ۹ صبح گزارش همین‌جا می‌رسد.</li>
+          <li>
+            ربات شماره را با پنل شما تطبیق می‌دهد؛ ساعت ارسال از همین پنل یا ربات قابل تنظیم است.
+          </li>
         </ol>
       )}
 
@@ -153,6 +183,30 @@ export function TelegramReportCard() {
           فعال‌سازی، گزارش‌ها می‌رسند.
         </p>
       )}
+
+      <form
+        onSubmit={saveTime}
+        className="grid gap-3 rounded-xl border border-border bg-[#f6faf5] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+      >
+        <Input
+          label="ساعت ارسال روزانه (به وقت تهران)"
+          type="time"
+          value={reportTime}
+          ltr
+          step={60}
+          required
+          onChange={(event) => {
+            setReportTime(event.target.value);
+            setTimeDirty(true);
+          }}
+          error={timeError}
+          hint="هر روز یک گزارش. اگر ساعت امروز گذشته باشد، تنظیم جدید از فردا اجرا می‌شود."
+          disabled={busy !== ''}
+        />
+        <Button type="submit" loading={busy === 'time'} disabled={busy !== ''}>
+          ذخیره ساعت ارسال
+        </Button>
+      </form>
 
       <form
         onSubmit={save}
@@ -199,8 +253,8 @@ export function TelegramConnectBanner() {
       <div className="min-w-[220px] flex-1">
         <p className="font-black text-[#143f36]">گزارش روزانه‌تان را در تلگرام بگیرید</p>
         <p className="mt-0.5 text-sm leading-6 text-[#3f5649]">
-          وارد ربات شوید، «شروع» را بزنید و شماره موبایل‌تان را ارسال کنید؛ هر روز ساعت ۹ صبح گزارش
-          اکسل بازاریاب‌های استان‌هایتان در تلگرام می‌رسد.
+          وارد ربات شوید، «شروع کنیم» را بزنید و شماره موبایل‌تان را ارسال کنید؛ ساعت گزارش روزانه
+          را از ربات یا پنل انتخاب کنید.
         </p>
       </div>
       <div className="flex gap-2">

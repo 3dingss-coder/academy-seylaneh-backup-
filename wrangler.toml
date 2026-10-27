@@ -42,7 +42,7 @@ EVENT_ARCHIVE_PRUNE = "off"
 # These expressions must match CRON_JOBS in functions/src/services/cron.ts. Times are UTC
 # (Tehran has no DST).
 [triggers]
-crons = ["*/15 * * * *", "0 * * * *", "30 4 * * *", "30 5 * * *", "30 6 * * *", "0 22 * * *"]
+crons = ["*/15 * * * *", "0 * * * *", "30 4 * * *", "* * * * *", "30 6 * * *", "0 22 * * *"]
 
 # Cloudflare D1 Database binding (SQLite at the edge — 100% free tier)
 # To connect your D1 database in Cloudflare Dashboard:

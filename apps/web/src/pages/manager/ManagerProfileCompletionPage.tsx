@@ -94,7 +94,7 @@ export function ManagerProfileCompletionPage() {
       if (me.telegramChatId) {
         toast.show({
           type: 'success',
-          message: 'تلگرام متصل شد؛ گزارش اول فردا ساعت ۹ صبح می‌رسد.',
+          message: 'تلگرام متصل شد؛ ساعت ارسال را از پروفایل یا ربات انتخاب کنید.',
         });
         navigate('/manager', { replace: true });
       } else {
@@ -124,7 +124,7 @@ export function ManagerProfileCompletionPage() {
                 <Send className="size-6" aria-hidden />
               </span>
               <div>
-                <h1 className="text-lg font-black text-[#143f36]">گزارش ساعت ۹ صبح در تلگرام</h1>
+                <h1 className="text-lg font-black text-[#143f36]">گزارش روزانه در تلگرام</h1>
                 <p className="mt-1 text-sm leading-6 text-[#52645b]">
                   وارد ربات تلگرام شوید، دکمهٔ «شروع» را بزنید و شماره موبایل‌تان را با دکمهٔ «📱
                   ارسال شماره موبایل» بفرستید. ربات شماره را با همین حساب مدیرتان (
@@ -133,8 +133,8 @@ export function ManagerProfileCompletionPage() {
                   ) : (
                     'شمارهٔ ورودتان'
                   )}
-                  ) تطبیق می‌دهد و از فردا، هر روز ساعت ۹ صبح گزارش اکسل بازاریاب‌های استان‌هایتان
-                  را در تلگرام می‌گیرید.
+                  ) تطبیق می‌دهد و در ساعت انتخابی شما، گزارش اکسل بازاریاب‌های استان‌هایتان را در
+                  تلگرام می‌گیرید.
                 </p>
               </div>
             </div>

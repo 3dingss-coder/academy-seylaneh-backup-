@@ -24,6 +24,7 @@ import {
 import type { Role, Team, User } from '../domain/types';
 import { audit, nowIso, SYSTEM, track, type Actor, type Deps } from './context';
 import { transferLearningHistory } from './history-transfer';
+import { reportTimeSchema } from '../telegram/schedule';
 import { normalizeTelegramChatId } from '../telegram/types';
 import { canonicalManagerProvinces, effectiveManagerProvinces, isTeamMarketer } from './team-scope';
 
@@ -269,6 +270,7 @@ export function publicUser(u: Doc<User>) {
     ...(u.role === 'manager'
       ? {
           telegramChatId: u.telegramChatId ?? null,
+          telegramReportTime: u.telegramReportTime ?? null,
           managerProvinces: effectiveManagerProvinces(u),
           managerProfileRequired: Boolean(u.managerProfileRequired),
           managerProfileCompletedAt: u.managerProfileCompletedAt ?? null,
@@ -671,6 +673,7 @@ export const patchMeSchema = z
     province: provinceSchema.optional(),
     city: citySchema.optional(),
     workplace: z.string().trim().max(80, 'محل فعالیت خیلی طولانی است.').nullable().optional(),
+    telegramReportTime: reportTimeSchema.nullable().optional(),
     telegramChatId: z.string().trim().max(24).nullable().optional(),
   })
   .superRefine(checkResidence)
@@ -697,7 +700,14 @@ export async function updateMe(d: Deps, user: Doc<User>, input: z.infer<typeof p
       'FORBIDDEN',
       'محدوده مدیریت مدیر از سوی ادمین تعیین می‌شود و از این بخش قابل تغییر نیست.',
     );
+  if (input.telegramReportTime !== undefined && user.role !== 'manager')
+    throw new ApiError('FORBIDDEN', 'تنظیم گزارش فقط برای مدیران در دسترس است.');
   const patch: Partial<User> = { updatedAt: nowIso(d) };
+  if (input.telegramReportTime !== undefined) {
+    patch.telegramReportTime = input.telegramReportTime;
+    if (input.telegramReportTime !== (user.telegramReportTime ?? null))
+      patch.telegramReportTimeUpdatedAt = nowIso(d);
+  }
   if (input.name !== undefined) patch.name = input.name;
   if (input.workplace !== undefined) patch.workplace = input.workplace;
   if (input.telegramChatId !== undefined)

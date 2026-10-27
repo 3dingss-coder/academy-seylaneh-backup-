@@ -97,18 +97,47 @@ export async function renderManagementWorkbook(report: ManagementReport): Promis
   set(44, 1, `تولید: ${reportDate(report.generatedAt)} · منبع: سامانه آکادمی سیلانه · زمان: تهران`);
   let data = '';
   for (let r = 1; r <= 44; r++) {
-    data += `<row r="${r}" ${frame.heights.get(r) ?? 'ht="22" customHeight="1"'}>`;
+    const height = [4, 8, 9, 13, 14, 24, 33, 34, 43].includes(r)
+      ? 4
+      : [1, 6, 11].includes(r)
+        ? 30
+        : [15, 25, 35].includes(r)
+          ? 25
+          : r >= 27 && r <= 32
+            ? 25
+            : 18;
+    data += `<row r="${r}" ht="${height}" customHeight="1">`;
     for (let c = 1; c <= 12; c++) {
       const ref = `${column(c)}${r}`;
       const kpiRow = [5, 6, 7, 10, 11, 12].includes(r);
-      const styleRef = kpiRow ? `A${r}` : ref;
+      const styleRef = kpiRow ? `A${r}` : r === 39 || r === 40 ? `${column(c)}36` : ref;
       data += cell(ref, values.get(ref), frame.cells.get(styleRef) ?? '0');
     }
     data += '</row>';
   }
   files['xl/worksheets/sheet1.xml'] = strToU8(
     pageSetup(
-      source.replace(/<sheetData>[\s\S]*?<\/sheetData>/, `<sheetData>${data}</sheetData>`),
+      source
+        .replace(/<sheetData>[\s\S]*?<\/sheetData>/, `<sheetData>${data}</sheetData>`)
+        .replace(
+          /<mergeCells count="(\d+)">/,
+          (_, count: string) => `<mergeCells count="${Number(count) + 8}">`,
+        )
+        .replace(
+          '</mergeCells>',
+          [39, 40]
+            .map((r) =>
+              [
+                ['A', 'D'],
+                ['E', 'F'],
+                ['G', 'J'],
+                ['K', 'L'],
+              ]
+                .map(([a, b]) => `<mergeCell ref="${a}${r}:${b}${r}"/>`)
+                .join(''),
+            )
+            .join('') + '</mergeCells>',
+        ),
       true,
     ),
   );
@@ -117,14 +146,32 @@ export async function renderManagementWorkbook(report: ManagementReport): Promis
     let xml = (template as Record<string, string>)[name];
     if (!xml) throw new Error('Missing report template');
     const styles = layout(xml);
-    const row = (r: number, values: Value[], styleRow: number, height = 42) =>
+    const row = (r: number, values: Value[], styleRow: number, height = 27) =>
       `<row r="${r}" ht="${height}" customHeight="1">${values.map((v, c) => cell(`${column(c + 1)}${r}`, v, styles.cells.get(`${column(c + 1)}${styleRow}`) ?? styles.cells.get(`A${styleRow}`) ?? '0')).join('')}</row>`;
     let body =
-      row(1, [`${report.title} · ${table.name}`], 1, 38) +
-      row(2, [`مدیر: ${report.managerName} · ${report.scopeName} · ${report.period}`], 2, 32) +
-      row(3, [table.note], 3, 30) +
-      row(5, table.columns, 5, 36);
-    if (table.rows.length) body += table.rows.map((v, j) => row(j + 6, v, j % 2 ? 7 : 6)).join('');
+      row(1, [`${report.title} · ${table.name}`], 1, 30) +
+      row(2, [`مدیر: ${report.managerName} · ${report.scopeName} · ${report.period}`], 2, 25) +
+      row(3, [table.note], 3, 22) +
+      row(5, table.columns, 5, 28);
+    if (table.rows.length)
+      body += table.rows
+        .map((v, j) => {
+          const lines = Math.max(
+            1,
+            ...v.map((value, c) =>
+              String(value ?? '')
+                .split('\n')
+                .reduce(
+                  (sum, line) =>
+                    sum +
+                    Math.max(1, Math.ceil(line.length / Math.max(8, (table.widths[c] ?? 20) - 2))),
+                  0,
+                ),
+            ),
+          );
+          return row(j + 6, v, j % 2 ? 7 : 6, Math.max(25, lines * 13 + 6));
+        })
+        .join('');
     else body += row(6, ['در این محدوده و بازه، رکوردی ثبت نشده است.'], 6);
     const end = Math.max(6, table.rows.length + 5);
     body += row(

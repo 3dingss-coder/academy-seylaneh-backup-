@@ -11,7 +11,8 @@ import type {
   Team,
   User,
 } from '../domain/types';
-import { audit, track, type Actor, type Deps } from './context';
+import { managerReportTime } from '../telegram/schedule';
+import { getPolicy, audit, track, type Actor, type Deps } from './context';
 import { loadLearningForUsers, loadUserLearning, type PackageView } from './learning-state';
 import { archivedReportKeys } from './archive';
 import { notifyTemplate } from './notify';
@@ -152,6 +153,8 @@ export async function managerProfile(d: Deps, manager: Doc<User>) {
       configured: Boolean(d.config.telegramBotToken),
       botUsername: d.config.telegramBotUsername || null,
       connected: Boolean(manager.telegramChatId),
+      reportTime: managerReportTime(manager, (await getPolicy(d)).managerDailyReportHour),
+      timeZone: (await getPolicy(d)).timezone,
     },
   };
 }

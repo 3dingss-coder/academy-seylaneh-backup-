@@ -58,15 +58,15 @@ describe('telegram daily Manager reports', () => {
     expect(ctx.deps.telegram.documents).toHaveLength(2);
   });
 
-  it('outside the 09:00 slot, and for managers without a chat id, nothing is sent', async () => {
+  it('before the selected time, and for managers without a chat id, nothing is sent', async () => {
     const { ctx, manager } = await setup();
     // No chat id yet — even a forced run skips this Manager.
     expect((await runDailyTelegramReports(ctx.deps, true)).sent).toBe(0);
 
     await ctx.deps.store.update(`users/${manager.id}`, { telegramChatId: '555000111' });
-    ctx.setNow('2026-10-03T06:30:00.000Z'); // 10:00 Tehran
+    ctx.setNow('2026-10-03T04:30:00.000Z'); // 08:00 Tehran
     const outside = await runDailyTelegramReports(ctx.deps);
-    expect(outside.skipped).toBe('outside_slot');
+    expect(outside.skippedManagers).toBe(1);
     expect(ctx.deps.telegram.documents).toHaveLength(0);
   });
 
